@@ -1,0 +1,3 @@
+-- Milestone 0: baseline migration, proves schema/connectivity before real
+-- tables (establishment, gate, ticket_type, subscription_status) land in
+-- Milestone 1/2.

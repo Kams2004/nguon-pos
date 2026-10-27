@@ -1,0 +1,3 @@
+-- Milestone 0: baseline migration, proves schema/connectivity before real
+-- tables (transaction, transaction_line, ticket, entry_scan) land in
+-- Milestone 1.

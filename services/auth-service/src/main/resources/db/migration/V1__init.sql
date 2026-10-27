@@ -1,0 +1,3 @@
+-- Milestone 0: baseline migration so Flyway's schema history table exists
+-- and the schema/connectivity path is proven before any real tables land.
+-- User/role tables arrive in Milestone 1.
