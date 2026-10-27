@@ -26,10 +26,10 @@ export default function GateHeader() {
         <div className="flex items-center gap-2 flex-shrink-0 order-3 sm:order-none sm:ml-auto">
           <span
             className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
-              isOnline ? "bg-secondary/20 text-foreground" : "bg-destructive/10 text-destructive"
+              isOnline ? "bg-green-100 text-green-800" : "bg-destructive/10 text-destructive"
             }`}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-secondary" : "bg-destructive"}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-green-500" : "bg-destructive"}`} />
             {isOnline ? "En ligne" : "Hors-ligne"}
           </span>
           {pendingCount > 0 && (

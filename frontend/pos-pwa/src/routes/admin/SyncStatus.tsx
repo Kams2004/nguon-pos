@@ -60,7 +60,7 @@ export default function SyncStatus() {
                 )}
                 <span
                   className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                    t.online ? "bg-secondary/20 text-foreground" : "bg-destructive/10 text-destructive"
+                    t.online ? "bg-green-100 text-green-800" : "bg-destructive/10 text-destructive"
                   }`}
                 >
                   {t.online ? "En ligne" : "Hors-ligne"}

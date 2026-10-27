@@ -4,10 +4,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme tokens mirrored from the Nguon festival site
-   (/home/kamsu-perold/NGUON/src/index.css) so this PWA matches the same
-   client/event's branding. Playfair Display is deliberately not imported
-   here — the source site imports it but never actually uses it. */
+/* Theme tokens: gold-primary / navy-structural palette, matching the POS
+   mockup the client approved (gold CTAs, deep-navy sidebar/headers with a
+   Bamoun diamond motif) — a deliberate departure from the main Nguon
+   festival site's blue-primary theme, confirmed with the client. The old
+   blue primary lives on as `secondary` (info pills, links, selected-state
+   highlights). Playfair Display is deliberately not imported here — the
+   source site imports it but never actually uses it. */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -19,50 +22,50 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 30% 12%;
 
-    --primary: 201 100% 35%;
-    --primary-foreground: 48 100% 96%;
+    --primary: 42 96% 51%;
+    --primary-foreground: 220 45% 14%;
 
-    --secondary: 48 100% 50%;
-    --secondary-foreground: 220 30% 12%;
+    --secondary: 201 100% 35%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 201 20% 95%;
-    --muted-foreground: 220 10% 46%;
+    --muted: 215 20% 95%;
+    --muted-foreground: 215 10% 46%;
 
-    --accent: 48 100% 50%;
-    --accent-foreground: 220 30% 12%;
+    --accent: 42 96% 93%;
+    --accent-foreground: 220 45% 14%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 201 20% 90%;
-    --input: 201 20% 90%;
-    --ring: 201 100% 35%;
+    --border: 215 20% 90%;
+    --input: 215 20% 90%;
+    --ring: 42 96% 51%;
 
     --radius: 0.5rem;
 
     --light-blue: 201 100% 35%;
     --dark-blue: 201 100% 28%;
-    --bright-yellow: 48 100% 50%;
-    --cream: 48 100% 96%;
+    --bright-yellow: 42 96% 51%;
+    --cream: 42 96% 96%;
     --warm-white: 40 30% 98%;
 
-    --gradient-hero: linear-gradient(135deg, hsl(201 100% 35%) 0%, hsl(201 100% 28%) 50%, hsl(220 30% 12%) 100%);
-    --gradient-gold: linear-gradient(135deg, hsl(48 100% 50%) 0%, hsl(45 100% 45%) 100%);
-    --gradient-section: linear-gradient(180deg, hsl(48 100% 96%) 0%, hsl(0 0% 100%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(201 100% 28%) 0%, hsl(220 30% 12%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(215 55% 16%) 0%, hsl(215 50% 12%) 50%, hsl(220 30% 8%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(42 96% 51%) 0%, hsl(38 96% 46%) 100%);
+    --gradient-section: linear-gradient(180deg, hsl(42 96% 96%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(215 50% 14%) 0%, hsl(220 30% 8%) 100%);
 
-    --shadow-soft: 0 4px 20px -4px hsl(201 100% 35% / 0.15);
-    --shadow-gold: 0 4px 30px -8px hsl(48 100% 50% / 0.4);
-    --shadow-elevated: 0 20px 60px -12px hsl(201 100% 35% / 0.25);
+    --shadow-soft: 0 4px 20px -4px hsl(215 50% 16% / 0.15);
+    --shadow-gold: 0 4px 30px -8px hsl(42 96% 51% / 0.4);
+    --shadow-elevated: 0 20px 60px -12px hsl(215 50% 16% / 0.25);
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 215 50% 14%;
+    --sidebar-foreground: 210 35% 92%;
+    --sidebar-primary: 42 96% 51%;
+    --sidebar-primary-foreground: 220 45% 14%;
+    --sidebar-accent: 215 40% 22%;
+    --sidebar-accent-foreground: 210 35% 95%;
+    --sidebar-border: 215 35% 24%;
+    --sidebar-ring: 42 96% 51%;
   }
 
   .dark {

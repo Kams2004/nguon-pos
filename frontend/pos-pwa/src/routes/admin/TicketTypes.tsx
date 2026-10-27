@@ -149,7 +149,7 @@ export default function TicketTypes() {
               <button
                 onClick={() => toggleActive(t)}
                 className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-                  t.active ? "bg-secondary/20 text-foreground" : "bg-muted text-muted-foreground"
+                  t.active ? "bg-green-100 text-green-800" : "bg-muted text-muted-foreground"
                 }`}
               >
                 {t.active ? "Actif" : "Désactivé"}

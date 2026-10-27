@@ -161,7 +161,7 @@ export default function Users() {
               <button
                 onClick={() => toggleActive(u)}
                 className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-                  u.active ? "bg-secondary/20 text-foreground" : "bg-muted text-muted-foreground"
+                  u.active ? "bg-green-100 text-green-800" : "bg-muted text-muted-foreground"
                 }`}
               >
                 {u.active ? "Actif" : "Désactivé"}

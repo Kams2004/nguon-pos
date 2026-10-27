@@ -35,21 +35,22 @@ export default function TicketCard({
 
   return (
     <div className="ticket-card rounded-[1.75rem] overflow-hidden bg-card border border-border shadow-lg shadow-black/5 break-inside-avoid">
-      <div className="relative bg-primary text-primary-foreground px-6 py-5 overflow-hidden">
+      <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary" />
+      <div className="relative bg-sidebar text-sidebar-foreground px-6 py-5 overflow-hidden">
         <div
-          className="absolute inset-0 opacity-25 mix-blend-soft-light"
+          className="absolute inset-0 opacity-20 mix-blend-soft-light"
           style={{ backgroundImage: "url(/img/diamond-pattern.svg)", backgroundSize: "140px" }}
         />
         <div className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <img src="/logo.png" alt="" className="h-8 flex-shrink-0 drop-shadow" />
+            <img src="/logo.png" alt="" className="h-8 flex-shrink-0 drop-shadow rounded bg-white/10 p-0.5" />
             <div className="min-w-0">
               <p className="font-display font-black text-sm leading-tight truncate">{establishment.name}</p>
-              <p className="text-[11px] text-white/75 truncate">{gate.name}</p>
+              <p className="text-[11px] text-sidebar-foreground/70 truncate">{gate.name}</p>
             </div>
           </div>
           {total > 1 && (
-            <span className="text-[11px] font-bold bg-white/15 rounded-full px-2.5 py-1 flex-shrink-0">
+            <span className="text-[11px] font-bold bg-primary text-primary-foreground rounded-full px-2.5 py-1 flex-shrink-0">
               {index + 1} / {total}
             </span>
           )}
@@ -62,7 +63,7 @@ export default function TicketCard({
           <h3 className="font-display text-xl font-black text-foreground mt-0.5">{ticketTypeName}</h3>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white shadow-inner">
+        <div className="p-3 rounded-2xl bg-white shadow-inner border-2 border-primary/30">
           {qrImage ? (
             <img src={qrImage} alt={ticketNumber} className="w-44 h-44" />
           ) : (
@@ -70,7 +71,9 @@ export default function TicketCard({
           )}
         </div>
 
-        <p className="font-mono font-bold text-sm text-foreground tracking-wide">N° {ticketNumber}</p>
+        <p className="font-mono font-bold text-sm text-foreground tracking-wide">
+          N° <span className="text-[hsl(38,80%,42%)]">{ticketNumber}</span>
+        </p>
 
         <div className="w-full border-t border-dashed border-border" />
 

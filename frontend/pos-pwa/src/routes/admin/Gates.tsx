@@ -95,7 +95,7 @@ export default function Gates() {
               <button
                 onClick={() => toggleActive(g)}
                 className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-                  g.active ? "bg-secondary/20 text-foreground" : "bg-muted text-muted-foreground"
+                  g.active ? "bg-green-100 text-green-800" : "bg-muted text-muted-foreground"
                 }`}
               >
                 {g.active ? "Active" : "Désactivée"}

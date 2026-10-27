@@ -30,7 +30,7 @@ export default function Login() {
       {/* Hero — hidden on small screens, the gate laptop's own branding moment */}
       <div className="hidden lg:block relative overflow-hidden">
         <img src="/img/login-hero.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[hsl(220,30%,8%)] via-[hsl(201,100%,20%)]/75 to-[hsl(201,100%,35%)]/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[hsl(220,30%,8%)] via-[hsl(215,50%,14%)]/80 to-[hsl(215,50%,22%)]/40" />
         <div
           className="absolute inset-0 opacity-20 mix-blend-soft-light"
           style={{ backgroundImage: "url(/img/diamond-pattern.svg)", backgroundSize: "220px" }}

@@ -65,7 +65,7 @@ export default function Sales() {
                   <td className="px-4 py-2.5">
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        t.status === "VOIDED" ? "bg-destructive/10 text-destructive" : "bg-secondary/20 text-foreground"
+                        t.status === "VOIDED" ? "bg-destructive/10 text-destructive" : "bg-green-100 text-green-800"
                       }`}
                     >
                       {t.status === "VOIDED" ? "Annulée" : "Complétée"}

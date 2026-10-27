@@ -51,17 +51,28 @@ export default function Scan() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div
-            className={`relative rounded-[1.75rem] border-2 border-dashed p-8 flex flex-col items-center gap-3 transition-colors ${
-              scanning ? "border-primary bg-primary/5" : "border-border bg-card"
-            }`}
-          >
+          <div className="relative rounded-[1.75rem] bg-sidebar p-8 flex flex-col items-center gap-4 overflow-hidden">
             <div
-              className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl ${
-                scanning ? "bg-primary/15 animate-pulse" : "bg-muted"
+              className="absolute inset-0 opacity-10 mix-blend-soft-light"
+              style={{ backgroundImage: "url(/img/diamond-pattern.svg)", backgroundSize: "160px" }}
+            />
+            {/* Viewfinder frame — a visual nod to camera-style scanning, though
+                this gate reads tickets as HID/manual text input, not a live
+                camera feed (see offline-first architecture notes). */}
+            <div
+              className={`relative w-40 h-40 rounded-2xl flex items-center justify-center transition-colors ${
+                scanning ? "bg-primary/10" : ""
               }`}
             >
-              ▭
+              {(["top-2 left-2 border-t-2 border-l-2", "top-2 right-2 border-t-2 border-r-2", "bottom-2 left-2 border-b-2 border-l-2", "bottom-2 right-2 border-b-2 border-r-2"] as const).map(
+                (pos) => (
+                  <span
+                    key={pos}
+                    className={`absolute w-7 h-7 rounded-sm ${pos} ${scanning ? "border-primary" : "border-sidebar-foreground/40"}`}
+                  />
+                ),
+              )}
+              <span className={`text-4xl ${scanning ? "animate-pulse text-primary" : "text-sidebar-foreground/50"}`}>▭</span>
             </div>
             <input
               ref={inputRef}
@@ -70,7 +81,7 @@ export default function Scan() {
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="Scanner ou coller le contenu du billet…"
-              className="w-full text-center border border-input rounded-xl px-4 py-3 text-sm font-mono bg-background focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              className="relative w-full text-center border border-sidebar-border rounded-xl px-4 py-3 text-sm font-mono bg-white/95 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary"
               disabled={scanning}
             />
           </div>
@@ -84,7 +95,7 @@ export default function Scan() {
 
 function ResultCard({ result }: { result: ScanOutcome }) {
   const styles: Record<ScanOutcome["kind"], { bg: string; text: string; icon: string; label: string }> = {
-    ACCEPTED: { bg: "bg-secondary/15", text: "text-foreground", icon: "✓", label: "Entrée autorisée" },
+    ACCEPTED: { bg: "bg-green-100", text: "text-green-800", icon: "✓", label: "Entrée autorisée" },
     REJECTED_ALREADY_REDEEMED: { bg: "bg-destructive/10", text: "text-destructive", icon: "✕", label: "Déjà utilisé" },
     REJECTED_INVALID_SIGNATURE: { bg: "bg-destructive/10", text: "text-destructive", icon: "✕", label: "Billet invalide" },
     REJECTED_WRONG_GATE: { bg: "bg-destructive/10", text: "text-destructive", icon: "✕", label: "Mauvaise porte" },
