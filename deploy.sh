@@ -36,8 +36,24 @@ down() {
 
 redeploy_service() {
     local service="$1"
-    echo "Rebuilding and redeploying: $service"
-    docker-compose up -d --build "$service"
+    echo "Rebuilding: $service"
+    docker-compose build "$service"
+    # This docker-compose (1.29.2) hits `KeyError: 'ContainerConfig'` trying
+    # to recreate-in-place against this Docker daemon's image metadata
+    # format — remove the old container first so it creates fresh instead
+    # of recreating. (The real fix is the `docker compose` v2 plugin; this
+    # workaround exists until that's installed here.)
+    docker-compose rm -f -s "$service"
+    docker-compose up -d "$service"
+
+    if [ "$service" != "nginx" ]; then
+        # nginx's proxy_pass targets are plain hostnames (deliberately, see
+        # nginx/pos.nguonevents.com.conf) resolved once at startup — a
+        # redeployed backend container gets a new IP, so nginx needs a
+        # restart too or it silently proxies to the old, now-dead address.
+        echo "Restarting nginx to pick up $service's new address..."
+        docker-compose restart nginx
+    fi
 }
 
 backup() {

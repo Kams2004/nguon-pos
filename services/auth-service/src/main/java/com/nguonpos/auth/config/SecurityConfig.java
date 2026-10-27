@@ -2,21 +2,31 @@ package com.nguonpos.auth.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-// Secure-by-default from the first commit: only the health probe is public,
-// everything else requires authentication even though no JWT filter exists
-// yet (that lands in Milestone 1). This is the opposite default posture of
-// the old Nguon backend's `.anyRequest().permitAll()` — nothing here is
-// reachable until it is explicitly allowed.
+// Secure-by-default: only login and the health probe are public. The JWT
+// filter populates the security context for every other request; nothing is
+// reachable without a valid token, and @PreAuthorize on individual endpoints
+// (added as they're built) enforces the CASHIER/COORDINATOR/SUPER_ADMIN
+// tiers — unlike the old Nguon backend, which left `.anyRequest().permitAll()`
+// and never actually enforced its roles anywhere.
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -24,9 +34,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health/**").permitAll()
+                        // /error deliberately permitted — see sales-service's
+                        // SecurityConfig for why (an unhandled exception's
+                        // internal forward to /error gets denied otherwise,
+                        // surfacing every server error as a misleading 403).
+                        .requestMatchers("/actuator/health/**", "/auth/login", "/error").permitAll()
                         .anyRequest().authenticated()
-                );
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
