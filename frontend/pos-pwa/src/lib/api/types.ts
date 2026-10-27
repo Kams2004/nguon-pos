@@ -81,4 +81,49 @@ export type TransactionSummary = {
   gateId: string;
   createdAtClient: string;
   syncedAt: string;
+  voidedByUserId: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+};
+
+export type PrintMode = "STANDARD" | "INDIVIDUAL" | "INHERIT_ESTABLISHMENT";
+export type ReceiptMode = "STANDARD" | "INDIVIDUAL_TICKETS" | "CONFIGURABLE_PER_TICKET_TYPE";
+
+export type AdminGate = { id: string; name: string; code: string; active: boolean };
+
+export type AdminTicketType = {
+  id: string;
+  gateId: string | null;
+  name: string;
+  price: number;
+  currency: string;
+  printMode: PrintMode;
+  active: boolean;
+};
+
+export type AdminEstablishment = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  brandPrimaryColor: string | null;
+  brandSecondaryColor: string | null;
+  receiptMode: ReceiptMode;
+};
+
+export type AdminUser = {
+  id: string;
+  username: string;
+  fullName: string;
+  role: Role;
+  assignedGateId: string | null;
+  active: boolean;
+};
+
+export type TerminalStatus = {
+  terminalId: string;
+  gateId: string;
+  deviceLabel: string | null;
+  lastSeenAt: string;
+  localPendingCount: number;
+  online: boolean;
 };

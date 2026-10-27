@@ -1,4 +1,4 @@
-import type { Session } from "../../lib/offline/session";
+import type { GateSession } from "../../lib/offline/session";
 import type { PaymentMethod } from "../../lib/api/types";
 import type { IssuedTicket } from "../../lib/offline/sale";
 
@@ -10,7 +10,7 @@ const PAYMENT_LABELS: Record<PaymentMethod, string> = {
 };
 
 export type ReceiptProps = {
-  session: Session;
+  session: GateSession;
   localReference: string; // the client-generated transaction id — see note below
   synced: boolean;
   serverReference: string | null;

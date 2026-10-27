@@ -1,10 +1,18 @@
 import type {
+  AdminEstablishment,
+  AdminGate,
+  AdminTicketType,
+  AdminUser,
   BootstrapResponse,
   LoginResponse,
+  PrintMode,
+  ReceiptMode,
+  Role,
   SaleSyncEntry,
   SaleSyncResult,
   ScanSyncEntry,
   ScanSyncResult,
+  TerminalStatus,
   TransactionSummary,
 } from "./types";
 
@@ -94,9 +102,128 @@ export const api = {
     });
   },
 
-  listTransactions(token: string): Promise<{ content: TransactionSummary[]; totalElements: number }> {
-    return request(`${SALES_BASE}/sales/transactions`, {
+  listTransactions(
+    token: string,
+    page = 0,
+    size = 25,
+  ): Promise<{ content: TransactionSummary[]; totalElements: number; totalPages: number }> {
+    return request(`${SALES_BASE}/sales/transactions?page=${page}&size=${size}`, {
       headers: authHeader(token),
+    });
+  },
+
+  voidTransaction(token: string, id: string, reason: string): Promise<TransactionSummary> {
+    return request(`${SALES_BASE}/sales/transactions/${id}/void`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  syncStatus(token: string): Promise<TerminalStatus[]> {
+    return request(`${SALES_BASE}/sales/admin/sync-status`, {
+      headers: authHeader(token),
+    });
+  },
+
+  // ── Admin: catalog ──────────────────────────────────────────────────
+
+  listGates(token: string): Promise<AdminGate[]> {
+    return request(`${CATALOG_BASE}/catalog/admin/gates`, { headers: authHeader(token) });
+  },
+
+  createGate(token: string, name: string, code: string): Promise<AdminGate> {
+    return request(`${CATALOG_BASE}/catalog/admin/gates`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify({ name, code }),
+    });
+  },
+
+  updateGate(token: string, id: string, name: string, active: boolean): Promise<AdminGate> {
+    return request(`${CATALOG_BASE}/catalog/admin/gates/${id}`, {
+      method: "PUT",
+      headers: authHeader(token),
+      body: JSON.stringify({ name, active }),
+    });
+  },
+
+  listTicketTypesAdmin(token: string): Promise<AdminTicketType[]> {
+    return request(`${CATALOG_BASE}/catalog/admin/ticket-types`, { headers: authHeader(token) });
+  },
+
+  createTicketType(
+    token: string,
+    data: { gateId: string | null; name: string; price: number; currency: string; printMode: PrintMode },
+  ): Promise<AdminTicketType> {
+    return request(`${CATALOG_BASE}/catalog/admin/ticket-types`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateTicketType(
+    token: string,
+    id: string,
+    data: { gateId: string | null; name: string; price: number; currency: string; printMode: PrintMode },
+  ): Promise<AdminTicketType> {
+    return request(`${CATALOG_BASE}/catalog/admin/ticket-types/${id}`, {
+      method: "PUT",
+      headers: authHeader(token),
+      body: JSON.stringify(data),
+    });
+  },
+
+  setTicketTypeActive(token: string, id: string, active: boolean): Promise<AdminTicketType> {
+    return request(`${CATALOG_BASE}/catalog/admin/ticket-types/${id}/active`, {
+      method: "PUT",
+      headers: authHeader(token),
+      body: JSON.stringify({ active }),
+    });
+  },
+
+  getEstablishment(token: string): Promise<AdminEstablishment> {
+    return request(`${CATALOG_BASE}/catalog/admin/establishment`, { headers: authHeader(token) });
+  },
+
+  updateEstablishment(
+    token: string,
+    data: { name: string; logoUrl: string | null; brandPrimaryColor: string | null; brandSecondaryColor: string | null; receiptMode: ReceiptMode },
+  ): Promise<AdminEstablishment> {
+    return request(`${CATALOG_BASE}/catalog/admin/establishment`, {
+      method: "PUT",
+      headers: authHeader(token),
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ── Admin: users ─────────────────────────────────────────────────────
+
+  listUsers(token: string): Promise<AdminUser[]> {
+    return request(`${AUTH_BASE}/auth/admin/users`, { headers: authHeader(token) });
+  },
+
+  createUser(
+    token: string,
+    data: { username: string; password: string; fullName: string; role: Role; assignedGateId: string | null },
+  ): Promise<AdminUser> {
+    return request(`${AUTH_BASE}/auth/admin/users`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateUser(
+    token: string,
+    id: string,
+    data: { fullName: string; role: Role; assignedGateId: string | null; active: boolean; password?: string },
+  ): Promise<AdminUser> {
+    return request(`${AUTH_BASE}/auth/admin/users/${id}`, {
+      method: "PUT",
+      headers: authHeader(token),
+      body: JSON.stringify(data),
     });
   },
 };

@@ -1,7 +1,7 @@
 import type { PaymentMethod } from "../api/types";
 import { signTicket, type TicketPayload } from "../qr/ticketSignature";
 import { cacheTicket, writeOutboxEntry, type SaleOutboxPayload } from "./db";
-import type { Session } from "./session";
+import type { GateSession } from "./session";
 
 export type CartLine = { ticketTypeId: string; quantity: number; unitPrice: number };
 
@@ -27,7 +27,7 @@ export type SaleResult = {
  * Only after both writes resolve does this return — the caller must not
  * tell the cashier "Saved" before that. See docs/SYNC_PROTOCOL.md.
  */
-export async function createSale(session: Session, cart: CartLine[], paymentMethod: PaymentMethod): Promise<SaleResult> {
+export async function createSale(session: GateSession, cart: CartLine[], paymentMethod: PaymentMethod): Promise<SaleResult> {
   const transactionId = crypto.randomUUID();
   const createdAtClient = new Date().toISOString();
   const shortId = transactionId.split("-")[0];

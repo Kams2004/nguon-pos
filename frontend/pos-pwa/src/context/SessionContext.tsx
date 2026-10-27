@@ -1,6 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { api } from "../lib/api/client";
-import { clearSession, getOrCreateTerminalId, loadSession, saveSession, type Session } from "../lib/offline/session";
+import {
+  clearSession,
+  getOrCreateTerminalId,
+  loadSession,
+  saveSession,
+  type GateSession,
+  type Session,
+} from "../lib/offline/session";
 import { runSync } from "../lib/offline/sync";
 import { countPendingOutbox } from "../lib/offline/db";
 
@@ -9,7 +16,7 @@ type SessionContextValue = {
   terminalId: string;
   isOnline: boolean;
   pendingCount: number;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<Session>;
   logout: () => void;
   syncNow: () => Promise<void>;
   refreshPendingCount: () => void;
@@ -28,8 +35,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const syncNow = useCallback(async () => {
-    if (!session || !navigator.onLine) return;
-    await runSync(session, terminalId);
+    // Gateless sessions (SUPER_ADMIN, potentially COORDINATOR) never have
+    // an outbox to sync — they don't operate a gate terminal.
+    if (!session || !session.bootstrap || !navigator.onLine) return;
+    await runSync(session as GateSession, terminalId);
     refreshPendingCount();
   }, [session, terminalId, refreshPendingCount]);
 
@@ -62,7 +71,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     const loginRes = await api.login(username, password);
-    const bootstrap = await api.bootstrap(loginRes.token);
+    // A gateless user (SUPER_ADMIN, and potentially COORDINATOR) has
+    // nothing to bootstrap — the endpoint requires a gate and would 400.
+    const bootstrap = loginRes.assignedGateId ? await api.bootstrap(loginRes.token) : null;
     const newSession: Session = {
       token: loginRes.token,
       userId: loginRes.userId,
@@ -75,6 +86,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
     saveSession(newSession);
     setSession(newSession);
+    return newSession;
   }, []);
 
   const logout = useCallback(() => {

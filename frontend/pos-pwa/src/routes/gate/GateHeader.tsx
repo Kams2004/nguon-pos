@@ -10,7 +10,7 @@ export default function GateHeader() {
       <div className="flex items-center gap-3 min-w-0">
         <img src="/logo.png" alt="Nguon" className="h-8 flex-shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-foreground truncate">{session?.bootstrap.gate.name}</p>
+          <p className="text-sm font-bold text-foreground truncate">{session?.bootstrap?.gate.name}</p>
           <p className="text-xs text-muted-foreground truncate">{session?.fullName}</p>
         </div>
       </div>
@@ -32,6 +32,14 @@ export default function GateHeader() {
         >
           Scanner
         </Link>
+        {(session?.role === "SUPER_ADMIN" || session?.role === "COORDINATOR") && (
+          <Link
+            to="/admin/sales"
+            className="text-xs font-bold px-3 py-1.5 rounded-full text-muted-foreground hover:bg-muted transition-colors"
+          >
+            Admin
+          </Link>
+        )}
       </nav>
 
       <div className="flex items-center gap-2 flex-shrink-0">

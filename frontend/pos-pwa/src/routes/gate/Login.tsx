@@ -15,8 +15,10 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      await login(username, password);
-      navigate("/gate/sell");
+      const session = await login(username, password);
+      // A gateless user (SUPER_ADMIN, and potentially COORDINATOR) has no
+      // gate terminal to operate — send them straight to the admin area.
+      navigate(session.assignedGateId ? "/gate/sell" : "/admin/sales");
     } catch {
       setError("Identifiants invalides.");
     } finally {

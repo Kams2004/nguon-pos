@@ -15,8 +15,18 @@ export type Session = {
   role: LoginResponse["role"];
   establishmentId: string;
   assignedGateId: string | null;
-  bootstrap: BootstrapResponse;
+  // null for a user with no assigned gate (SUPER_ADMIN, and potentially
+  // COORDINATOR) — catalog-service's /bootstrap endpoint requires a gate,
+  // so these users skip it entirely and go straight to /admin instead of
+  // a gate terminal screen.
+  bootstrap: BootstrapResponse | null;
 };
+
+/** A session known to belong to a gate-assigned user — bootstrap data is
+ * guaranteed present. The gate screens (Sell/Scan) are only ever reached
+ * via RequireGateSession in App.tsx, which enforces exactly this before
+ * they render, so narrowing to this type there is safe, not just hopeful. */
+export type GateSession = Session & { assignedGateId: string; bootstrap: BootstrapResponse };
 
 export function saveSession(session: Session): void {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));

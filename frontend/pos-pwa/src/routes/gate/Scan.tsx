@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useSession } from "../../context/SessionContext";
 import { scanTicket, type ScanOutcome } from "../../lib/offline/scan";
+import type { GateSession } from "../../lib/offline/session";
 import GateHeader from "./GateHeader";
 
 // A real USB QR/barcode scanner acts as a keyboard-emulation (HID) device:
@@ -15,7 +16,11 @@ export default function Scan() {
   const [scanning, setScanning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  if (!session) return null;
+  // See Sell.tsx for why this is just a type-narrowing formality.
+  if (!session || !session.assignedGateId || !session.bootstrap) return null;
+  // Explicit local, not just the narrowed `session` — narrowing from the
+  // guard above doesn't reliably persist into the nested closure below.
+  const gateSession = session as GateSession;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +28,7 @@ export default function Scan() {
     if (!content) return;
     setScanning(true);
     try {
-      const outcome = await scanTicket(session, content);
+      const outcome = await scanTicket(gateSession, content);
       setResult(outcome);
       refreshPendingCount();
       syncNow(); // fire-and-forget

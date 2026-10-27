@@ -18,4 +18,6 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
               AND (t.gateId = :gateId OR t.gateId IS NULL)
             """)
     List<TicketType> findSellableAtGate(@Param("establishmentId") UUID establishmentId, @Param("gateId") UUID gateId);
+
+    List<TicketType> findByEstablishmentIdOrderByNameAsc(UUID establishmentId);
 }

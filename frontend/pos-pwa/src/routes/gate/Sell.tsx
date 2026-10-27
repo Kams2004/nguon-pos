@@ -2,6 +2,7 @@ import { useState } from "react";
 import QRCode from "qrcode";
 import { useSession } from "../../context/SessionContext";
 import { createSale, type CartLine, type IssuedTicket } from "../../lib/offline/sale";
+import type { GateSession } from "../../lib/offline/session";
 import type { PaymentMethod } from "../../lib/api/types";
 import GateHeader from "./GateHeader";
 import Receipt from "./Receipt";
@@ -24,7 +25,7 @@ type CompletedSale = {
 
 export default function Sell() {
   const { session, syncNow, refreshPendingCount } = useSession();
-  const ticketTypes = session?.bootstrap.ticketTypes ?? [];
+  const ticketTypes = session?.bootstrap?.ticketTypes ?? [];
   const [selectedTypeId, setSelectedTypeId] = useState(ticketTypes[0]?.id ?? "");
   const [quantity, setQuantity] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
@@ -32,7 +33,14 @@ export default function Sell() {
   const [qrImages, setQrImages] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  if (!session) return null;
+  // RequireGateSession (App.tsx) guarantees a gate-assigned session with
+  // bootstrap data before this screen ever renders — this check is just
+  // what lets TypeScript narrow `session` to GateSession for the rest of
+  // the component.
+  if (!session || !session.assignedGateId || !session.bootstrap) return null;
+  // Explicit local, not just the narrowed `session` — narrowing from the
+  // guard above doesn't reliably persist into the nested closures below.
+  const gateSession = session as GateSession;
   const ticketType = ticketTypes.find((t) => t.id === selectedTypeId) ?? ticketTypes[0];
 
   const handleConfirm = async () => {
@@ -40,7 +48,7 @@ export default function Sell() {
     setSubmitting(true);
     try {
       const cart: CartLine[] = [{ ticketTypeId: ticketType.id, quantity, unitPrice: ticketType.price }];
-      const result = await createSale(session, cart, paymentMethod);
+      const result = await createSale(gateSession, cart, paymentMethod);
       // Only AFTER the offline write resolves do we render/print — see
       // docs/SYNC_PROTOCOL.md's "golden rule".
       setCompletedSale({
@@ -90,7 +98,7 @@ export default function Sell() {
           </div>
 
           <Receipt
-            session={session}
+            session={gateSession}
             localReference={completedSale.transactionId}
             synced={false}
             serverReference={null}

@@ -7,7 +7,7 @@ import {
   type SaleOutboxPayload,
   type ScanOutboxPayload,
 } from "./db";
-import type { Session } from "./session";
+import type { GateSession } from "./session";
 
 const BATCH_SIZE = 25;
 
@@ -24,7 +24,7 @@ export type SyncSummary = { salesSynced: number; scansSynced: number; failed: nu
  * (e.g. on an interval, or on the browser's `online` event) — entries
  * already SYNCED are never re-sent, and a re-sent batch is a no-op on the
  * server thanks to the idempotency-key dedup (see docs/SYNC_PROTOCOL.md). */
-export async function runSync(session: Session, terminalId: string): Promise<SyncSummary> {
+export async function runSync(session: GateSession, terminalId: string): Promise<SyncSummary> {
   const summary: SyncSummary = { salesSynced: 0, scansSynced: 0, failed: 0 };
   const gateId = session.bootstrap.gate.id;
 

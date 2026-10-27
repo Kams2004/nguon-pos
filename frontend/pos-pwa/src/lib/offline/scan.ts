@@ -1,6 +1,6 @@
 import { verifyTicketSignature } from "../qr/ticketSignature";
 import { getCachedTicket, markTicketRedeemed, writeOutboxEntry } from "./db";
-import type { Session } from "./session";
+import type { GateSession } from "./session";
 
 export type ScanOutcome =
   | { kind: "ACCEPTED"; ticketNumber: string }
@@ -25,7 +25,7 @@ export type ScanOutcome =
  * worth reporting; a "not recognized" case is a display state, not an
  * audit event, since there is nothing to usefully sync without a trusted id.
  */
-export async function scanTicket(session: Session, qrContent: string): Promise<ScanOutcome> {
+export async function scanTicket(session: GateSession, qrContent: string): Promise<ScanOutcome> {
   const verified = await verifyTicketSignature(qrContent, session.bootstrap.gate.signingSecret);
   if (!verified.ok) {
     return { kind: "REJECTED_INVALID_SIGNATURE" };
