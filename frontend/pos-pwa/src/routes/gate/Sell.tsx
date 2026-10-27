@@ -6,6 +6,7 @@ import type { GateSession } from "../../lib/offline/session";
 import type { PaymentMethod } from "../../lib/api/types";
 import GateHeader from "./GateHeader";
 import Receipt from "./Receipt";
+import TicketCard from "./TicketCard";
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "CASH", label: "Espèces" },
@@ -79,57 +80,64 @@ export default function Sell() {
 
   if (completedSale) {
     const soldType = ticketTypes.find((t) => t.id === completedSale.ticketTypeId)!;
-    const isIndividual = soldType.printMode !== "STANDARD";
 
     return (
       <div className="min-h-screen bg-background">
         <div className="no-print">
           <GateHeader />
         </div>
-        <div className="max-w-2xl mx-auto p-6 space-y-6">
+        <div className="max-w-5xl mx-auto p-6 space-y-8">
           <div className="no-print text-center space-y-1">
             <div className="w-14 h-14 rounded-full bg-secondary/20 flex items-center justify-center mx-auto">
               <span className="text-2xl">✓</span>
             </div>
             <h2 className="font-display text-xl font-bold text-foreground">Vente enregistrée</h2>
             <p className="text-sm text-muted-foreground">
-              {completedSale.tickets.length} billet(s) — prêts à être présentés
+              {completedSale.tickets.length === 1
+                ? "1 billet prêt à être présenté"
+                : `${completedSale.tickets.length} billets séparés, chacun prêt à être présenté`}
             </p>
           </div>
 
-          <Receipt
-            session={gateSession}
-            localReference={completedSale.transactionId}
-            synced={false}
-            serverReference={null}
-            createdAtClient={completedSale.createdAtClient}
-            ticketTypeName={soldType.name}
-            unitPrice={soldType.price}
-            currency={soldType.currency}
-            quantity={completedSale.quantity}
-            paymentMethod={completedSale.paymentMethod}
-            tickets={completedSale.tickets}
-            qrImages={qrImages}
-            printMode={soldType.printMode}
-          />
+          <div className="max-w-xs mx-auto">
+            <Receipt
+              session={gateSession}
+              localReference={completedSale.transactionId}
+              synced={false}
+              serverReference={null}
+              createdAtClient={completedSale.createdAtClient}
+              ticketTypeName={soldType.name}
+              unitPrice={soldType.price}
+              currency={soldType.currency}
+              quantity={completedSale.quantity}
+              paymentMethod={completedSale.paymentMethod}
+              tickets={completedSale.tickets}
+            />
+          </div>
 
-          {isIndividual && (
-            <div className="no-print">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
-                Billets individuels à découper
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {completedSale.tickets.map((t) => (
-                  <div key={t.id} className="rounded-2xl border border-border bg-card p-4 text-center space-y-2">
-                    {qrImages[t.id] && <img src={qrImages[t.id]} alt={t.ticketNumber} className="mx-auto rounded-lg" />}
-                    <p className="text-xs font-mono font-bold text-foreground">{t.ticketNumber}</p>
-                  </div>
-                ))}
-              </div>
+          <div>
+            <p className="no-print text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3 text-center">
+              {completedSale.tickets.length > 1 ? "Billets individuels — un par entrée" : "Billet"}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {completedSale.tickets.map((t, i) => (
+                <TicketCard
+                  key={t.id}
+                  session={gateSession}
+                  ticketNumber={t.ticketNumber}
+                  ticketTypeName={soldType.name}
+                  price={soldType.price}
+                  currency={soldType.currency}
+                  createdAtClient={completedSale.createdAtClient}
+                  qrImage={qrImages[t.id]}
+                  index={i}
+                  total={completedSale.tickets.length}
+                />
+              ))}
             </div>
-          )}
+          </div>
 
-          <div className="no-print flex gap-3">
+          <div className="no-print flex gap-3 max-w-xs mx-auto">
             <button
               onClick={() => window.print()}
               className="flex-1 py-3 rounded-xl border-2 border-primary text-primary font-bold"
@@ -151,27 +159,29 @@ export default function Sell() {
   return (
     <div className="min-h-screen bg-background">
       <GateHeader />
-      <div className="max-w-md mx-auto p-6 space-y-6">
-        <h2 className="font-display text-lg font-bold text-foreground">Vendre un billet</h2>
+      <div className="max-w-5xl mx-auto p-4 sm:p-6">
+        <h2 className="font-display text-xl font-bold text-foreground mb-5">Vendre un billet</h2>
 
         {ticketTypes.length === 0 ? (
           <p className="text-sm text-muted-foreground">Aucun type de billet configuré pour cette porte.</p>
         ) : (
-          <>
+          <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Type de billet</p>
-              <div className="space-y-2">
+              <div className="grid sm:grid-cols-2 gap-3">
                 {ticketTypes.map((t) => (
                   <button
                     key={t.id}
                     type="button"
                     onClick={() => setSelectedTypeId(t.id)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-colors flex items-center justify-between ${
-                      selectedTypeId === t.id ? "border-primary bg-primary/10" : "border-border"
+                    className={`text-left px-4 py-4 rounded-2xl border-2 transition-all flex items-center justify-between gap-2 ${
+                      selectedTypeId === t.id
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border bg-card hover:border-primary/40"
                     }`}
                   >
                     <span className="font-bold text-foreground">{t.name}</span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
                       {t.price.toLocaleString("fr-FR")} {t.currency}
                     </span>
                   </button>
@@ -180,13 +190,16 @@ export default function Sell() {
             </div>
 
             {ticketType && (
-              <>
-                <div className="rounded-2xl border border-border bg-card p-5">
+              <div className="rounded-[1.75rem] border border-border bg-card p-5 space-y-5 lg:sticky lg:top-6">
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 text-center">
+                    Quantité
+                  </p>
                   <div className="flex items-center justify-center gap-4">
                     <button
                       type="button"
                       onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                      className="w-10 h-10 rounded-xl border border-border font-bold text-lg"
+                      className="w-10 h-10 rounded-xl border border-border font-bold text-lg hover:bg-muted transition-colors"
                     >
                       −
                     </button>
@@ -194,11 +207,16 @@ export default function Sell() {
                     <button
                       type="button"
                       onClick={() => setQuantity((q) => q + 1)}
-                      className="w-10 h-10 rounded-xl border border-border font-bold text-lg"
+                      className="w-10 h-10 rounded-xl border border-border font-bold text-lg hover:bg-muted transition-colors"
                     >
                       +
                     </button>
                   </div>
+                  {quantity > 1 && (
+                    <p className="text-[11px] text-center text-muted-foreground mt-2">
+                      {quantity} billets séparés seront générés
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -229,13 +247,20 @@ export default function Sell() {
                 <button
                   onClick={handleConfirm}
                   disabled={submitting}
-                  className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold shadow-md disabled:opacity-60"
+                  className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold shadow-md shadow-primary/20 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  {submitting ? "Enregistrement…" : "Confirmer la vente"}
+                  {submitting ? (
+                    <>
+                      <span className="w-4 h-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
+                      Enregistrement…
+                    </>
+                  ) : (
+                    "Confirmer la vente"
+                  )}
                 </button>
-              </>
+              </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

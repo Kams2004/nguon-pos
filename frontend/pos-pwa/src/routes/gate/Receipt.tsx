@@ -21,20 +21,18 @@ export type ReceiptProps = {
   quantity: number;
   paymentMethod: PaymentMethod;
   tickets: IssuedTicket[];
-  qrImages: Record<string, string>;
-  // STANDARD: one combined receipt, all QR codes listed inline (e.g. a
-  // group pass — the point is one proof-of-purchase, not per-person
-  // tear-apart cards). INDIVIDUAL: this receipt is the summary slip;
-  // Sell.tsx also renders each ticket as its own separate card alongside it.
-  printMode: "STANDARD" | "INDIVIDUAL" | "INHERIT_ESTABLISHMENT";
 };
 
 /**
  * Compact, thermal-printer-width receipt (72mm print area, the printable
- * width on a standard 80mm roll). The transaction hasn't necessarily synced
- * yet when this prints — offline sales must still produce a usable receipt
- * — so it shows the client-generated reference with a clear "not yet
- * synced" note rather than blocking on or faking a server reference number.
+ * width on a standard 80mm roll) — the payment/till slip. It proves what
+ * was paid, never an entry credential: it carries no QR code, however many
+ * tickets the sale produced. Every ticket is always its own full TicketCard
+ * (see TicketCard.tsx) — one admission, one card, one QR, no exceptions.
+ * The transaction hasn't necessarily synced yet when this prints — offline
+ * sales must still produce a usable receipt — so it shows the
+ * client-generated reference with a clear "not yet synced" note rather than
+ * blocking on or faking a server reference number.
  */
 export default function Receipt({
   session,
@@ -48,8 +46,6 @@ export default function Receipt({
   quantity,
   paymentMethod,
   tickets,
-  qrImages,
-  printMode,
 }: ReceiptProps) {
   const total = unitPrice * quantity;
   const date = new Date(createdAtClient);
@@ -102,21 +98,10 @@ export default function Receipt({
       </div>
       <Row label="Paiement" value={PAYMENT_LABELS[paymentMethod]} />
 
-      {printMode === "STANDARD" && (
-        <>
-          <div className="border-t border-dashed border-black/40 my-2" />
-          <p className="text-center text-[10px] mb-2">{tickets.length} entrée(s) — ce reçu vaut pour l'ensemble</p>
-          <div className="grid grid-cols-2 gap-2">
-            {tickets.map((t) => (
-              <div key={t.id} className="text-center">
-                {qrImages[t.id] && <img src={qrImages[t.id]} alt={t.ticketNumber} className="mx-auto" />}
-                <p className="text-[8px]">{t.ticketNumber}</p>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
+      <div className="border-t border-dashed border-black/40 my-2" />
+      <p className="text-center text-[9px]">
+        {tickets.length} billet{tickets.length > 1 ? "s" : ""} — voir carte{tickets.length > 1 ? "s" : ""} ci-après
+      </p>
       <div className="border-t border-dashed border-black/40 my-2" />
       <p className="text-center text-[9px]">Merci de votre visite — Nguon {new Date().getFullYear()}</p>
     </div>
