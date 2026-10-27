@@ -130,3 +130,34 @@
     font-family: 'Montserrat', sans-serif;
   }
 }
+
+/* Thermal receipt — 72mm is the printable width on a standard 80mm roll
+   (the remaining 8mm is the printer's own unprintable margin). On screen
+   this just caps the preview's width; on print it drives the actual page
+   size via @page below. */
+.receipt {
+  width: 280px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .receipt,
+  .receipt * {
+    visibility: visible;
+  }
+  .receipt {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 72mm;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}
