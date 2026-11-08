@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -15,6 +16,8 @@ services:
 
   auth-service:
     build: ./services/auth-service
+    restart: unless-stopped
+    mem_limit: ${SERVICE_MEM_LIMIT:-768m}
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -22,12 +25,15 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
     depends_on:
       postgres:
         condition: service_healthy
 
   catalog-service:
     build: ./services/catalog-service
+    restart: unless-stopped
+    mem_limit: ${SERVICE_MEM_LIMIT:-768m}
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -35,6 +41,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -51,7 +58,8 @@ services:
   # images to Docker Hub/Quay — this pinned release must already be present
   # locally (docker save/load it onto the VPS).
   minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-09-07T16-13-09Z}
+    restart: unless-stopped
     command: server /data
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -61,6 +69,8 @@ services:
 
   sales-service:
     build: ./services/sales-service
+    restart: unless-stopped
+    mem_limit: ${SERVICE_MEM_LIMIT:-768m}
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -68,15 +78,18 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
     depends_on:
       postgres:
         condition: service_healthy
 
   pos-pwa:
     build: ./frontend/pos-pwa
+    restart: unless-stopped
 
   nginx:
     image: nginx:stable-alpine
+    restart: unless-stopped
     volumes:
       # Mounted AT default.conf (not alongside it) — the nginx:stable-alpine
       # image ships its own default.conf with server_name "localhost", which
@@ -85,8 +98,10 @@ services:
       # testing, or hitting the VPS by bare IP).
       - ./nginx/pos.nguonevents.com.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
+    # On the shared VPS: POS_HTTP_BIND=127.0.0.1:8090, behind the host's
+    # nginx (TLS for pos.nguonevents.com). Locally it defaults to :8081.
     ports:
-      - "8081:80"
+      - "${POS_HTTP_BIND:-8081}:80"
     depends_on:
       - auth-service
       - catalog-service
