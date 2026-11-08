@@ -28,4 +28,14 @@ public class Terminal {
 
     @Column(nullable = false)
     private int localPendingCount;
+
+    @Column(nullable = false)
+    private boolean online;
+
+    @Column(nullable = false)
+    private boolean loggedIn;
+
+    private UUID currentUserId;
+
+    private String currentUserName;
 }

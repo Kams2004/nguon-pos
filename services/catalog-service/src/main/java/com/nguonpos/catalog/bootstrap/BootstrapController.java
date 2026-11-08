@@ -52,13 +52,17 @@ public class BootstrapController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Porte introuvable."));
 
         var ticketTypes = ticketTypeRepository.findSellableAtGate(establishmentId, gateId).stream()
-                .map(t -> new BootstrapResponse.TicketTypeInfo(t.getId(), t.getName(), t.getPrice(), t.getCurrency(), t.getPrintMode().name()))
+                .map(t -> new BootstrapResponse.TicketTypeInfo(t.getId(), t.getName(), t.getPrice(), t.getCurrency(), t.getPrintMode().name(), t.getIcon(), t.getColor()))
                 .toList();
 
         return new BootstrapResponse(
                 new BootstrapResponse.EstablishmentInfo(
                         establishment.getId(), establishment.getName(), establishment.getLogoUrl(),
-                        establishment.getBrandPrimaryColor(), establishment.getBrandSecondaryColor()
+                        establishment.getBrandPrimaryColor(), establishment.getBrandSecondaryColor(),
+                        establishment.getTicketTitle(), establishment.getTicketSubtitle(), establishment.getTicketTagline(),
+                        establishment.getTicketLocation(), establishment.getTicketFooter(), establishment.getTicketBannerUrl(),
+                        establishment.getReceiptFooter(), establishment.getTicketOptions(), establishment.getReceiptOptions(),
+                        establishment.getReceiptMode().name()
                 ),
                 new BootstrapResponse.GateInfo(gate.getId(), gate.getName(), gate.getCode(), gate.getSigningSecret()),
                 ticketTypes

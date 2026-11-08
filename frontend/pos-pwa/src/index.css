@@ -4,68 +4,74 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme tokens: gold-primary / navy-structural palette, matching the POS
-   mockup the client approved (gold CTAs, deep-navy sidebar/headers with a
-   Bamoun diamond motif) — a deliberate departure from the main Nguon
-   festival site's blue-primary theme, confirmed with the client. The old
-   blue primary lives on as `secondary` (info pills, links, selected-state
-   highlights). Playfair Display is deliberately not imported here — the
-   source site imports it but never actually uses it. */
+/* Theme tokens: royal-blue structure / gold action palette, matching the
+   client's approved POS mockup — royal-blue sidebar and banners with the
+   Bamoun diamond motif, gold primary CTAs, a brighter "action blue" for
+   secondary buttons (Ajouter, Voir, Imprimer), on a cool light-grey canvas
+   with white cards. Playfair Display is deliberately not imported here —
+   the source site imports it but never actually uses it. */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 220 30% 12%;
+    --background: 222 40% 97%;
+    --foreground: 220 63% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 30% 12%;
+    --card-foreground: 220 63% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 12%;
+    --popover-foreground: 220 63% 15%;
 
-    --primary: 42 96% 51%;
-    --primary-foreground: 220 45% 14%;
+    --primary: 46 96% 53%;
+    --primary-foreground: 220 63% 15%;
 
-    --secondary: 201 100% 35%;
+    --secondary: 219 76% 48%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 215 20% 95%;
-    --muted-foreground: 215 10% 46%;
+    --muted: 220 30% 95%;
+    --muted-foreground: 220 12% 46%;
 
-    --accent: 42 96% 93%;
-    --accent-foreground: 220 45% 14%;
+    --accent: 46 96% 92%;
+    --accent-foreground: 220 63% 15%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 74% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 20% 90%;
-    --input: 215 20% 90%;
-    --ring: 42 96% 51%;
+    --success: 142 72% 36%;
+    --success-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    --warning: 32 95% 48%;
 
-    --light-blue: 201 100% 35%;
-    --dark-blue: 201 100% 28%;
-    --bright-yellow: 42 96% 51%;
-    --cream: 42 96% 96%;
+    --border: 220 25% 91%;
+    --input: 220 25% 88%;
+    --ring: 219 76% 48%;
+
+    --radius: 0.75rem;
+
+    --royal: 213 88% 34%;
+    --royal-deep: 215 88% 24%;
+    --light-blue: 219 76% 48%;
+    --dark-blue: 213 88% 34%;
+    --bright-yellow: 46 96% 53%;
+    --cream: 46 96% 96%;
     --warm-white: 40 30% 98%;
 
-    --gradient-hero: linear-gradient(135deg, hsl(215 55% 16%) 0%, hsl(215 50% 12%) 50%, hsl(220 30% 8%) 100%);
-    --gradient-gold: linear-gradient(135deg, hsl(42 96% 51%) 0%, hsl(38 96% 46%) 100%);
-    --gradient-section: linear-gradient(180deg, hsl(42 96% 96%) 0%, hsl(0 0% 100%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(215 50% 14%) 0%, hsl(220 30% 8%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(213 88% 38%) 0%, hsl(215 88% 28%) 60%, hsl(218 85% 20%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(46 96% 55%) 0%, hsl(42 96% 50%) 100%);
+    --gradient-section: linear-gradient(180deg, hsl(46 96% 96%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(213 88% 30%) 0%, hsl(218 85% 18%) 100%);
 
-    --shadow-soft: 0 4px 20px -4px hsl(215 50% 16% / 0.15);
-    --shadow-gold: 0 4px 30px -8px hsl(42 96% 51% / 0.4);
-    --shadow-elevated: 0 20px 60px -12px hsl(215 50% 16% / 0.25);
+    --shadow-soft: 0 1px 2px hsl(220 60% 20% / 0.04), 0 4px 16px -4px hsl(220 60% 20% / 0.08);
+    --shadow-gold: 0 6px 20px -6px hsl(46 96% 45% / 0.55);
+    --shadow-elevated: 0 20px 50px -12px hsl(220 60% 20% / 0.25);
 
-    --sidebar-background: 215 50% 14%;
-    --sidebar-foreground: 210 35% 92%;
-    --sidebar-primary: 42 96% 51%;
-    --sidebar-primary-foreground: 220 45% 14%;
-    --sidebar-accent: 215 40% 22%;
-    --sidebar-accent-foreground: 210 35% 95%;
-    --sidebar-border: 215 35% 24%;
-    --sidebar-ring: 42 96% 51%;
+    --sidebar-background: 213 88% 32%;
+    --sidebar-foreground: 210 60% 96%;
+    --sidebar-primary: 46 96% 53%;
+    --sidebar-primary-foreground: 220 63% 15%;
+    --sidebar-accent: 213 70% 40%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 213 60% 42%;
+    --sidebar-ring: 46 96% 53%;
   }
 
   .dark {
@@ -136,31 +142,158 @@
 
 /* Thermal receipt — 72mm is the printable width on a standard 80mm roll
    (the remaining 8mm is the printer's own unprintable margin). On screen
-   this just caps the preview's width; on print it drives the actual page
-   size via @page below. */
+   this just caps the preview's width. */
 .receipt {
   width: 280px;
 }
+.receipt[data-paper="58"] {
+  width: 200px;
+}
 
+@layer components {
+  .card {
+    @apply rounded-2xl border border-border bg-card;
+    box-shadow: var(--shadow-soft);
+  }
+  .field {
+    @apply w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 transition-shadow focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary;
+  }
+  .field-label {
+    @apply mb-1.5 block text-xs font-semibold text-muted-foreground;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all disabled:opacity-60 disabled:pointer-events-none;
+  }
+  .btn-gold {
+    @apply btn bg-primary text-primary-foreground hover:brightness-105;
+    box-shadow: var(--shadow-gold);
+  }
+  .btn-blue {
+    @apply btn bg-secondary text-secondary-foreground hover:brightness-110 shadow-sm shadow-secondary/30;
+  }
+  .btn-outline {
+    @apply btn border border-border bg-card text-foreground hover:bg-muted;
+  }
+  .th {
+    @apply px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide whitespace-nowrap;
+    color: hsl(var(--royal) / 0.75);
+  }
+  thead:has(.th) {
+    background: hsl(var(--royal) / 0.045) !important;
+  }
+  .td {
+    @apply px-4 py-3 whitespace-nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Page banner: the mockup's royal band with the Bamoun diamond motif,
+     carried from the sidebar into every page title. */
+  .masthead {
+    @apply relative overflow-hidden rounded-2xl bg-royal text-white;
+    box-shadow: 0 10px 30px -14px hsl(var(--royal-deep) / 0.55);
+  }
+  .masthead .btn-outline {
+    @apply border-white/30 bg-white/10 text-white hover:bg-white/20;
+  }
+  .masthead .btn-blue {
+    @apply bg-primary text-primary-foreground shadow-none hover:brightness-105;
+  }
+  .masthead .field {
+    @apply border-white/30;
+  }
+
+  /* KPI scoreboard: one strip, the lead figure on royal blue. Each cell
+     draws its own top/left separator; the strip's edges clip the outer ones. */
+  .stat-strip {
+    @apply card grid overflow-hidden;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  }
+  .stat-strip > * {
+    box-shadow: -1px -1px 0 hsl(var(--border));
+  }
+  .stat-strip > :first-child {
+    background: var(--gradient-hero);
+    color: white;
+    box-shadow: none;
+  }
+  .stat-strip > :first-child .stat-label,
+  .stat-strip > :first-child .stat-hint {
+    color: hsl(210 60% 92% / 0.85);
+  }
+  .stat-strip > :first-child .stat-value {
+    color: white;
+  }
+  .stat-strip > :first-child .stat-icon {
+    @apply bg-primary text-royal-deep;
+  }
+  .stat-strip > :first-child .stat-hint .text-success {
+    color: hsl(142 70% 72%);
+  }
+  .stat-strip > :first-child .stat-hint .text-destructive {
+    color: hsl(0 90% 80%);
+  }
+
+  /* Till tile cut as a ticket stub: notches on both edges at the
+     perforation line, drawn with two half-width radial masks. */
+  .ticket-stub {
+    --notch-y: 76px;
+    -webkit-mask:
+      radial-gradient(circle 10px at left var(--notch-y), #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle 10px at right var(--notch-y), #0000 98%, #000) right / 51% 100% no-repeat;
+    mask:
+      radial-gradient(circle 10px at left var(--notch-y), #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle 10px at right var(--notch-y), #0000 98%, #000) right / 51% 100% no-repeat;
+  }
+}
+
+/* Browser surfaces in the brand's colours rather than the platform defaults. */
+::selection {
+  background: hsl(var(--primary) / 0.55);
+  color: hsl(var(--royal-deep));
+}
+:focus-visible {
+  outline: 2px solid hsl(var(--secondary));
+  outline-offset: 2px;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--royal) / 0.3) transparent;
+}
+input,
+textarea {
+  caret-color: hsl(var(--secondary));
+}
+
+/* Printing: everything marked .no-print (app chrome, filters, buttons)
+   drops out; what remains is the printable content of the page. Thermal
+   output (receipt + entry tickets) sets the 80mm roll page itself while
+   mounted (see Sell.tsx); reports print on the browser's default page. */
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  .receipt,
-  .receipt * {
-    visibility: visible;
-  }
-  .receipt {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 72mm;
+  body,
+  body > #root > * {
+    background: white !important;
   }
   .no-print {
     display: none !important;
   }
-  @page {
-    size: 80mm auto;
-    margin: 0;
+  .print-thermal {
+    width: 72mm;
+    margin: 0 auto;
+  }
+  .print-thermal .receipt {
+    width: 72mm;
+    padding: 0;
+    border: 0;
+  }
+  /* 58mm roll: 48mm printable. */
+  .print-thermal.paper-58,
+  .print-thermal.paper-58 .receipt {
+    width: 48mm;
+  }
+  .print-page-break {
+    break-before: page;
+  }
+  .card {
+    box-shadow: none;
   }
 }

@@ -1,12 +1,26 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useSession } from "../../context/SessionContext";
+import { useBranding } from "../../context/BrandingContext";
+
+const REMEMBER_KEY = "nguon-pos.rememberedUsername";
+
+function readRemembered(): string {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
 
 export default function Login() {
   const { login } = useSession();
+  const { logoUrl, loginBackgroundUrl } = useBranding();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(readRemembered);
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(() => readRemembered() !== "");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,7 +31,14 @@ export default function Login() {
     setLoading(true);
     try {
       const session = await login(username, password);
-      navigate(session.assignedGateId ? "/gate/sell" : "/admin/sales");
+      // Only the username is remembered — never the password.
+      try {
+        if (remember) localStorage.setItem(REMEMBER_KEY, username);
+        else localStorage.removeItem(REMEMBER_KEY);
+      } catch {
+        /* storage unavailable: nothing to remember */
+      }
+      navigate(session.assignedGateId ? "/gate/sell" : "/admin/dashboard");
     } catch {
       setError("Identifiants invalides.");
     } finally {
@@ -26,105 +47,99 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-background">
-      {/* Hero — hidden on small screens, the gate laptop's own branding moment */}
-      <div className="hidden lg:block relative overflow-hidden">
-        <img src="/img/login-hero.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[hsl(220,30%,8%)] via-[hsl(215,50%,14%)]/80 to-[hsl(215,50%,22%)]/40" />
-        <div
-          className="absolute inset-0 opacity-20 mix-blend-soft-light"
-          style={{ backgroundImage: "url(/img/diamond-pattern.svg)", backgroundSize: "220px" }}
-        />
-        <div className="relative h-full flex flex-col justify-between p-12 text-white">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Nguon" className="h-12 drop-shadow-lg" />
-            <div>
-              <p className="font-display font-black text-xl tracking-wide">NGUON POS</p>
-              <p className="text-xs text-white/70 uppercase tracking-[0.2em]">Billetterie des portes</p>
-            </div>
-          </div>
-          <div className="space-y-3 max-w-sm">
-            <h1 className="font-display text-4xl font-black leading-tight">
-              Festival Nguon<br />2026
-            </h1>
-            <p className="text-white/80 text-sm leading-relaxed">
-              Vente et validation des billets d'entrée, en ligne comme hors-ligne — chaque vente est enregistrée
-              immédiatement et synchronisée dès que la connexion revient.
-            </p>
+    <div className="relative min-h-screen overflow-hidden bg-royal-deep">
+      {/* Full-bleed festival artwork: palace + royal dancer, blue sky fading into the brand blue */}
+      <img
+        src={loginBackgroundUrl}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover object-[70%_center] opacity-90"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-royal-deep/95 via-royal/70 to-transparent" />
+      <div
+        className="pointer-events-none absolute -bottom-10 -left-10 h-72 w-72 bg-cover opacity-70"
+        style={{ backgroundImage: "url(/img/diamond-pattern.svg)" }}
+      />
+
+      <div className="relative flex min-h-screen flex-col justify-center gap-8 px-5 py-10 sm:px-12 lg:px-20">
+        <div className="flex items-center gap-4 text-white">
+          <img src={logoUrl} alt="Nguon" className="h-16 w-16 rounded-xl bg-white object-contain p-1 shadow-lg" />
+          <div>
+            <p className="font-display text-3xl font-extrabold leading-none tracking-wide sm:text-4xl">NGUON</p>
+            <p className="font-display text-3xl font-extrabold leading-none tracking-wide sm:text-4xl">FESTIVAL</p>
           </div>
         </div>
-      </div>
+        <div className="-mt-4 text-white/90">
+          <p className="font-display text-lg font-bold">Le NGUON</p>
+          <p className="text-sm">Patrimoine Culturel du Royaume Bamoun</p>
+        </div>
 
-      {/* Form */}
-      <div className="flex items-center justify-center p-6 sm:p-10 relative">
-        <div
-          className="absolute inset-0 opacity-[0.12] pointer-events-none lg:hidden"
-          style={{ backgroundImage: "url(/img/diamond-pattern.svg)", backgroundSize: "180px" }}
-        />
-        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-7 relative">
-          <div className="text-center lg:text-left space-y-1">
-            <img src="/logo.png" alt="Nguon" className="h-14 mx-auto lg:hidden mb-4" />
-            <h2 className="font-display text-2xl font-black text-foreground">Bienvenue</h2>
-            <p className="text-sm text-muted-foreground">Connectez-vous pour accéder à votre porte.</p>
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-md space-y-5 rounded-3xl bg-white p-7 shadow-2xl shadow-black/30 sm:p-8"
+        >
+          <div>
+            <h1 className="font-display text-3xl font-bold text-royal">Bienvenue</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Connectez-vous pour accéder à la billetterie et à la gestion du NGUON.
+            </p>
           </div>
 
-          {error && (
-            <div className="rounded-xl bg-destructive/10 text-destructive text-sm font-semibold px-4 py-3 text-center">
-              {error}
-            </div>
-          )}
+          {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-destructive">{error}</div>}
 
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1.5 block">
-                Identifiant
-              </label>
+          <div>
+            <label className="field-label">Nom d'utilisateur</label>
+            <input
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="field py-3"
+              autoComplete="username"
+              placeholder="caissier1"
+            />
+          </div>
+          <div>
+            <label className="field-label">Mot de passe</label>
+            <div className="relative">
               <input
-                type="text"
+                type={showPassword ? "text" : "password"}
                 required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full border border-input rounded-2xl px-4 py-3 text-sm bg-card shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
-                autoComplete="username"
-                placeholder="cashier1"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="field py-3 pr-12"
+                autoComplete="current-password"
               />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1.5 block">
-                Mot de passe
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border border-input rounded-2xl px-4 py-3 text-sm bg-card shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all pr-12"
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground hover:text-primary"
-                >
-                  {showPassword ? "Masquer" : "Voir"}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-secondary"
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-          >
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="h-4 w-4 rounded accent-[hsl(var(--secondary))]"
+            />
+            Se souvenir de moi
+          </label>
+
+          <button type="submit" disabled={loading} className="btn-gold w-full py-3.5 text-base">
             {loading ? (
               <>
-                <span className="w-4 h-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
                 Connexion…
               </>
             ) : (
-              "Se connecter"
+              <>
+                Se connecter <ArrowRight className="h-4 w-4" />
+              </>
             )}
           </button>
         </form>

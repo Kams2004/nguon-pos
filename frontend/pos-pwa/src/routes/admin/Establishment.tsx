@@ -1,105 +1,144 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { ArrowRight, Check, Palette } from "lucide-react";
 import { useSession } from "../../context/SessionContext";
-import { api } from "../../lib/api/client";
+import { useConfirm } from "../../context/ConfirmContext";
+import { api, errorMessage } from "../../lib/api/client";
 import type { AdminEstablishment, ReceiptMode } from "../../lib/api/types";
+import { CardHeader, Loading, PageHeader } from "../../components/ui";
+import { ImageField } from "../../components/MediaLibrary";
 
-const RECEIPT_MODES: { value: ReceiptMode; label: string }[] = [
-  { value: "STANDARD", label: "Standard (reçu unique par défaut)" },
-  { value: "INDIVIDUAL_TICKETS", label: "Billets individuels par défaut" },
-  { value: "CONFIGURABLE_PER_TICKET_TYPE", label: "Configurable par type de billet" },
+const RECEIPT_MODES: { value: ReceiptMode; label: string; hint: string }[] = [
+  { value: "STANDARD", label: "Standard", hint: "Un seul ticket récapitulatif par vente" },
+  { value: "INDIVIDUAL_TICKETS", label: "Individuel", hint: "Un ticket distinct par entrée vendue" },
+  { value: "CONFIGURABLE_PER_TICKET_TYPE", label: "Par type de billet", hint: "Chaque type de billet choisit son mode" },
 ];
 
 export default function Establishment() {
   const { session } = useSession();
+  const confirm = useConfirm();
   const [data, setData] = useState<AdminEstablishment | null>(null);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) return;
     api.getEstablishment(session.token).then(setData);
   }, [session]);
 
-  if (!session || !data) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (!session) return null;
+  if (!data) return <Loading />;
+
+  const set = (patch: Partial<AdminEstablishment>) => {
+    setSaved(false);
+    setData({ ...data, ...patch });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaved(false);
-    const updated = await api.updateEstablishment(session.token, {
-      name: data.name,
-      logoUrl: data.logoUrl,
-      brandPrimaryColor: data.brandPrimaryColor,
-      brandSecondaryColor: data.brandSecondaryColor,
-      receiptMode: data.receiptMode,
+    const ok = await confirm({
+      title: "Enregistrer les paramètres ?",
+      message: "Le nom, le logo et le fond de connexion seront mis à jour partout, y compris sur les caisses ouvertes.",
+      confirmLabel: "Enregistrer",
     });
-    setData(updated);
-    setSaved(true);
+    if (!ok) return;
+    setError(null);
+    try {
+      // The ticket/receipt fields are edited in "Billet & reçu" — sent back unchanged.
+      const { id: _id, ...payload } = data;
+      setData(await api.updateEstablishment(session.token, payload));
+      setSaved(true);
+    } catch (err) {
+      setError(errorMessage(err, "Impossible d'enregistrer les paramètres."));
+    }
   };
 
   return (
-    <div className="space-y-6 max-w-md">
-      <h1 className="font-display text-2xl font-bold text-foreground">Établissement</h1>
+    <>
+      <PageHeader title="Paramètres" subtitle="Établissement, logo, images et mode de ticket" />
 
-      <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 space-y-4">
-        {saved && <p className="text-sm text-secondary-foreground font-semibold">Enregistré ✓</p>}
-
-        <div>
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1 block">Nom</label>
-          <input
-            required
-            value={data.name}
-            onChange={(e) => setData({ ...data, name: e.target.value })}
-            className="w-full border border-input rounded-xl px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1 block">URL du logo</label>
-          <input
-            value={data.logoUrl ?? ""}
-            onChange={(e) => setData({ ...data, logoUrl: e.target.value || null })}
-            placeholder="https://…"
-            className="w-full border border-input rounded-xl px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1 block">Couleur principale</label>
-            <input
-              value={data.brandPrimaryColor ?? ""}
-              onChange={(e) => setData({ ...data, brandPrimaryColor: e.target.value || null })}
-              className="w-full border border-input rounded-xl px-3 py-2 text-sm font-mono"
-            />
+      <form onSubmit={handleSubmit} className="grid gap-4 xl:grid-cols-[1fr_340px]">
+        <div className="space-y-4">
+          <div className="card">
+            <CardHeader title="Établissement & images" />
+            <div className="space-y-4 px-5 pb-5">
+              <div>
+                <label className="field-label">Nom</label>
+                <input required value={data.name} onChange={(e) => set({ name: e.target.value })} className="field" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ImageField label="Logo / icône" value={data.logoUrl} onChange={(logoUrl) => set({ logoUrl })} fallback="/logo.png" hint="Logo Nguon par défaut" />
+                <ImageField
+                  label="Fond de l'écran de connexion"
+                  value={data.loginBackgroundUrl}
+                  onChange={(loginBackgroundUrl) => set({ loginBackgroundUrl })}
+                  fallback="/img/banners/hero.jpg"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {(["brandPrimaryColor", "brandSecondaryColor"] as const).map((key) => (
+                  <div key={key}>
+                    <label className="field-label">{key === "brandPrimaryColor" ? "Couleur principale" : "Couleur secondaire"}</label>
+                    <div className="flex items-center gap-2">
+                      <span className="h-10 w-10 flex-shrink-0 rounded-xl border border-border" style={{ background: data[key] ?? "transparent" }} />
+                      <input value={data[key] ?? ""} onChange={(e) => set({ [key]: e.target.value || null })} placeholder="#0A4DA2" className="field font-mono" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1 block">Couleur secondaire</label>
-            <input
-              value={data.brandSecondaryColor ?? ""}
-              onChange={(e) => setData({ ...data, brandSecondaryColor: e.target.value || null })}
-              className="w-full border border-input rounded-xl px-3 py-2 text-sm font-mono"
-            />
+
+          <div className="card">
+            <CardHeader title="Mode de ticket par défaut" />
+            <div className="grid gap-3 px-5 pb-5 sm:grid-cols-3">
+              {RECEIPT_MODES.map((m) => {
+                const active = data.receiptMode === m.value;
+                return (
+                  <button
+                    type="button"
+                    key={m.value}
+                    onClick={() => set({ receiptMode: m.value })}
+                    className={`relative rounded-xl border-2 p-4 text-left transition-colors ${
+                      active ? "border-secondary bg-blue-50/60" : "border-border hover:border-secondary/40"
+                    }`}
+                  >
+                    {active && (
+                      <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-white">
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                      </span>
+                    )}
+                    <p className="text-sm font-bold text-foreground">{m.label}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{m.hint}</p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        <div>
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1 block">Mode de reçu par défaut</label>
-          <select
-            value={data.receiptMode}
-            onChange={(e) => setData({ ...data, receiptMode: e.target.value as ReceiptMode })}
-            className="w-full border border-input rounded-xl px-3 py-2 text-sm bg-background"
-          >
-            {RECEIPT_MODES.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
+        <div className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+          <Link to="/admin/design" className="card group block p-5 transition-shadow hover:shadow-lg">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <Palette className="h-5 w-5" />
+            </span>
+            <p className="mt-3 font-display font-bold text-foreground">Personnaliser le billet et le reçu</p>
+            <p className="mt-1 text-sm text-muted-foreground">Textes, couleurs, éléments imprimés, largeur de papier, mentions légales — avec aperçu et impression test.</p>
+            <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-secondary group-hover:underline">
+              Ouvrir <ArrowRight className="h-4 w-4" />
+            </span>
+          </Link>
+          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
+          <button type="submit" className="btn-gold w-full">
+            Enregistrer les paramètres
+          </button>
+          {saved && (
+            <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-success">
+              <Check className="h-4 w-4" /> Enregistré
+            </p>
+          )}
         </div>
-
-        <button type="submit" className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-bold">
-          Enregistrer
-        </button>
       </form>
-    </div>
+    </>
   );
 }

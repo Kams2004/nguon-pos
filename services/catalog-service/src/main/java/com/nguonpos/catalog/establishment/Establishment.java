@@ -33,6 +33,20 @@ public class Establishment {
     @Column(nullable = false)
     private ReceiptMode receiptMode;
 
+    // Ticket/receipt wording and artwork — null means the app's default.
+    private String ticketTitle;
+    private String ticketSubtitle;
+    private String ticketTagline;
+    private String ticketLocation;
+    private String ticketFooter;
+    private String ticketBannerUrl;
+    private String receiptFooter;
+    private String loginBackgroundUrl;
+
+    // JSON documents edited in the PWA's "Billet & reçu" page — see V7 migration.
+    private String ticketOptions;
+    private String receiptOptions;
+
     @Column(nullable = false)
     private Instant createdAt;
 

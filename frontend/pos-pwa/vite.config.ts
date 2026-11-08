@@ -18,7 +18,7 @@ export default defineConfig({
         name: "Nguon POS",
         short_name: "Nguon POS",
         description: "Billetterie et caisse hors-ligne pour les portes du festival Nguon",
-        theme_color: "#0074B2",
+        theme_color: "#0A4DA2",
         background_color: "#ffffff",
         display: "standalone",
         start_url: "/",
@@ -33,7 +33,10 @@ export default defineConfig({
         // strategies for catalog/sales data are added once those endpoints
         // exist (Milestone 1+) — the real offline data story lives in
         // IndexedDB (src/lib/offline), not in the service worker cache.
-        globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
+        // Festival artwork (jpg) is precached too, so ticket cards, the
+        // login screen and the POS grid look right on a terminal that has
+        // never been online since install.
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,jpg}"],
       },
     }),
   ],

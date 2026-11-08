@@ -1,8 +1,10 @@
 package com.nguonpos.auth.user;
 
+import com.nguonpos.auth.audit.AuditService;
 import io.jsonwebtoken.Claims;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,10 +31,12 @@ public class UserAdminController {
 
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService audit;
 
-    public UserAdminController(AppUserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserAdminController(AppUserRepository userRepository, PasswordEncoder passwordEncoder, AuditService audit) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.audit = audit;
     }
 
     @GetMapping
@@ -62,13 +66,25 @@ public class UserAdminController {
                 .updatedAt(now)
                 .build();
         userRepository.save(user);
+        audit.record(claims, "USER", "USER_CREATED", "USER", user.getId(),
+                "Utilisateur « " + user.getFullName() + " » (" + user.getUsername() + ", " + user.getRole() + ") créé");
         return UserSummary.from(user);
     }
 
     @PutMapping("/{id}")
-    public UserSummary update(@PathVariable UUID id, @Valid @RequestBody UpdateRequest request) {
+    public UserSummary update(@PathVariable UUID id, @Valid @RequestBody UpdateRequest request, @AuthenticationPrincipal Claims claims) {
         AppUser user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur introuvable."));
+        if (id.equals(AuditService.actorId(claims)) && (!request.active() || request.role() != user.getRole())) {
+            // Never let the Super Admin lock themselves out by accident.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vous ne pouvez pas désactiver votre propre compte ni changer votre rôle.");
+        }
+        java.util.List<String> changes = new java.util.ArrayList<>();
+        if (!user.getFullName().equals(request.fullName())) changes.add("nom « " + user.getFullName() + " » → « " + request.fullName() + " »");
+        if (user.getRole() != request.role()) changes.add("rôle " + user.getRole() + " → " + request.role());
+        if (!java.util.Objects.equals(user.getAssignedGateId(), request.assignedGateId())) changes.add("porte modifiée");
+        if (user.isActive() != request.active()) changes.add(request.active() ? "réactivé" : "désactivé");
+        if (request.password() != null && !request.password().isBlank()) changes.add("mot de passe réinitialisé");
         user.setFullName(request.fullName());
         user.setRole(request.role());
         user.setAssignedGateId(request.assignedGateId());
@@ -78,17 +94,21 @@ public class UserAdminController {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
         }
         userRepository.save(user);
+        audit.record(claims, "USER", "USER_UPDATED", "USER", user.getId(),
+                "Utilisateur « " + user.getFullName() + " » modifié" + (changes.isEmpty() ? "" : " : " + String.join(", ", changes)));
         return UserSummary.from(user);
     }
 
     public record CreateRequest(
-            @NotBlank String username, @NotBlank String password, @NotBlank String fullName,
+            @NotBlank @Size(max = 100) String username, @NotBlank @Size(min = 4, max = 200) String password,
+            @NotBlank @Size(max = 200) String fullName,
             @NotNull Role role, UUID assignedGateId
     ) {
     }
 
     public record UpdateRequest(
-            @NotBlank String fullName, @NotNull Role role, UUID assignedGateId, boolean active, String password
+            @NotBlank @Size(max = 200) String fullName, @NotNull Role role, UUID assignedGateId, boolean active,
+            @Size(max = 200) String password
     ) {
     }
 

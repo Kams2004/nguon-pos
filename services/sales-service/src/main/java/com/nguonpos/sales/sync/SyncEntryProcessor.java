@@ -11,10 +11,13 @@ import com.nguonpos.sales.ticket.TicketStatus;
 import com.nguonpos.sales.validation.EntryScan;
 import com.nguonpos.sales.validation.EntryScanRepository;
 import com.nguonpos.sales.validation.ScanResult;
+import com.nguonpos.sales.audit.AuditService;
+import io.jsonwebtoken.Claims;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -33,24 +36,27 @@ public class SyncEntryProcessor {
     private final TicketRepository ticketRepository;
     private final EntryScanRepository entryScanRepository;
     private final EntityManager entityManager;
+    private final AuditService audit;
 
     public SyncEntryProcessor(
             TransactionRepository transactionRepository,
             TransactionLineRepository transactionLineRepository,
             TicketRepository ticketRepository,
             EntryScanRepository entryScanRepository,
-            EntityManager entityManager
+            EntityManager entityManager,
+            AuditService audit
     ) {
         this.transactionRepository = transactionRepository;
         this.transactionLineRepository = transactionLineRepository;
         this.ticketRepository = ticketRepository;
         this.entryScanRepository = entryScanRepository;
         this.entityManager = entityManager;
+        this.audit = audit;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public SaleSyncResponse.EntryResult processSaleEntry(
-            SaleSyncRequest.SaleEntry entry, UUID terminalId, UUID gateId, UUID establishmentId, UUID cashierUserId
+            SaleSyncRequest.SaleEntry entry, UUID terminalId, UUID gateId, UUID establishmentId, UUID cashierUserId, Claims claims
     ) {
         var existing = transactionRepository.findById(entry.idempotencyKey());
         if (existing.isPresent()) {
@@ -118,13 +124,22 @@ public class SyncEntryProcessor {
                         .issuedAt(entry.createdAtClient())
                         .build();
                 ticketRepository.save(ticket);
+                resolvePendingScans(ticket);
             }
+
+            audit.record(claims, "SALE", "SALE_SYNCED", "TRANSACTION", transaction.getId(),
+                    "Vente " + transaction.getReferenceNumber() + " synchronisée — "
+                            + String.format("%,.0f", total).replace(',', ' ') + " FCFA, "
+                            + entry.tickets().size() + " billet(s), " + entry.paymentMethod());
 
             return new SaleSyncResponse.EntryResult(
                     entry.idempotencyKey(), SaleSyncResponse.Status.ACCEPTED,
                     transaction.getReferenceNumber(), Instant.now(), null
             );
         } catch (Exception ex) {
+            // Caught to report REJECTED for this entry only — but the rows
+            // already written above must not commit without their tickets.
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return new SaleSyncResponse.EntryResult(
                     entry.idempotencyKey(), SaleSyncResponse.Status.REJECTED, null, Instant.now(), ex.getMessage()
             );
@@ -133,7 +148,7 @@ public class SyncEntryProcessor {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ScanSyncResponse.EntryResult processScanEntry(
-            ScanSyncRequest.ScanEntry entry, UUID terminalId, UUID gateId, UUID scannedByUserId
+            ScanSyncRequest.ScanEntry entry, UUID terminalId, UUID gateId, UUID establishmentId, UUID scannedByUserId, Claims claims
     ) {
         var existingScan = entryScanRepository.findById(entry.clientScanId());
         if (existingScan.isPresent()) {
@@ -143,14 +158,34 @@ public class SyncEntryProcessor {
             );
         }
 
-        var ticketOpt = ticketRepository.findById(entry.ticketId());
+        // A ticket of another establishment is treated as unknown: a till
+        // can only ever redeem its own establishment's tickets.
+        var anyTicket = ticketRepository.findById(entry.ticketId());
+        if (anyTicket.isEmpty()) {
+            // Not here yet: the sale that issued it is still on its way from
+            // another till. Kept and settled when that sale syncs.
+            EntryScan scan = EntryScan.builder()
+                    .id(entry.clientScanId()).ticketId(entry.ticketId()).establishmentId(establishmentId).gateId(gateId)
+                    .terminalId(terminalId).scannedByUserId(scannedByUserId)
+                    .scannedAt(entry.scannedAt()).result(ScanResult.PENDING_TICKET)
+                    .build();
+            entryScanRepository.save(scan);
+            audit.record(claims, "SCAN", "SCAN_PENDING_TICKET", "TICKET", entry.ticketId(),
+                    "Scan reçu avant la vente du billet — en attente de sa synchronisation");
+            return new ScanSyncResponse.EntryResult(
+                    entry.clientScanId(), ScanSyncResponse.SyncStatus.ACCEPTED, ScanResult.PENDING_TICKET, null
+            );
+        }
+        var ticketOpt = anyTicket.filter(t -> establishmentId.equals(t.getEstablishmentId()));
         if (ticketOpt.isEmpty()) {
             EntryScan scan = EntryScan.builder()
-                    .id(entry.clientScanId()).ticketId(entry.ticketId()).gateId(gateId)
+                    .id(entry.clientScanId()).ticketId(entry.ticketId()).establishmentId(establishmentId).gateId(gateId)
                     .terminalId(terminalId).scannedByUserId(scannedByUserId)
                     .scannedAt(entry.scannedAt()).result(ScanResult.REJECTED_UNKNOWN_TICKET)
                     .build();
             entryScanRepository.save(scan);
+            audit.record(claims, "SCAN", "SCAN_UNKNOWN_TICKET", "TICKET", entry.ticketId(),
+                    "Scan d'un billet inconnu du serveur");
             return new ScanSyncResponse.EntryResult(
                     entry.clientScanId(), ScanSyncResponse.SyncStatus.ACCEPTED,
                     ScanResult.REJECTED_UNKNOWN_TICKET, "Billet inconnu du serveur."
@@ -170,18 +205,52 @@ public class SyncEntryProcessor {
             ticket.setRedeemedByTerminalId(terminalId);
             ticketRepository.save(ticket);
             result = ScanResult.ACCEPTED;
+        } else if (ticket.getStatus() == TicketStatus.VOIDED) {
+            result = ScanResult.REJECTED_VOIDED;
         } else {
             result = ScanResult.REJECTED_ALREADY_REDEEMED;
         }
 
         EntryScan scan = EntryScan.builder()
-                .id(entry.clientScanId()).ticketId(entry.ticketId()).gateId(gateId)
+                .id(entry.clientScanId()).ticketId(entry.ticketId()).establishmentId(establishmentId).gateId(gateId)
                 .terminalId(terminalId).scannedByUserId(scannedByUserId)
                 .scannedAt(entry.scannedAt()).result(result)
                 .build();
         entryScanRepository.save(scan);
+        audit.record(claims, "SCAN", "SCAN_" + result.name(), "TICKET", ticket.getId(),
+                (result == ScanResult.ACCEPTED ? "Entrée validée — billet "
+                        : result == ScanResult.REJECTED_VOIDED ? "Entrée refusée (vente annulée) — billet "
+                        : "Entrée refusée (déjà utilisé) — billet ")
+                        + ticket.getTicketNumber());
 
         return new ScanSyncResponse.EntryResult(entry.clientScanId(), ScanSyncResponse.SyncStatus.ACCEPTED, result, null);
+    }
+
+    /**
+     * Settles scans that reached central before this ticket's sale: the
+     * earliest one (by till scan time) gets the entry, any later ones were
+     * the same ticket presented again.
+     */
+    private void resolvePendingScans(Ticket ticket) {
+        var pending = entryScanRepository.findByTicketIdAndEstablishmentIdAndResultOrderByScannedAtAscIdAsc(
+                ticket.getId(), ticket.getEstablishmentId(), ScanResult.PENDING_TICKET);
+        for (EntryScan scan : pending) {
+            if (ticket.getStatus() == TicketStatus.ISSUED) {
+                ticket.setStatus(TicketStatus.REDEEMED);
+                ticket.setRedeemedAt(scan.getScannedAt());
+                ticket.setRedeemedByUserId(scan.getScannedByUserId());
+                ticket.setRedeemedByTerminalId(scan.getTerminalId());
+                ticketRepository.save(ticket);
+                scan.setResult(ScanResult.ACCEPTED);
+            } else {
+                scan.setResult(ScanResult.REJECTED_ALREADY_REDEEMED);
+            }
+            entryScanRepository.save(scan);
+            audit.recordAs(scan.getScannedByUserId(), "Système", "SCAN", "SCAN_" + scan.getResult().name(), "TICKET", ticket.getId(),
+                    "Scan en attente réglé à l'arrivée de la vente : "
+                            + (scan.getResult() == ScanResult.ACCEPTED ? "entrée validée" : "entrée refusée (déjà utilisé)")
+                            + " — billet " + ticket.getTicketNumber());
+        }
     }
 
     private String nextReferenceNumber() {

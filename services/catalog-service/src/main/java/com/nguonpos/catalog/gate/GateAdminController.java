@@ -1,7 +1,10 @@
 package com.nguonpos.catalog.gate;
 
+import jakarta.validation.Valid;
+import com.nguonpos.catalog.audit.AuditService;
 import io.jsonwebtoken.Claims;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,9 +29,11 @@ import java.util.UUID;
 public class GateAdminController {
 
     private final GateRepository gateRepository;
+    private final AuditService audit;
 
-    public GateAdminController(GateRepository gateRepository) {
+    public GateAdminController(GateRepository gateRepository, AuditService audit) {
         this.gateRepository = gateRepository;
+        this.audit = audit;
     }
 
     @GetMapping
@@ -40,7 +45,7 @@ public class GateAdminController {
     }
 
     @PostMapping
-    public GateSummary create(@AuthenticationPrincipal Claims claims, @RequestBody CreateGateRequest request) {
+    public GateSummary create(@AuthenticationPrincipal Claims claims, @Valid @RequestBody CreateGateRequest request) {
         UUID establishmentId = UUID.fromString(claims.get("establishmentId", String.class));
         Instant now = Instant.now();
         Gate gate = Gate.builder()
@@ -53,17 +58,24 @@ public class GateAdminController {
                 .updatedAt(now)
                 .build();
         gateRepository.save(gate);
+        audit.record(claims, "CATALOG", "GATE_CREATED", "GATE", gate.getId(),
+                "Porte « " + gate.getName() + " » (" + gate.getCode() + ") créée");
+        audit.catalogChanged();
         return GateSummary.from(gate);
     }
 
     @PutMapping("/{id}")
-    public GateSummary update(@PathVariable UUID id, @RequestBody UpdateGateRequest request) {
+    public GateSummary update(@PathVariable UUID id, @Valid @RequestBody UpdateGateRequest request, @AuthenticationPrincipal Claims claims) {
         Gate gate = gateRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Porte introuvable."));
+        String before = gate.getName() + (gate.isActive() ? "" : " (désactivée)");
         gate.setName(request.name());
         gate.setActive(request.active());
         gate.setUpdatedAt(Instant.now());
         gateRepository.save(gate);
+        audit.record(claims, "CATALOG", "GATE_UPDATED", "GATE", gate.getId(),
+                "Porte « " + before + " » → « " + gate.getName() + " »" + (gate.isActive() ? " (active)" : " (désactivée)"));
+        audit.catalogChanged();
         return GateSummary.from(gate);
     }
 
@@ -75,10 +87,10 @@ public class GateAdminController {
         return sb.toString();
     }
 
-    public record CreateGateRequest(@NotBlank String name, @NotBlank String code) {
+    public record CreateGateRequest(@NotBlank @Size(max = 200) String name, @NotBlank @Size(max = 50) String code) {
     }
 
-    public record UpdateGateRequest(@NotBlank String name, boolean active) {
+    public record UpdateGateRequest(@NotBlank @Size(max = 200) String name, boolean active) {
     }
 
     // Deliberately excludes signingSecret from any admin-list response —

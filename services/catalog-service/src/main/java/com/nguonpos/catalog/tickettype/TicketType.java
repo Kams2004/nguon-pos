@@ -42,6 +42,11 @@ public class TicketType {
     @Column(nullable = false)
     private boolean active;
 
+    // How the ticket type looks on the till's grid: an icon name from the
+    // app's curated set and a colour key. null = app default (ticket, blue).
+    private String icon;
+    private String color;
+
     @Column(nullable = false)
     private Instant createdAt;
 

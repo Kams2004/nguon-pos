@@ -1,0 +1,10 @@
+# LAN test overlay — HTTPS on port 8443 with a self-signed certificate so
+# phones/laptops on the local network can run the PWA (see nginx/lan-https.conf):
+#   docker-compose -f docker-compose.yml -f docker-compose.lan.yml up -d --build
+services:
+  nginx:
+    ports:
+      - "8443:443"
+    volumes:
+      - ./nginx/lan-https.conf:/etc/nginx/conf.d/lan-https.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro

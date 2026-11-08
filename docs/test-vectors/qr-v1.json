@@ -1,0 +1,86 @@
+{
+  "description": "QR v1 ticket signatures produced by frontend/pos-pwa/src/lib/qr/ticketSignature.ts. Every implementation (TypeScript, Java sync-core) must sign `payload` to exactly `qr`, and reject each `invalid` case with `reason`.",
+  "format": "base64url(JSON.stringify(payload)) + '.' + base64url(HMAC-SHA256(hexDecode(secretHex), ascii(payloadB64)))",
+  "valid": [
+    {
+      "secretHex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "payload": {
+        "v": 1,
+        "tid": "8f8c2b9e-6a3f-4d61-9a47-2f3a1c0d9e11",
+        "gw": "PORTE-A",
+        "tt": "4b1c7e52-0d0a-4f7e-8f55-0b1e2c3d4e5f",
+        "tx": "0e9a7c1d-2b3c-4d5e-8f90-a1b2c3d4e5f6",
+        "tn": "PORTE-A-0e9a7c1d-0-0",
+        "iat": "2026-10-28T10:00:00.000Z"
+      },
+      "payloadJson": "{\"v\":1,\"tid\":\"8f8c2b9e-6a3f-4d61-9a47-2f3a1c0d9e11\",\"gw\":\"PORTE-A\",\"tt\":\"4b1c7e52-0d0a-4f7e-8f55-0b1e2c3d4e5f\",\"tx\":\"0e9a7c1d-2b3c-4d5e-8f90-a1b2c3d4e5f6\",\"tn\":\"PORTE-A-0e9a7c1d-0-0\",\"iat\":\"2026-10-28T10:00:00.000Z\"}",
+      "qr": "eyJ2IjoxLCJ0aWQiOiI4ZjhjMmI5ZS02YTNmLTRkNjEtOWE0Ny0yZjNhMWMwZDllMTEiLCJndyI6IlBPUlRFLUEiLCJ0dCI6IjRiMWM3ZTUyLTBkMGEtNGY3ZS04ZjU1LTBiMWUyYzNkNGU1ZiIsInR4IjoiMGU5YTdjMWQtMmIzYy00ZDVlLThmOTAtYTFiMmMzZDRlNWY2IiwidG4iOiJQT1JURS1BLTBlOWE3YzFkLTAtMCIsImlhdCI6IjIwMjYtMTAtMjhUMTA6MDA6MDAuMDAwWiJ9.ti1sYuOOEpAA8z22PcTMIauMvoH-Bq6QCFvdWs45JPw"
+    },
+    {
+      "secretHex": "00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff",
+      "payload": {
+        "v": 1,
+        "tid": "11111111-2222-4333-8444-555555555555",
+        "gw": "GATE-B",
+        "tt": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        "tx": "99999999-8888-4777-8666-555555555555",
+        "tn": "GATE-B-99999999-2-14",
+        "iat": "2026-11-08T23:59:59.999Z"
+      },
+      "payloadJson": "{\"v\":1,\"tid\":\"11111111-2222-4333-8444-555555555555\",\"gw\":\"GATE-B\",\"tt\":\"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee\",\"tx\":\"99999999-8888-4777-8666-555555555555\",\"tn\":\"GATE-B-99999999-2-14\",\"iat\":\"2026-11-08T23:59:59.999Z\"}",
+      "qr": "eyJ2IjoxLCJ0aWQiOiIxMTExMTExMS0yMjIyLTQzMzMtODQ0NC01NTU1NTU1NTU1NTUiLCJndyI6IkdBVEUtQiIsInR0IjoiYWFhYWFhYWEtYmJiYi00Y2NjLThkZGQtZWVlZWVlZWVlZWVlIiwidHgiOiI5OTk5OTk5OS04ODg4LTQ3NzctODY2Ni01NTU1NTU1NTU1NTUiLCJ0biI6IkdBVEUtQi05OTk5OTk5OS0yLTE0IiwiaWF0IjoiMjAyNi0xMS0wOFQyMzo1OTo1OS45OTlaIn0.NrxrRI1ZXUJOjvJsJ75Pei0B35qducpghPik9MwppWs"
+    },
+    {
+      "secretHex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "payload": {
+        "v": 1,
+        "tid": "t-1",
+        "gw": "Entrée \"VIP\" / Sud\\Nord",
+        "tt": "tt-éü",
+        "tx": "tx\ttab\nline\u0001",
+        "tn": "N°1 – Fête",
+        "iat": "2026-01-01T00:00:00.000Z"
+      },
+      "payloadJson": "{\"v\":1,\"tid\":\"t-1\",\"gw\":\"Entrée \\\"VIP\\\" / Sud\\\\Nord\",\"tt\":\"tt-éü\",\"tx\":\"tx\\ttab\\nline\\u0001\",\"tn\":\"N°1 – Fête\",\"iat\":\"2026-01-01T00:00:00.000Z\"}",
+      "qr": "eyJ2IjoxLCJ0aWQiOiJ0LTEiLCJndyI6IkVudHLDqWUgXCJWSVBcIiAvIFN1ZFxcTm9yZCIsInR0IjoidHQtw6nDvCIsInR4IjoidHhcdHRhYlxubGluZVx1MDAwMSIsInRuIjoiTsKwMSDigJMgRsOqdGUiLCJpYXQiOiIyMDI2LTAxLTAxVDAwOjAwOjAwLjAwMFoifQ.F4kUCyDUJE_bCgdlBPMDNY1MkZfkURqmneg1D9rErDk"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "payload edited after signing",
+      "secretHex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "qr": "eyJ2IjoxLCJ0aWQiOiI4ZjhjMmI5ZS02YTNmLTRkNjEtOWE0Ny0yZjNhMWMwZDllMTEiLCJndyI6IlBPUlRFLUEiLCJ0dCI6InZpcCIsInR4IjoiMGU5YTdjMWQtMmIzYy00ZDVlLThmOTAtYTFiMmMzZDRlNWY2IiwidG4iOiJQT1JURS1BLTBlOWE3YzFkLTAtMCIsImlhdCI6IjIwMjYtMTAtMjhUMTA6MDA6MDAuMDAwWiJ9.ti1sYuOOEpAA8z22PcTMIauMvoH-Bq6QCFvdWs45JPw",
+      "reason": "INVALID_SIGNATURE"
+    },
+    {
+      "name": "signature altered",
+      "secretHex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "qr": "eyJ2IjoxLCJ0aWQiOiI4ZjhjMmI5ZS02YTNmLTRkNjEtOWE0Ny0yZjNhMWMwZDllMTEiLCJndyI6IlBPUlRFLUEiLCJ0dCI6IjRiMWM3ZTUyLTBkMGEtNGY3ZS04ZjU1LTBiMWUyYzNkNGU1ZiIsInR4IjoiMGU5YTdjMWQtMmIzYy00ZDVlLThmOTAtYTFiMmMzZDRlNWY2IiwidG4iOiJQT1JURS1BLTBlOWE3YzFkLTAtMCIsImlhdCI6IjIwMjYtMTAtMjhUMTA6MDA6MDAuMDAwWiJ9.Ai1sYuOOEpAA8z22PcTMIauMvoH-Bq6QCFvdWs45JPw",
+      "reason": "INVALID_SIGNATURE"
+    },
+    {
+      "name": "signed by another gate",
+      "secretHex": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "qr": "eyJ2IjoxLCJ0aWQiOiI4ZjhjMmI5ZS02YTNmLTRkNjEtOWE0Ny0yZjNhMWMwZDllMTEiLCJndyI6IlBPUlRFLUEiLCJ0dCI6IjRiMWM3ZTUyLTBkMGEtNGY3ZS04ZjU1LTBiMWUyYzNkNGU1ZiIsInR4IjoiMGU5YTdjMWQtMmIzYy00ZDVlLThmOTAtYTFiMmMzZDRlNWY2IiwidG4iOiJQT1JURS1BLTBlOWE3YzFkLTAtMCIsImlhdCI6IjIwMjYtMTAtMjhUMTA6MDA6MDAuMDAwWiJ9.ti1sYuOOEpAA8z22PcTMIauMvoH-Bq6QCFvdWs45JPw",
+      "reason": "INVALID_SIGNATURE"
+    },
+    {
+      "name": "no dot",
+      "secretHex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "qr": "no-dot",
+      "reason": "MALFORMED"
+    },
+    {
+      "name": "three parts",
+      "secretHex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "qr": "a.b.c",
+      "reason": "MALFORMED"
+    },
+    {
+      "name": "payload not JSON",
+      "secretHex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "qr": "bm90IGpzb24.ti1sYuOOEpAA8z22PcTMIauMvoH-Bq6QCFvdWs45JPw",
+      "reason": "MALFORMED"
+    }
+  ]
+}

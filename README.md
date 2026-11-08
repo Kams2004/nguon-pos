@@ -6,10 +6,13 @@ for the full design, [`docs/SYNC_PROTOCOL.md`](docs/SYNC_PROTOCOL.md) and
 [`docs/QR_TICKET_SPEC.md`](docs/QR_TICKET_SPEC.md) for the two protocols that
 make offline operation safe.
 
-**Current status**: Milestone 0 (skeleton & infra) — three Spring Boot
-services with health checks, an installable blank PWA shell, nginx path-based
-routing, all wired through `docker-compose`. No business logic yet; that's
-Milestone 1.
+**Current status**: event ticketing is feature-complete — offline sale and
+entry scan with signed QR codes, multi-till sync, print modes (Standard /
+Individuel / par type de billet), ticket and receipt designer, live admin
+(dashboard, sales, reports with A4 print, tills, entry control, activity
+journal, users, media library on MinIO) and the annual subscription module
+(present, switched off by default, never blocks a till). Retail POS
+(products, barcodes, till sessions) is not built yet.
 
 ## Local development
 
@@ -27,6 +30,14 @@ open http://localhost:8081    # the PWA shell, with live service status tiles
 ./deploy.sh logs sales-service   # tail one service's logs
 ./deploy.sh auth-service         # rebuild & redeploy just that service
 ./deploy.sh down                 # stop everything (keeps the DB volume)
+```
+
+## Tests
+
+```bash
+cd services/sales-service && mvn test     # sync idempotency, SQL injection, access rules (needs Docker)
+cd services/catalog-service && mvn test   # subscription status rules
+cd frontend/pos-pwa && npm test           # QR signature tamper checks, print modes
 ```
 
 ## Services

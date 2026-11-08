@@ -1,7 +1,11 @@
-import type { GateSession } from "../../lib/offline/session";
+import { MapPin } from "lucide-react";
+import { formatMoney } from "../../lib/format";
+import { fillPlaceholders, type ResolvedTicketDesign } from "../../lib/ticketDesign";
 
 export type TicketCardProps = {
-  session: GateSession;
+  design: ResolvedTicketDesign;
+  logoUrl: string;
+  gateName: string;
   ticketNumber: string;
   ticketTypeName: string;
   price: number;
@@ -12,14 +16,26 @@ export type TicketCardProps = {
   total: number;
 };
 
+const QR_SIZES = { s: "h-32 w-32", m: "h-40 w-40", l: "h-48 w-48" } as const;
+
 /**
  * One full, standalone admission ticket — one per entry, always, regardless
  * of how many entries were bought in a single sale or how the ticket
  * type's print mode is configured. A purchase of N entries renders N of
  * these; it never collapses into shared/thumbnail QR codes (see Sell.tsx).
+ *
+ * Wording, colours and visible blocks come from "Billet & reçu" (see
+ * lib/ticketDesign.ts), so the editor's preview is exactly what tills print.
+ * The QR code and ticket number are always shown — they are what makes the
+ * ticket verifiable at the gate.
+ *
+ * On screen it wears its frame; in print the frame and artwork drop to a
+ * thin rule, since a thermal printer would render them as solid black.
  */
 export default function TicketCard({
-  session,
+  design,
+  logoUrl,
+  gateName,
   ticketNumber,
   ticketTypeName,
   price,
@@ -29,72 +45,87 @@ export default function TicketCard({
   index,
   total,
 }: TicketCardProps) {
+  const o = design.ticket;
   const date = new Date(createdAtClient);
-  const establishment = session.bootstrap.establishment;
-  const gate = session.bootstrap.gate;
+  // "NGUON FESTIVAL" stacks as two lines like the mockup; any title works.
+  const [titleFirst, ...titleRest] = design.ticketTitle.split(" ");
+  const accent = { color: o.accent };
+
+  const frameStyle =
+    o.frame === "pattern"
+      ? { backgroundColor: o.accent, backgroundImage: "url(/img/banners/blue.jpg)", backgroundBlendMode: "luminosity" as const }
+      : o.frame === "solid"
+        ? { backgroundColor: o.accent }
+        : undefined;
 
   return (
-    <div className="ticket-card rounded-[1.75rem] overflow-hidden bg-card border border-border shadow-lg shadow-black/5 break-inside-avoid">
-      <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary" />
-      <div className="relative bg-sidebar text-sidebar-foreground px-6 py-5 overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-20 mix-blend-soft-light"
-          style={{ backgroundImage: "url(/img/diamond-pattern.svg)", backgroundSize: "140px" }}
-        />
-        <div className="relative flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <img src="/logo.png" alt="" className="h-8 flex-shrink-0 drop-shadow rounded bg-white/10 p-0.5" />
-            <div className="min-w-0">
-              <p className="font-display font-black text-sm leading-tight truncate">{establishment.name}</p>
-              <p className="text-[11px] text-sidebar-foreground/70 truncate">{gate.name}</p>
+    <div
+      className={`ticket-card break-inside-avoid rounded-[1.5rem] bg-cover bg-center print:rounded-none print:bg-white print:bg-none print:p-0 print:shadow-none ${
+        o.frame === "none" ? "border-2 p-0" : "p-2.5 shadow-xl shadow-black/10"
+      }`}
+      style={o.frame === "none" ? { borderColor: o.accent } : frameStyle}
+    >
+      <div className="relative overflow-hidden rounded-[1.1rem] bg-white print:rounded-none print:border print:border-black">
+        {total > 1 && (
+          <span
+            className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold text-white print:border print:border-black print:bg-white print:text-black"
+            style={{ backgroundColor: o.accent }}
+          >
+            {index + 1} / {total}
+          </span>
+        )}
+
+        <div className="flex flex-col items-center px-5 pt-5 text-center">
+          <div className="flex items-center gap-2">
+            {o.showLogo && <img src={logoUrl} alt="" className="h-10 w-10 object-contain" />}
+            <div className="text-left leading-none print:!text-black" style={accent}>
+              <p className="font-display text-lg font-extrabold">{titleFirst}</p>
+              {titleRest.length > 0 && <p className="font-display text-lg font-extrabold">{titleRest.join(" ")}</p>}
             </div>
           </div>
-          {total > 1 && (
-            <span className="text-[11px] font-bold bg-primary text-primary-foreground rounded-full px-2.5 py-1 flex-shrink-0">
-              {index + 1} / {total}
-            </span>
-          )}
-        </div>
-      </div>
+          {o.showSubtitle && <p className="mt-1.5 text-[11px] font-bold text-foreground">{design.ticketSubtitle}</p>}
+          {o.showTagline && <p className="text-[10px] text-muted-foreground print:text-black">{design.ticketTagline}</p>}
 
-      <div className="px-6 py-5 flex flex-col items-center text-center gap-4">
-        <div>
-          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.15em]">Billet d'entrée</p>
-          <h3 className="font-display text-xl font-black text-foreground mt-0.5">{ticketTypeName}</h3>
-        </div>
-
-        <div className="p-3 rounded-2xl bg-white shadow-inner border-2 border-primary/30">
-          {qrImage ? (
-            <img src={qrImage} alt={ticketNumber} className="w-44 h-44" />
-          ) : (
-            <div className="w-44 h-44 bg-muted animate-pulse rounded-lg" />
-          )}
-        </div>
-
-        <p className="font-mono font-bold text-sm text-foreground tracking-wide">
-          N° <span className="text-[hsl(38,80%,42%)]">{ticketNumber}</span>
-        </p>
-
-        <div className="w-full border-t border-dashed border-border" />
-
-        <div className="w-full grid grid-cols-2 gap-3 text-left">
-          <div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Date</p>
-            <p className="text-xs font-semibold text-foreground">
-              {date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-            </p>
+          <div className="mt-3 rounded-xl border-2 bg-white p-2 print:border-0 print:p-0" style={{ borderColor: `${o.accent}55` }}>
+            {qrImage ? (
+              <img src={qrImage} alt={ticketNumber} className={QR_SIZES[o.qrSize]} />
+            ) : (
+              <div className={`${QR_SIZES[o.qrSize]} animate-pulse rounded-lg bg-muted`} />
+            )}
           </div>
-          <div className="text-right">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Tarif</p>
-            <p className="text-xs font-semibold text-foreground">
-              {price.toLocaleString("fr-FR")} {currency}
-            </p>
-          </div>
-        </div>
-      </div>
 
-      <div className="bg-muted/60 px-6 py-2.5 text-center">
-        <p className="text-[10px] text-muted-foreground">Valable uniquement à {gate.name} — usage unique</p>
+          <h3 className="mt-3 font-display text-xl font-extrabold print:!text-black" style={accent}>
+            {ticketTypeName}
+          </h3>
+          <p className="mt-0.5 font-mono text-xs font-bold text-foreground">N° : {ticketNumber}</p>
+          {o.showDate && (
+            <p className="mt-1 text-xs text-muted-foreground print:text-black">
+              {date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" })} ·{" "}
+              {date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
+          {o.showLocation && (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground print:text-black">
+              <MapPin className="h-3 w-3" /> {design.ticketLocation} — {gateName}
+            </p>
+          )}
+          {o.showPrice && <p className="mt-2 font-display text-base font-extrabold text-foreground">Prix : {formatMoney(price, currency)}</p>}
+          {o.note && <p className="mt-2 rounded-lg bg-muted/70 px-3 py-1 text-[11px] font-semibold text-foreground print:bg-white">{o.note}</p>}
+        </div>
+
+        {o.showBanner ? (
+          <div className="relative mt-3 h-24 print:hidden">
+            <img src={design.ticketBannerUrl} alt="" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-b from-white via-white/10 to-transparent" />
+          </div>
+        ) : (
+          <div className="h-4" />
+        )}
+        {o.showFooter && (
+          <p className="bg-muted/60 px-3 py-2 text-center text-[10px] text-muted-foreground print:border-t print:border-dashed print:border-black print:bg-white print:py-1.5 print:text-[9px] print:text-black">
+            {fillPlaceholders(design.ticketFooter, gateName)}
+          </p>
+        )}
       </div>
     </div>
   );

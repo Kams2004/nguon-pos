@@ -22,3 +22,6 @@ dist-ssr/
 
 # Logs
 *.log
+
+# Self-signed LAN test certificates
+nginx/certs/

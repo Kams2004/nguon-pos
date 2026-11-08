@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { AlertTriangle, Check, HelpCircle, ScanLine, X, type LucideIcon } from "lucide-react";
 import { useSession } from "../../context/SessionContext";
 import { scanTicket, type ScanOutcome } from "../../lib/offline/scan";
 import type { GateSession } from "../../lib/offline/session";
@@ -12,7 +13,9 @@ import GateHeader from "./GateHeader";
 export default function Scan() {
   const { session, syncNow, refreshPendingCount } = useSession();
   const [value, setValue] = useState("");
-  const [result, setResult] = useState<ScanOutcome | null>(null);
+  const [result, setResult] = useState<{ outcome: ScanOutcome; at: Date } | null>(null);
+  // This session's scans, newest first — what the controller glances back at.
+  const [history, setHistory] = useState<{ outcome: ScanOutcome; at: Date }[]>([]);
   const [scanning, setScanning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -29,7 +32,9 @@ export default function Scan() {
     setScanning(true);
     try {
       const outcome = await scanTicket(gateSession, content);
-      setResult(outcome);
+      const entry = { outcome, at: new Date() };
+      setResult(entry);
+      setHistory((h) => [entry, ...h].slice(0, 50));
       refreshPendingCount();
       syncNow(); // fire-and-forget
     } finally {
@@ -39,81 +44,181 @@ export default function Scan() {
     }
   };
 
+  const accepted = history.filter((h) => h.outcome.kind === "ACCEPTED").length;
+
   return (
     <div className="min-h-screen bg-background">
       <GateHeader />
-      <div className="max-w-md mx-auto p-4 sm:p-6 space-y-6">
-        <div className="text-center space-y-1 pt-2">
-          <h2 className="font-display text-xl font-bold text-foreground">Validation de billet</h2>
-          <p className="text-sm text-muted-foreground">
-            Présentez le QR code du billet au lecteur, ou collez-le manuellement.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="relative rounded-[1.75rem] bg-sidebar p-8 flex flex-col items-center gap-4 overflow-hidden">
-            <div
-              className="absolute inset-0 opacity-10 mix-blend-soft-light"
-              style={{ backgroundImage: "url(/img/diamond-pattern.svg)", backgroundSize: "160px" }}
-            />
+      <div className="mx-auto grid max-w-[1400px] gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <div className="space-y-5">
+          <form onSubmit={handleSubmit} className="relative overflow-hidden rounded-2xl bg-royal-deep px-6 pb-7 pt-6 shadow-[0_10px_30px_-14px_hsl(var(--royal-deep)/0.6)]">
+            <img src="/img/banners/navy-palace.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-50" />
+            <div className="absolute inset-0 bg-gradient-to-b from-royal-deep/60 via-transparent to-royal-deep/80" />
+            <div className="relative text-center">
+              <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Validation de billet</h1>
+              <p className="text-sm text-white/75">{session.bootstrap.gate.name}</p>
+            </div>
             {/* Viewfinder frame — a visual nod to camera-style scanning, though
                 this gate reads tickets as HID/manual text input, not a live
                 camera feed (see offline-first architecture notes). */}
-            <div
-              className={`relative w-40 h-40 rounded-2xl flex items-center justify-center transition-colors ${
-                scanning ? "bg-primary/10" : ""
-              }`}
-            >
-              {(["top-2 left-2 border-t-2 border-l-2", "top-2 right-2 border-t-2 border-r-2", "bottom-2 left-2 border-b-2 border-l-2", "bottom-2 right-2 border-b-2 border-r-2"] as const).map(
-                (pos) => (
-                  <span
-                    key={pos}
-                    className={`absolute w-7 h-7 rounded-sm ${pos} ${scanning ? "border-primary" : "border-sidebar-foreground/40"}`}
-                  />
-                ),
-              )}
-              <span className={`text-4xl ${scanning ? "animate-pulse text-primary" : "text-sidebar-foreground/50"}`}>▭</span>
+            <div className="relative mx-auto mt-6 flex h-56 w-56 items-center justify-center sm:h-64 sm:w-64">
+              {(
+                [
+                  "left-0 top-0 border-l-4 border-t-4 rounded-tl-2xl",
+                  "right-0 top-0 border-r-4 border-t-4 rounded-tr-2xl",
+                  "bottom-0 left-0 border-b-4 border-l-4 rounded-bl-2xl",
+                  "bottom-0 right-0 border-b-4 border-r-4 rounded-br-2xl",
+                ] as const
+              ).map((pos) => (
+                <span key={pos} className={`absolute h-12 w-12 border-primary ${pos}`} />
+              ))}
+              <span
+                className={`absolute inset-x-5 top-1/2 h-0.5 rounded-full bg-primary/80 shadow-[0_0_12px_2px] shadow-primary/60 ${
+                  scanning ? "animate-pulse" : ""
+                }`}
+              />
+              <ScanLine className={`h-16 w-16 ${scanning ? "animate-pulse text-primary" : "text-white/40"}`} strokeWidth={1.4} />
             </div>
+            <p className="relative mt-5 text-center text-sm text-white/85">Présentez le QR code au lecteur</p>
             <input
               ref={inputRef}
               type="text"
               autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder="Scanner ou coller le contenu du billet…"
-              className="relative w-full text-center border border-sidebar-border rounded-xl px-4 py-3 text-sm font-mono bg-white/95 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary"
+              placeholder="ou collez le code puis Entrée"
+              aria-label="Code du billet"
+              className="relative mt-3 w-full rounded-xl border border-white/20 bg-white/95 px-4 py-3.5 text-center font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               disabled={scanning}
             />
-          </div>
-        </form>
+          </form>
 
-        {result && <ResultCard result={result} />}
+          <div className="card grid grid-cols-3 divide-x divide-border text-center">
+            <div className="px-3 py-4">
+              <p className="font-display text-2xl font-extrabold tabular-nums">{history.length}</p>
+              <p className="text-xs font-semibold text-muted-foreground">Scans</p>
+            </div>
+            <div className="px-3 py-4">
+              <p className="font-display text-2xl font-extrabold tabular-nums text-success">{accepted}</p>
+              <p className="text-xs font-semibold text-muted-foreground">Entrées validées</p>
+            </div>
+            <div className="px-3 py-4">
+              <p className="font-display text-2xl font-extrabold tabular-nums text-destructive">{history.length - accepted}</p>
+              <p className="text-xs font-semibold text-muted-foreground">Refus</p>
+            </div>
+          </div>
+        </div>
+
+        {/* On a phone the verdict goes on top once a ticket is read, so it's in view. */}
+        <div className={`space-y-5 ${result ? "order-first lg:order-none" : ""}`}>
+          {result ? (
+            <ResultPanel key={result.at.getTime()} outcome={result.outcome} at={result.at} />
+          ) : (
+            <div className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-royal/20 bg-card px-6 text-center">
+              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-royal/10 text-royal">
+                <ScanLine className="h-8 w-8" strokeWidth={1.8} />
+              </span>
+              <p className="mt-4 font-display text-xl font-bold text-foreground">Prêt à scanner</p>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Le résultat s'affiche ici en grand dès qu'un billet est lu : vert pour entrer, rouge pour refuser.
+              </p>
+            </div>
+          )}
+
+          <div className="card overflow-hidden">
+            <div className="flex items-center justify-between px-5 pb-3 pt-4">
+              <h2 className="font-display text-sm font-bold text-foreground">Derniers scans</h2>
+              <span className="text-xs text-muted-foreground">cette session</span>
+            </div>
+            {history.length === 0 ? (
+              <p className="px-5 pb-5 text-sm text-muted-foreground">Aucun billet scanné depuis l'ouverture de cet écran.</p>
+            ) : (
+              <ul className="divide-y divide-border border-t border-border">
+                {history.slice(0, 8).map((h) => {
+                  const st = STYLES[h.outcome.kind];
+                  const Icon = st.icon;
+                  return (
+                    <li key={h.at.getTime()} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                      <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${st.panel}`}>
+                        <Icon className="h-4 w-4" strokeWidth={3} />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-semibold">{st.title}</span>
+                      <span className="hidden truncate font-mono text-xs text-muted-foreground sm:block">
+                        {"ticketNumber" in h.outcome ? h.outcome.ticketNumber : ""}
+                      </span>
+                      <span className="w-16 text-right text-xs tabular-nums text-muted-foreground">{h.at.toLocaleTimeString("fr-FR")}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function ResultCard({ result }: { result: ScanOutcome }) {
-  const styles: Record<ScanOutcome["kind"], { bg: string; text: string; icon: string; label: string }> = {
-    ACCEPTED: { bg: "bg-green-100", text: "text-green-800", icon: "✓", label: "Entrée autorisée" },
-    REJECTED_ALREADY_REDEEMED: { bg: "bg-destructive/10", text: "text-destructive", icon: "✕", label: "Déjà utilisé" },
-    REJECTED_INVALID_SIGNATURE: { bg: "bg-destructive/10", text: "text-destructive", icon: "✕", label: "Billet invalide" },
-    REJECTED_WRONG_GATE: { bg: "bg-destructive/10", text: "text-destructive", icon: "✕", label: "Mauvaise porte" },
-    NOT_RECOGNIZED: { bg: "bg-muted", text: "text-muted-foreground", icon: "?", label: "Non reconnu sur cet appareil" },
-  };
-  const style = styles[result.kind];
-  const ticketNumber = "ticketNumber" in result ? result.ticketNumber : null;
+const STYLES: Record<
+  ScanOutcome["kind"],
+  { icon: LucideIcon; title: string; barLabel: string; panel: string }
+> = {
+  ACCEPTED: {
+    icon: Check,
+    title: "Billet valide",
+    barLabel: "Accès autorisé",
+    panel: "bg-success text-white",
+  },
+  REJECTED_ALREADY_REDEEMED: {
+    icon: X,
+    title: "Billet déjà utilisé",
+    barLabel: "Accès refusé",
+    panel: "bg-destructive text-white",
+  },
+  REJECTED_INVALID_SIGNATURE: {
+    icon: X,
+    title: "Billet invalide",
+    barLabel: "Accès refusé",
+    panel: "bg-destructive text-white",
+  },
+  REJECTED_WRONG_GATE: {
+    icon: AlertTriangle,
+    title: "Mauvaise porte",
+    barLabel: "Orienter vers la bonne porte",
+    panel: "bg-amber-400 text-amber-950",
+  },
+  NOT_RECOGNIZED: {
+    icon: HelpCircle,
+    title: "Non reconnu sur cet appareil",
+    barLabel: "Vérifier auprès du coordonnateur",
+    panel: "bg-slate-600 text-white",
+  },
+};
 
+function ResultPanel({ outcome, at }: { outcome: ScanOutcome; at: Date }) {
+  const style = STYLES[outcome.kind];
+  const Icon = style.icon;
+  const ticketNumber = "ticketNumber" in outcome ? outcome.ticketNumber : null;
+
+  // Colour-drenched so the verdict reads from across the gate, not just from the screen.
   return (
-    <div className={`rounded-[1.75rem] p-7 text-center space-y-3 ${style.bg} animate-in fade-in`}>
-      <div
-        className={`w-14 h-14 rounded-full mx-auto flex items-center justify-center text-2xl font-black ${style.text}`}
-        style={{ backgroundColor: "rgba(255,255,255,0.5)" }}
-      >
-        {style.icon}
+    <div
+      role="status"
+      className={`animate-in fade-in zoom-in-95 flex min-h-[260px] flex-col justify-between rounded-2xl p-6 shadow-lg duration-200 sm:p-8 ${style.panel}`}
+    >
+      <div className="flex items-start gap-5">
+        <span className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30">
+          <Icon className="h-11 w-11" strokeWidth={3} />
+        </span>
+        <div className="min-w-0 pt-1">
+          <p className="font-display text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">{style.title}</p>
+          {ticketNumber && <p className="mt-1 truncate font-mono text-sm opacity-90">{ticketNumber}</p>}
+          <p className="mt-0.5 text-sm tabular-nums opacity-80">Scanné à {at.toLocaleTimeString("fr-FR")}</p>
+        </div>
       </div>
-      <p className={`font-display text-xl font-bold ${style.text}`}>{style.label}</p>
-      {ticketNumber && <p className="text-sm font-mono text-muted-foreground">{ticketNumber}</p>}
+      <p className="mt-8 rounded-xl bg-black/15 px-5 py-4 text-center font-display text-2xl font-extrabold uppercase tracking-wide">
+        {style.barLabel}
+      </p>
     </div>
   );
 }

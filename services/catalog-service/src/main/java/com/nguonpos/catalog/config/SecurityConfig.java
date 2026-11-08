@@ -30,7 +30,7 @@ public class SecurityConfig {
                         // SecurityConfig for why (an unhandled exception's
                         // internal forward to /error gets denied otherwise,
                         // surfacing every server error as a misleading 403).
-                        .requestMatchers("/actuator/health/**", "/error").permitAll()
+                        .requestMatchers("/actuator/health/**", "/error", "/catalog/public/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

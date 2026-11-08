@@ -12,5 +12,11 @@ public enum ScanResult {
     // Server-side-only outcome: the ticket id wasn't found in this
     // establishment's data at all when the scan synced (distinct from the
     // client's own, more ambiguous "not recognized on this device" state).
-    REJECTED_UNKNOWN_TICKET
+    REJECTED_UNKNOWN_TICKET,
+    // The ticket's sale was voided: the ticket no longer admits anyone.
+    REJECTED_VOIDED,
+    // The scan reached central before the sale that issued the ticket
+    // (another till's sale not synced yet). Settled to ACCEPTED or
+    // REJECTED_ALREADY_REDEEMED as soon as that sale arrives.
+    PENDING_TICKET
 }

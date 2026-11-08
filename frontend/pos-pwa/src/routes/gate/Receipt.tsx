@@ -1,111 +1,213 @@
-import type { GateSession } from "../../lib/offline/session";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import type { PaymentMethod } from "../../lib/api/types";
-import type { IssuedTicket } from "../../lib/offline/sale";
+import { PAYMENT_LABELS, formatMoney } from "../../lib/format";
+import { fillPlaceholders, type ResolvedTicketDesign } from "../../lib/ticketDesign";
 
-const PAYMENT_LABELS: Record<PaymentMethod, string> = {
-  CASH: "Espèces",
-  MOBILE_MONEY: "Mobile Money",
-  CARD: "Carte",
-  OTHER: "Autre",
+export type ReceiptLine = { name: string; quantity: number; unitPrice: number };
+/** An entry printed on the receipt itself (print mode "Standard"). */
+export type ReceiptEntry = {
+  ticketNumber: string;
+  typeName: string;
+  qrImage: string | undefined;
 };
 
 export type ReceiptProps = {
-  session: GateSession;
-  localReference: string; // the client-generated transaction id — see note below
-  synced: boolean;
-  serverReference: string | null;
+  design: ResolvedTicketDesign;
+  logoUrl: string | null;
+  establishmentName: string;
+  gateName: string;
+  cashierName: string;
+  reference: string; // server reference once synced, else the local LOC-… one
   createdAtClient: string;
-  ticketTypeName: string;
-  unitPrice: number;
+  lines: ReceiptLine[];
   currency: string;
-  quantity: number;
   paymentMethod: PaymentMethod;
-  tickets: IssuedTicket[];
+  ticketCount: number;
+  received?: number | null; // cash only
+  /** Entries whose QR codes go on this receipt rather than on separate tickets. */
+  entries?: ReceiptEntry[];
 };
 
 /**
- * Compact, thermal-printer-width receipt (72mm print area, the printable
- * width on a standard 80mm roll) — the payment/till slip. It proves what
- * was paid, never an entry credential: it carries no QR code, however many
- * tickets the sale produced. Every ticket is always its own full TicketCard
- * (see TicketCard.tsx) — one admission, one card, one QR, no exceptions.
+ * Compact thermal receipt — the payment/till slip. 72mm print area on an
+ * 80mm roll, 48mm on a 58mm roll (chosen in "Billet & reçu"). It proves
+ * what was paid. In print mode "Individuel" it is never an entry credential:
+ * entry QR codes are on the individual TicketCards. In mode "Standard" the
+ * entries are printed here instead (`entries`), one signed QR per entry, so
+ * a single slip covers the purchase. The optional reference QR only encodes
+ * the sale reference, for looking the sale up in the back office.
  * The transaction hasn't necessarily synced yet when this prints — offline
  * sales must still produce a usable receipt — so it shows the
- * client-generated reference with a clear "not yet synced" note rather than
- * blocking on or faking a server reference number.
+ * client-generated reference (LOC-…) rather than blocking on or faking a
+ * server reference number; the two stay linked in the back office.
  */
 export default function Receipt({
-  session,
-  localReference,
-  synced,
-  serverReference,
+  design,
+  logoUrl,
+  establishmentName,
+  gateName,
+  cashierName,
+  reference,
   createdAtClient,
-  ticketTypeName,
-  unitPrice,
+  lines,
   currency,
-  quantity,
   paymentMethod,
-  tickets,
+  ticketCount,
+  received = null,
+  entries = [],
 }: ReceiptProps) {
-  const total = unitPrice * quantity;
+  const o = design.receipt;
+  const total = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
   const date = new Date(createdAtClient);
+  const [qr, setQr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!o.showQr) return setQr(null);
+    QRCode.toDataURL(reference, { width: 160, margin: 0 })
+      .then(setQr)
+      .catch(() => setQr(null));
+  }, [o.showQr, reference]);
+
+  const header = o.headerLines
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const legal = o.legalLines
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const showCash = o.showCashDetails && paymentMethod === "CASH" && received !== null && received >= total;
 
   return (
-    <div className="receipt mx-auto bg-white text-black text-xs font-mono leading-tight p-4 border border-border rounded-lg print:border-0 print:rounded-none print:p-0">
-      <div className="text-center space-y-1 mb-3">
-        {session.bootstrap.establishment.logoUrl ? (
-          <img src={session.bootstrap.establishment.logoUrl} alt="" className="h-10 mx-auto" />
-        ) : (
-          <p className="font-bold text-sm">{session.bootstrap.establishment.name}</p>
+    <div
+      data-paper={o.paperWidth}
+      className={`receipt mx-auto border border-border bg-white p-4 font-mono leading-tight text-black print:rounded-none print:border-0 print:p-0 ${
+        o.fontSize === "s" ? "text-[10px]" : "text-xs"
+      } rounded-lg`}
+    >
+      <div className="mb-3 space-y-1 text-center">
+        {o.showLogo && logoUrl && <img src={logoUrl} alt="" className="mx-auto h-10 object-contain" />}
+        {o.showName && <p className="text-sm font-bold">{establishmentName}</p>}
+        {header.map((l, i) => (
+          <p key={i} className="text-[10px]">
+            {l}
+          </p>
+        ))}
+        {o.showGate && <p className="text-[10px]">{gateName}</p>}
+      </div>
+
+      <Rule />
+
+      <div className="space-y-0.5">
+        <Row label="Réf." value={reference} />
+        <Row
+          label="Date"
+          value={date.toLocaleString("fr-FR", {
+            dateStyle: "short",
+            timeStyle: "short",
+          })}
+        />
+        {o.showCashier && <Row label="Caissier" value={cashierName} />}
+      </div>
+
+      <Rule />
+
+      <div className="space-y-1">
+        {lines.map((l, i) =>
+          o.showUnitPrices ? (
+            <div key={i}>
+              <p>{l.name}</p>
+              <div className="flex justify-between gap-2">
+                <span>
+                  {l.quantity} × {formatMoney(l.unitPrice, currency)}
+                </span>
+                <span className="whitespace-nowrap">{formatMoney(l.unitPrice * l.quantity, currency)}</span>
+              </div>
+            </div>
+          ) : (
+            <div key={i} className="flex justify-between gap-2">
+              <span>
+                {l.quantity} × {l.name}
+              </span>
+              <span className="whitespace-nowrap">{formatMoney(l.unitPrice * l.quantity, currency)}</span>
+            </div>
+          ),
         )}
-        <p className="text-[10px]">{session.bootstrap.gate.name}</p>
       </div>
 
-      <div className="border-t border-dashed border-black/40 my-2" />
+      <Rule />
 
-      <div className="space-y-0.5">
-        <Row label="Réf." value={serverReference ?? `LOC-${localReference.slice(0, 8)}`} />
-        {!synced && <p className="text-[9px] italic text-center">(en attente de synchronisation)</p>}
-        <Row label="Date" value={date.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} />
-        <Row label="Caissier" value={session.fullName} />
-      </div>
-
-      <div className="border-t border-dashed border-black/40 my-2" />
-
-      <div className="space-y-0.5">
-        <div className="flex justify-between">
-          <span>
-            {quantity} × {ticketTypeName}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span>
-            {unitPrice.toLocaleString("fr-FR")} {currency} / unité
-          </span>
-          <span>
-            {total.toLocaleString("fr-FR")} {currency}
-          </span>
-        </div>
-      </div>
-
-      <div className="border-t border-dashed border-black/40 my-2" />
-
-      <div className="flex justify-between font-bold text-sm">
+      <div className="flex justify-between text-sm font-bold">
         <span>TOTAL</span>
-        <span>
-          {total.toLocaleString("fr-FR")} {currency}
-        </span>
+        <span>{formatMoney(total, currency)}</span>
       </div>
-      <Row label="Paiement" value={PAYMENT_LABELS[paymentMethod]} />
+      {o.showPayment && <Row label="Paiement" value={PAYMENT_LABELS[paymentMethod]} />}
+      {showCash && (
+        <>
+          <Row label="Reçu" value={formatMoney(received!, currency)} />
+          <Row label="Rendu" value={formatMoney(received! - total, currency)} />
+        </>
+      )}
 
-      <div className="border-t border-dashed border-black/40 my-2" />
-      <p className="text-center text-[9px]">
-        {tickets.length} billet{tickets.length > 1 ? "s" : ""} — voir carte{tickets.length > 1 ? "s" : ""} ci-après
-      </p>
-      <div className="border-t border-dashed border-black/40 my-2" />
-      <p className="text-center text-[9px]">Merci de votre visite — Nguon {new Date().getFullYear()}</p>
+      {entries.length > 0 && (
+        <>
+          <Rule />
+          <p className="text-center text-[10px] font-bold uppercase">
+            {entries.length > 1 ? `${entries.length} entrées — une par personne` : "Entrée"}
+          </p>
+          <div className={`mt-2 grid gap-x-2 gap-y-3 ${o.paperWidth === 58 || entries.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+            {entries.map((e, i) => (
+              <div key={e.ticketNumber} className="break-inside-avoid text-center">
+                {e.qrImage ? (
+                  <img src={e.qrImage} alt={e.ticketNumber} className="mx-auto h-28 w-28" />
+                ) : (
+                  <div className="mx-auto h-28 w-28 animate-pulse bg-black/5" />
+                )}
+                <p className="mt-1 text-[10px] font-bold">{e.typeName}</p>
+                <p className="text-[9px]">
+                  {e.ticketNumber}
+                  {entries.length > 1 ? ` · ${i + 1}/${entries.length}` : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-center text-[9px]">Chaque code n'est valable que pour une seule entrée.</p>
+        </>
+      )}
+      {o.showTicketCount && ticketCount > entries.length && (
+        <>
+          <Rule />
+          <p className="text-center text-[9px]">
+            {ticketCount - entries.length} billet
+            {ticketCount - entries.length > 1 ? "s" : ""} — voir carte
+            {ticketCount - entries.length > 1 ? "s" : ""} ci-après
+          </p>
+        </>
+      )}
+      {qr && (
+        <div className="mt-2 flex justify-center">
+          <img src={qr} alt={reference} className="h-20 w-20" />
+        </div>
+      )}
+      {legal.length > 0 && (
+        <>
+          <Rule />
+          {legal.map((l, i) => (
+            <p key={i} className="text-center text-[9px]">
+              {l}
+            </p>
+          ))}
+        </>
+      )}
+      <Rule />
+      <p className="text-center text-[9px]">{fillPlaceholders(design.receiptFooter, gateName)}</p>
     </div>
   );
+}
+
+function Rule() {
+  return <div className="my-2 border-t border-dashed border-black/40" />;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

@@ -23,6 +23,8 @@ public class EntryScan {
     @Column(nullable = false)
     private UUID ticketId;
 
+    private UUID establishmentId;
+
     @Column(nullable = false)
     private UUID gateId;
 

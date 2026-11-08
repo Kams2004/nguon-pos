@@ -67,6 +67,26 @@ Verified directly in `/home/kamsu-perold/Nguon-backend` before writing this:
   service's `config/SecurityConfig.java`); `@PreAuthorize` role checks land
   with the business logic in Milestone 1.
 
+## Database access and SQL injection
+
+User input never becomes SQL text. Every query is one of:
+
+- Spring Data derived queries or JPQL with named parameters
+  (`TicketTypeRepository.findSellableAtGate`);
+- JPA Criteria `Specification`s built from typed request parameters
+  (`UUID`, `Instant`, enums) — sale list, scan list. A value that doesn't
+  parse is a 400 before any query runs;
+- `JdbcTemplate` with `?` bind parameters, where the SQL string itself is
+  assembled only from constants (audit writes, the consolidated journal).
+  Free-text search escapes `%`/`_` (`ESCAPE '\'`) so they match literally,
+  and the journal's category is checked against a fixed list.
+
+Request bodies carry `@Valid` with `@Size` limits that match the column
+lengths, so oversized input is a clean 400. `SalesSecurityIntegrationTest`
+replays injection payloads against a real Postgres and checks the tables are
+untouched. Keep new code to these three forms; never concatenate a request
+value into a query string, an `ORDER BY`, or a table/column name.
+
 ## Build order
 
 See the approved plan at `/home/kamsu-perold/.claude/plans/linear-conjuring-badger.md`

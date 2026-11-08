@@ -36,6 +36,8 @@ public class JwtService {
         return Jwts.builder()
                 .subject(user.getUsername())
                 .claim("userId", user.getId().toString())
+                // Lets every service name the actor in the activity journal without a lookup.
+                .claim("fullName", user.getFullName())
                 .claim("establishmentId", user.getEstablishmentId().toString())
                 .claim("role", user.getRole().name())
                 .claim("assignedGateId", user.getAssignedGateId() != null ? user.getAssignedGateId().toString() : null)
