@@ -16,5 +16,6 @@
         <module>services/auth-service</module>
         <module>services/catalog-service</module>
         <module>services/sales-service</module>
+        <module>edge/edge-service</module>
     </modules>
 </project>
