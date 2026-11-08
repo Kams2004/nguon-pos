@@ -18,6 +18,11 @@ export default defineMessages({
     "shell.login.submit": "Se connecter",
     "shell.login.submitting": "Connexion…",
     "shell.login.invalid": "Identifiants invalides.",
+    "shell.login.error.FIRST_LOGIN_NEEDS_NETWORK": "Première connexion sur cette caisse : une connexion internet est nécessaire une fois.",
+    "shell.login.error.TOO_MANY_ATTEMPTS": "Trop de tentatives. Réessayez dans quelques minutes.",
+    "shell.login.error.OTHER_GATE": "Ce compte est affecté à une autre porte que cette caisse.",
+    "shell.login.error.NO_GATE_ASSIGNED": "Ce compte n'est affecté à aucune porte : utilisez l'administration dans le navigateur.",
+    "shell.login.error.EDGE_UNREACHABLE": "Le service local de la caisse ne répond pas. Redémarrez l'ordinateur ou contactez le support.",
 
     "shell.nav.dashboard": "Tableau de bord",
     "shell.nav.sales": "Ventes",
@@ -64,6 +69,11 @@ export default defineMessages({
     "shell.login.submit": "Sign in",
     "shell.login.submitting": "Signing in…",
     "shell.login.invalid": "Invalid username or password.",
+    "shell.login.error.FIRST_LOGIN_NEEDS_NETWORK": "First sign-in on this till: an internet connection is needed once.",
+    "shell.login.error.TOO_MANY_ATTEMPTS": "Too many attempts. Try again in a few minutes.",
+    "shell.login.error.OTHER_GATE": "This account is assigned to a different gate than this till.",
+    "shell.login.error.NO_GATE_ASSIGNED": "This account has no gate: use the administration in a browser.",
+    "shell.login.error.EDGE_UNREACHABLE": "The till's local service is not responding. Restart the computer or contact support.",
 
     "shell.nav.dashboard": "Dashboard",
     "shell.nav.sales": "Sales",

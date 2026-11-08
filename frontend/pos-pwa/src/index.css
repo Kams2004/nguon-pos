@@ -279,6 +279,9 @@ textarea {
   .print-thermal {
     width: 72mm;
     margin: 0 auto;
+    /* Per-till nudge for printers that clip one edge (Imprimante de cette caisse). */
+    position: relative;
+    left: var(--print-offset, 0mm);
   }
   .print-thermal .receipt {
     width: 72mm;

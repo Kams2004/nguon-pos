@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, LogOut, RefreshCw, ScanLine, ShoppingCart, UserRound } from "lucide-react";
+import { LayoutDashboard, LogOut, RefreshCw, ScanLine, ShoppingCart, UserRound, Printer } from "lucide-react";
 import { useSession } from "../../context/SessionContext";
 import { BrandLockup } from "../../components/ui";
 import { useI18n } from "../../i18n";
+import { isEdgeMode } from "../../lib/platform";
+import { PrinterSettingsDialog } from "../../components/PrinterSettingsDialog";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 /**
@@ -16,6 +18,7 @@ export default function GateHeader() {
   const { session, isOnline, pendingCount, logout, syncNow } = useSession();
   const location = useLocation();
   const { t } = useI18n();
+  const [printerOpen, setPrinterOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const sync = async () => {
@@ -51,7 +54,7 @@ export default function GateHeader() {
             <Link to="/gate/scan" className={navLinkClass(location.pathname === "/gate/scan")}>
               <ScanLine className="h-3.5 w-3.5" /> {t("shell.till.scan")}
             </Link>
-            {(session?.role === "SUPER_ADMIN" || session?.role === "COORDINATOR") && (
+            {!isEdgeMode() && (session?.role === "SUPER_ADMIN" || session?.role === "COORDINATOR") && (
               <Link to="/admin/dashboard" className={navLinkClass(false)}>
                 <LayoutDashboard className="h-3.5 w-3.5" /> {t("shell.till.admin")}
               </Link>
@@ -88,6 +91,14 @@ export default function GateHeader() {
             )}
           </button>
           <button
+            onClick={() => setPrinterOpen(true)}
+            className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20"
+            aria-label={t("gate.printer.open")}
+            title={t("gate.printer.open")}
+          >
+            <Printer className="h-4 w-4" />
+          </button>
+          <button
             onClick={logout}
             className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20"
             aria-label={t("shell.logout")}
@@ -97,6 +108,7 @@ export default function GateHeader() {
           </button>
         </div>
       </div>
+      {printerOpen && <PrinterSettingsDialog onClose={() => setPrinterOpen(false)} />}
     </header>
   );
 }

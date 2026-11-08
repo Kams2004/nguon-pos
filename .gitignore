@@ -25,3 +25,6 @@ dist-ssr/
 
 # Self-signed LAN test certificates
 nginx/certs/
+
+# Desktop till build output
+frontend/pos-pwa/dist-desktop/

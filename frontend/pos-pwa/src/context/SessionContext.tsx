@@ -1,16 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../lib/api/client";
-import {
-  clearSession,
-  getOrCreateTerminalId,
-  loadSession,
-  saveSession,
-  type GateSession,
-  type Session,
-} from "../lib/offline/session";
+import { clearSession, getOrCreateTerminalId, loadSession, saveSession, type GateSession, type Session } from "../lib/offline/session";
 import { runSync } from "../lib/offline/sync";
 import { countPendingOutbox } from "../lib/offline/db";
 import { openLiveStream, type LiveEvent } from "../lib/live";
+import { isEdgeMode } from "../lib/platform";
+import { EDGE_SESSION_EXPIRED, edge } from "../lib/till/edgeClient";
 
 type Listener = (e: LiveEvent) => void;
 
@@ -40,6 +35,11 @@ export function deviceLabelFor(session: Session, terminalId: string): string | u
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  return isEdgeMode() ? <EdgeSessionProvider>{children}</EdgeSessionProvider> : <BrowserSessionProvider>{children}</BrowserSessionProvider>;
+}
+
+/** The PWA: the browser keeps the outbox and syncs with central itself. */
+function BrowserSessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => loadSession());
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
@@ -198,6 +198,105 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The desktop till: the local server installed on the machine logs the
+ * cashier in (online or not), holds the catalog and the sales, and syncs
+ * with central on its own. This only mirrors its state for the screens.
+ */
+function EdgeSessionProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(() => loadSession());
+  const [isOnline, setIsOnline] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [liveConnected, setLiveConnected] = useState(false);
+  const listeners = useRef(new Set<Listener>());
+  const [terminalId, setTerminalId] = useState("");
+
+  const refreshPendingCount = useCallback(() => {
+    edge
+      .status()
+      .then((s) => {
+        setTerminalId(s.deviceId);
+        setPendingCount(s.pending);
+        setIsOnline(s.centralReachable);
+      })
+      .catch(() => setIsOnline(false));
+  }, []);
+
+  useEffect(refreshPendingCount, [refreshPendingCount]);
+
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  useEffect(() => {
+    if (!session) return;
+    return edge.events(
+      session.token,
+      (event) => {
+        if (event.type === "SYNC_STATUS") {
+          const d = event.data as { centralReachable: boolean; pending: number };
+          setIsOnline(d.centralReachable);
+          setPendingCount(d.pending);
+        }
+        if (event.type === "SALE_CREATED") refreshPendingCount();
+        listeners.current.forEach((l) => l(event as LiveEvent));
+      },
+      setLiveConnected,
+    );
+  }, [session?.token, refreshPendingCount]);
+
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const res = await edge.login(username, password);
+      const bootstrap = await edge.bootstrap(res.token);
+      const newSession: Session = {
+        token: res.token,
+        userId: res.user.id,
+        username: res.user.username,
+        fullName: res.user.fullName,
+        role: res.user.role,
+        establishmentId: bootstrap.establishment.id,
+        assignedGateId: res.user.assignedGateId,
+        // The signing secret stays inside the local server.
+        bootstrap: { ...bootstrap, gate: { ...bootstrap.gate, signingSecret: "" } },
+      };
+      saveSession(newSession);
+      setSession(newSession);
+      refreshPendingCount();
+      return newSession;
+    },
+    [refreshPendingCount],
+  );
+
+  const logout = useCallback(() => {
+    const current = sessionRef.current;
+    if (current) edge.logout(current.token).catch(() => {});
+    clearSession();
+    setSession(null);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener(EDGE_SESSION_EXPIRED, logout);
+    return () => window.removeEventListener(EDGE_SESSION_EXPIRED, logout);
+  }, [logout]);
+
+  // The local server syncs every few seconds by itself; "sync now" just refreshes what the screen shows.
+  const syncNow = useCallback(async () => refreshPendingCount(), [refreshPendingCount]);
+
+  const subscribe = useCallback((listener: Listener) => {
+    listeners.current.add(listener);
+    return () => {
+      listeners.current.delete(listener);
+    };
+  }, []);
+
+  return (
+    <SessionContext.Provider
+      value={{ session, terminalId, isOnline, pendingCount, liveConnected, login, logout, syncNow, refreshPendingCount, subscribe }}
+    >
+      {children}
+    </SessionContext.Provider>
+  );
+}
+
 export function useSession(): SessionContextValue {
   const ctx = useContext(SessionContext);
   if (!ctx) throw new Error("useSession must be used within SessionProvider");
@@ -230,7 +329,10 @@ export function useLiveRefresh(types: string[], reload: () => void) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(reload, 300);
   });
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 }

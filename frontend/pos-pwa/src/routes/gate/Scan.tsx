@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { AlertTriangle, Check, HelpCircle, ScanLine, X, type LucideIcon } from "lucide-react";
+import { Ban, AlertTriangle, Check, HelpCircle, ScanLine, X, type LucideIcon } from "lucide-react";
 import { useSession } from "../../context/SessionContext";
-import { scanTicket, type ScanOutcome } from "../../lib/offline/scan";
+import type { ScanOutcome } from "../../lib/offline/scan";
+import { till } from "../../lib/till/backend";
 import type { GateSession } from "../../lib/offline/session";
 import GateHeader from "./GateHeader";
 import { locale, useI18n } from "../../i18n";
@@ -33,7 +34,7 @@ export default function Scan() {
     if (!content) return;
     setScanning(true);
     try {
-      const outcome = await scanTicket(gateSession, content);
+      const outcome = await till.scan(gateSession, content);
       const entry = { outcome, at: new Date() };
       setResult(entry);
       setHistory((h) => [entry, ...h].slice(0, 50));
@@ -172,6 +173,10 @@ const STYLES: Record<ScanOutcome["kind"], { icon: LucideIcon; panel: string }> =
   },
   REJECTED_ALREADY_REDEEMED: {
     icon: X,
+    panel: "bg-destructive text-white",
+  },
+  REJECTED_VOIDED: {
+    icon: Ban,
     panel: "bg-destructive text-white",
   },
   REJECTED_INVALID_SIGNATURE: {

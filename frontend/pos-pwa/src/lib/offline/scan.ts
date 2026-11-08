@@ -5,6 +5,8 @@ import type { GateSession } from "./session";
 export type ScanOutcome =
   | { kind: "ACCEPTED"; ticketNumber: string }
   | { kind: "REJECTED_ALREADY_REDEEMED"; ticketNumber: string }
+  // Desktop tills only: the local server knows when a sale was voided.
+  | { kind: "REJECTED_VOIDED"; ticketNumber: string }
   | { kind: "REJECTED_INVALID_SIGNATURE" }
   | { kind: "REJECTED_WRONG_GATE" }
   | { kind: "NOT_RECOGNIZED" };

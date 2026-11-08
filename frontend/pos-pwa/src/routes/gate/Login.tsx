@@ -4,6 +4,7 @@ import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useSession } from "../../context/SessionContext";
 import { useBranding } from "../../context/BrandingContext";
 import { useI18n } from "../../i18n";
+import { EdgeError } from "../../lib/till/edgeClient";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 const REMEMBER_KEY = "nguon-pos.rememberedUsername";
@@ -42,8 +43,11 @@ export default function Login() {
         /* storage unavailable: nothing to remember */
       }
       navigate(session.assignedGateId ? "/gate/sell" : "/admin/dashboard");
-    } catch {
-      setError(t("shell.login.invalid"));
+    } catch (err) {
+      const code = err instanceof EdgeError ? err.code : "";
+      const known = ["FIRST_LOGIN_NEEDS_NETWORK", "TOO_MANY_ATTEMPTS", "OTHER_GATE", "NO_GATE_ASSIGNED", "EDGE_UNREACHABLE"] as const;
+      const match = known.find((k) => k === code);
+      setError(match ? t(`shell.login.error.${match}`) : t("shell.login.invalid"));
     } finally {
       setLoading(false);
     }

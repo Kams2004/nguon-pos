@@ -22,8 +22,9 @@ import {
 } from "lucide-react";
 import { useSession } from "../../context/SessionContext";
 import { useBranding } from "../../context/BrandingContext";
-import { createSale, type CartLine, type IssuedTicket } from "../../lib/offline/sale";
-import { getAllOutboxEntries, type SaleOutboxPayload } from "../../lib/offline/db";
+import type { CartLine, IssuedTicket } from "../../lib/offline/sale";
+import { till, type TodaySale } from "../../lib/till/backend";
+import { usePrinterSettings } from "../../lib/till/printerSettings";
 import type { GateSession } from "../../lib/offline/session";
 import type { PaymentMethod } from "../../lib/api/types";
 import { PAYMENT_LABELS, formatMoney, formatTime } from "../../lib/format";
@@ -72,6 +73,7 @@ export default function Sell() {
   const { t } = useI18n();
   const { session, syncNow, refreshPendingCount } = useSession();
   const { logoUrl } = useBranding();
+  const [printer] = usePrinterSettings();
   const ticketTypes = session?.bootstrap?.ticketTypes ?? [];
   const [cart, setCart] = useState<CartItem[]>([]);
   const [query, setQuery] = useState("");
@@ -97,7 +99,9 @@ export default function Sell() {
   // Explicit local, not just the narrowed `session` — narrowing from the
   // guard above doesn't reliably persist into the nested closures below.
   const gateSession = session as GateSession;
-  const design = resolveTicketDesign(gateSession.bootstrap.establishment);
+  const sharedDesign = resolveTicketDesign(gateSession.bootstrap.establishment);
+  // This till's paper width wins over the establishment-wide one.
+  const design = printer ? { ...sharedDesign, receipt: { ...sharedDesign.receipt, paperWidth: printer.paperWidth } } : sharedDesign;
   const typeById = (id: string) => ticketTypes.find((t) => t.id === id)!;
   const currency = ticketTypes[0]?.currency ?? "XAF";
 
@@ -133,7 +137,7 @@ export default function Sell() {
         quantity: l.quantity,
         unitPrice: l.type.price,
       }));
-      const result = await createSale(gateSession, saleCart, paymentMethod);
+      const result = await till.createSale(gateSession, saleCart, paymentMethod);
       // Only AFTER the offline write resolves do we render/print — see
       // docs/SYNC_PROTOCOL.md's "golden rule".
       setCompletedSale({
@@ -450,39 +454,17 @@ export default function Sell() {
   );
 }
 
-type TodaySale = {
-  id: string;
-  at: string;
-  total: number;
-  tickets: number;
-  synced: boolean;
-  reference: string | null;
-};
-
 /** This till's sales today, from its own local store — works offline, and shows what's still unsent. */
-function useTodaySales(refreshKey: unknown): TodaySale[] {
+function useTodaySales(session: GateSession, refreshKey: unknown): TodaySale[] {
   const [sales, setSales] = useState<TodaySale[]>([]);
   useEffect(() => {
-    const today = new Date().toDateString();
-    getAllOutboxEntries().then((entries) =>
-      setSales(
-        entries
-          .filter((e) => e.type === "SALE" && new Date(e.createdAtClient).toDateString() === today)
-          .map((e) => {
-            const p = e.payload as SaleOutboxPayload;
-            return {
-              id: e.id,
-              at: e.createdAtClient,
-              total: p.lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0),
-              tickets: p.tickets.length,
-              synced: e.syncStatus === "SYNCED",
-              reference: e.referenceNumber ?? null,
-            };
-          })
-          .sort((a, b) => b.at.localeCompare(a.at)),
-      ),
-    );
-  }, [refreshKey]);
+    till
+      .todaySales(session)
+      .then(setSales)
+      .catch(() => {
+        /* keep the last list; the next sale or sync refreshes it */
+      });
+  }, [session, refreshKey]);
   return sales;
 }
 
@@ -504,8 +486,10 @@ function SaleComplete({
   const { t } = useI18n();
   const { pendingCount } = useSession();
   const [printTarget, setPrintTarget] = useState<PrintTarget>("all");
+  const [printer] = usePrinterSettings();
+  const autoPrinted = useRef(false);
   // Re-read the local store as this sale (and earlier ones) sync.
-  const today = useTodaySales(`${sale.transactionId}-${pendingCount}`);
+  const today = useTodaySales(session, `${sale.transactionId}-${pendingCount}`);
   const saleTotal = sale.lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
   const n = sale.tickets.length;
   const change = sale.received !== null ? sale.received - saleTotal : null;
@@ -546,12 +530,41 @@ function SaleComplete({
     setTimeout(() => window.print(), 50);
   };
 
+  // Automatic printing, as set for this till — once every QR code is drawn.
+  useEffect(() => {
+    if (!printer || printer.autoPrint === "NONE" || autoPrinted.current) return;
+    if (sale.tickets.some((tk) => !qrImages[tk.id])) return;
+    autoPrinted.current = true;
+    const target: PrintTarget =
+      printer.autoPrint === "RECEIPT" ? "receipt" : printer.autoPrint === "ALL" ? "all" : ns > 0 ? "tickets" : "receipt";
+    print(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printer, qrImages]);
+
+  const receipt = (
+    <Receipt
+      design={design}
+      logoUrl={session.bootstrap.establishment.logoUrl ?? logoUrl}
+      establishmentName={session.bootstrap.establishment.name}
+      gateName={session.bootstrap.gate.name}
+      cashierName={session.fullName}
+      reference={thisSale?.reference ?? `LOC-${sale.transactionId.slice(0, 8)}`}
+      createdAtClient={sale.createdAtClient}
+      lines={sale.lines}
+      currency={sale.currency}
+      paymentMethod={sale.paymentMethod}
+      ticketCount={sale.tickets.length}
+      received={sale.received}
+      entries={receiptEntries}
+    />
+  );
+
   const todayTotal = today.reduce((s, x) => s + x.total, 0);
   const todayTickets = today.reduce((s, x) => s + x.tickets, 0);
   const todayPending = today.filter((x) => !x.synced).length;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={{ "--print-offset": `${printer?.offsetMm ?? 0}mm` } as React.CSSProperties}>
       {/* Zero page margins for the thermal roll — only while this screen
           is mounted, so reports elsewhere keep the browser's default
           margins. The paper itself (80mm roll, cut at end of content) is
@@ -641,21 +654,13 @@ function SaleComplete({
               <p className="no-print mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <ReceiptIcon className="h-4 w-4" /> {t("gate.done.receiptHeading")}
               </p>
-              <Receipt
-                design={design}
-                logoUrl={session.bootstrap.establishment.logoUrl ?? logoUrl}
-                establishmentName={session.bootstrap.establishment.name}
-                gateName={session.bootstrap.gate.name}
-                cashierName={session.fullName}
-                reference={thisSale?.reference ?? `LOC-${sale.transactionId.slice(0, 8)}`}
-                createdAtClient={sale.createdAtClient}
-                lines={sale.lines}
-                currency={sale.currency}
-                paymentMethod={sale.paymentMethod}
-                ticketCount={sale.tickets.length}
-                received={sale.received}
-                entries={receiptEntries}
-              />
+              {receipt}
+              {/* Extra copies of the receipt, as set for this till: printed only. */}
+              {Array.from({ length: Math.max(0, (printer?.copies ?? 1) - 1) }, (_, i) => (
+                <div key={i} className="print-page-break hidden print:block">
+                  {receipt}
+                </div>
+              ))}
             </div>
 
             <div className="no-print card p-5">

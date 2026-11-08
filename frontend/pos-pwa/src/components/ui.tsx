@@ -175,7 +175,8 @@ export function Modal({
       // dialog and released outside must not close it.
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className={`card my-auto w-full ${MODAL_WIDTHS[size]} overflow-hidden animate-in fade-in zoom-in-95`}>
+      {/* Own text colour: a dialog opened from a coloured header must not inherit its white text. */}
+      <div className={`card my-auto w-full ${MODAL_WIDTHS[size]} overflow-hidden text-foreground animate-in fade-in zoom-in-95`}>
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="font-display text-base font-bold">{title}</h2>
           <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted" aria-label={translate("common.close")}>
