@@ -1,13 +1,8 @@
 import { api } from "../api/client";
 import type { SaleSyncEntry, ScanSyncEntry } from "../api/types";
-import {
-  countPendingOutbox,
-  getPendingOutboxEntries,
-  updateOutboxEntry,
-  type SaleOutboxPayload,
-  type ScanOutboxPayload,
-} from "./db";
+import { countPendingOutbox, getPendingOutboxEntries, updateOutboxEntry, type SaleOutboxPayload, type ScanOutboxPayload } from "./db";
 import type { GateSession } from "./session";
+import { translate } from "../../i18n";
 
 const BATCH_SIZE = 25;
 
@@ -33,7 +28,13 @@ export async function runSync(session: GateSession, terminalId: string): Promise
     for (const e of batch) await updateOutboxEntry(e.id, { syncStatus: "SYNCING" });
     const entries: SaleSyncEntry[] = batch.map((e) => {
       const p = e.payload as SaleOutboxPayload;
-      return { idempotencyKey: e.id, paymentMethod: p.paymentMethod, createdAtClient: p.createdAtClient, lines: p.lines, tickets: p.tickets };
+      return {
+        idempotencyKey: e.id,
+        paymentMethod: p.paymentMethod,
+        createdAtClient: p.createdAtClient,
+        lines: p.lines,
+        tickets: p.tickets,
+      };
     });
     try {
       const { results } = await api.syncTransactions(session.token, terminalId, gateId, entries);
@@ -58,7 +59,7 @@ export async function runSync(session: GateSession, terminalId: string): Promise
       for (const e of batch) {
         await updateOutboxEntry(e.id, {
           syncStatus: "PENDING",
-          lastError: err instanceof Error ? err.message : "Erreur réseau",
+          lastError: err instanceof Error ? err.message : translate("gate.sync.networkError"),
           attemptCount: e.attemptCount + 1,
           lastAttemptAt: new Date().toISOString(),
         });
@@ -83,7 +84,7 @@ export async function runSync(session: GateSession, terminalId: string): Promise
       for (const e of batch) {
         await updateOutboxEntry(e.id, {
           syncStatus: "PENDING",
-          lastError: err instanceof Error ? err.message : "Erreur réseau",
+          lastError: err instanceof Error ? err.message : translate("gate.sync.networkError"),
           attemptCount: e.attemptCount + 1,
           lastAttemptAt: new Date().toISOString(),
         });

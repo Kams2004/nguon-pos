@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useI18n } from "../i18n";
 
 export const PAGE_SIZES = [10, 25, 50, 100] as const;
 
@@ -25,7 +26,7 @@ export function usePaged<T>(items: T[], initialSize = 25, resetKey: unknown = nu
   };
 }
 
-/** Pager bar: "21–40 sur 312", rows-per-page, numbered pages with ellipses. */
+/** Pager bar: "21–40 of 312", rows-per-page, numbered pages with ellipses. */
 export function Pagination({
   page,
   pages,
@@ -33,7 +34,7 @@ export function Pagination({
   size,
   onPage,
   onSize,
-  unit = "lignes",
+  unit,
 }: {
   page: number;
   pages: number;
@@ -43,6 +44,7 @@ export function Pagination({
   onSize?: (size: number) => void;
   unit?: string;
 }) {
+  const { t } = useI18n();
   if (total === 0) return null;
   const from = page * size + 1;
   const to = Math.min(total, page * size + size);
@@ -57,13 +59,15 @@ export function Pagination({
   return (
     <div className="no-print flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
       <div className="flex items-center gap-3">
-        <span>
-          {from}–{to} sur {total.toLocaleString("fr-FR")} {unit}
-        </span>
+        <span>{t("pagination.range", { from, to, total, unit: unit ?? t("common.rows") })}</span>
         {onSize && (
           <label className="flex items-center gap-1.5">
-            <span>Par page</span>
-            <select value={size} onChange={(e) => onSize(Number(e.target.value))} className="rounded-lg border border-border bg-card px-2 py-1 text-xs">
+            <span>{t("pagination.perPage")}</span>
+            <select
+              value={size}
+              onChange={(e) => onSize(Number(e.target.value))}
+              className="rounded-lg border border-border bg-card px-2 py-1 text-xs"
+            >
               {PAGE_SIZES.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -75,7 +79,12 @@ export function Pagination({
       </div>
       {pages > 1 && (
         <div className="flex items-center gap-1">
-          <button disabled={page === 0} onClick={() => onPage(page - 1)} className="btn-outline px-2 py-1.5" aria-label="Page précédente">
+          <button
+            disabled={page === 0}
+            onClick={() => onPage(page - 1)}
+            className="btn-outline px-2 py-1.5"
+            aria-label={t("pagination.previous")}
+          >
             <ChevronLeft className="h-4 w-4" />
           </button>
           {numbers.map((n, i) =>
@@ -96,7 +105,12 @@ export function Pagination({
               </button>
             ),
           )}
-          <button disabled={page + 1 >= pages} onClick={() => onPage(page + 1)} className="btn-outline px-2 py-1.5" aria-label="Page suivante">
+          <button
+            disabled={page + 1 >= pages}
+            onClick={() => onPage(page + 1)}
+            className="btn-outline px-2 py-1.5"
+            aria-label={t("pagination.next")}
+          >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>

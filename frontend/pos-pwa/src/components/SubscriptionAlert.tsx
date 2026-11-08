@@ -4,12 +4,14 @@ import { BellRing } from "lucide-react";
 import { useSession } from "../context/SessionContext";
 import { api } from "../lib/api/client";
 import type { SubscriptionOverview } from "../lib/api/types";
+import { locale, useI18n } from "../i18n";
 
 /**
  * Due-date alert for the Super Admin (cahier §9.4 "alertes d'échéance"),
  * shown only once the module is switched on. Re-checked on navigation.
  */
 export function SubscriptionAlert() {
+  const { t } = useI18n();
   const { session } = useSession();
   const { pathname } = useLocation();
   const [data, setData] = useState<SubscriptionOverview | null>(null);
@@ -24,23 +26,25 @@ export function SubscriptionAlert() {
 
   if (!data?.settings.moduleEnabled || pathname === "/admin/subscription") return null;
   const { state, daysRemaining, coveredUntil } = data.status;
-  const until = coveredUntil ? new Date(`${coveredUntil}T12:00:00`).toLocaleDateString("fr-FR") : "";
+  const until = coveredUntil ? new Date(`${coveredUntil}T12:00:00`).toLocaleDateString(locale()) : "";
   const message =
     state === "TO_RENEW"
-      ? `L'abonnement arrive à échéance le ${until} (dans ${daysRemaining} jour${daysRemaining === 1 ? "" : "s"}).`
+      ? t("settings.subscriptionAlert.toRenew", { date: until, count: daysRemaining ?? 0 })
       : state === "EXPIRED"
-        ? `L'abonnement a expiré le ${until}.`
+        ? t("settings.subscriptionAlert.expired", { date: until })
         : state === "PENDING_PAYMENT"
-          ? "Une période d'abonnement est en attente de paiement."
+          ? t("settings.subscriptionAlert.pending")
           : null;
   if (!message) return null;
 
   return (
     <div className="no-print flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
       <BellRing className="h-4 w-4 flex-shrink-0" />
-      <span className="flex-1">{message} Les caisses continuent de fonctionner normalement.</span>
+      <span className="flex-1">
+        {message} {t("settings.subscriptionAlert.tillsUnaffected")}
+      </span>
       <Link to="/admin/subscription" className="btn-outline bg-white px-3 py-1.5 text-xs">
-        Voir l'abonnement
+        {t("settings.subscriptionAlert.view")}
       </Link>
     </div>
   );

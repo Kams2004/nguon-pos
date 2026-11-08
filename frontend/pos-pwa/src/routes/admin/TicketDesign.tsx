@@ -17,6 +17,7 @@ import { CardHeader, Loading, PageHeader } from "../../components/ui";
 import { ImageField } from "../../components/MediaLibrary";
 import TicketCard from "../gate/TicketCard";
 import Receipt from "../gate/Receipt";
+import { translate, useI18n } from "../../i18n";
 
 type Tab = "ticket" | "receipt";
 
@@ -29,12 +30,15 @@ const SAMPLE_QR =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" shape-rendering="crispEdges"><rect width="21" height="21" fill="#fff"/>${Array.from(
       { length: 120 },
       (_, i) => `<rect x="${(i * 7) % 21}" y="${(i * 11) % 21}" width="1" height="1"/>`,
-    ).join("")}<path d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0z" fill="#000"/><path d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z" fill="#fff"/><path d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"/></svg>`,
+    ).join(
+      "",
+    )}<path d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0z" fill="#000"/><path d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z" fill="#fff"/><path d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"/></svg>`,
   );
 
-const SAMPLE_LINES = [
-  { name: "Entrée générale", quantity: 2, unitPrice: 2000 },
-  { name: "Pass VIP", quantity: 1, unitPrice: 10000 },
+// A function so the sample names follow the current language.
+const sampleLines = () => [
+  { name: translate("settings.sample.generalAdmission"), quantity: 2, unitPrice: 2000 },
+  { name: translate("settings.sample.vipPass"), quantity: 1, unitPrice: 10000 },
 ];
 
 function Toggle({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) {
@@ -92,6 +96,7 @@ function Segmented<T extends string | number>({
  * (CATALOG_CHANGED → tills re-fetch their bootstrap).
  */
 export default function TicketDesignPage() {
+  const { t } = useI18n();
   const { session } = useSession();
   const confirm = useConfirm();
   const { logoUrl } = useBranding();
@@ -124,8 +129,7 @@ export default function TicketDesignPage() {
   }, [session]);
 
   const design = useMemo(
-    () =>
-      resolveTicketDesign({ ...(texts ?? {}), ticketOptions: JSON.stringify(ticket), receiptOptions: JSON.stringify(receipt) }),
+    () => resolveTicketDesign({ ...(texts ?? {}), ticketOptions: JSON.stringify(ticket), receiptOptions: JSON.stringify(receipt) }),
     [texts, ticket, receipt],
   );
 
@@ -161,9 +165,9 @@ export default function TicketDesignPage() {
 
   const save = async () => {
     const ok = await confirm({
-      title: "Enregistrer le billet et le reçu ?",
-      message: "Toutes les caisses ouvertes imprimeront la nouvelle mise en page dès maintenant. La modification est tracée dans le journal.",
-      confirmLabel: "Enregistrer",
+      title: t("settings.design.confirmSaveTitle"),
+      message: t("settings.design.confirmSaveMessage"),
+      confirmLabel: t("common.save"),
     });
     if (!ok) return;
     setError(null);
@@ -180,23 +184,31 @@ export default function TicketDesignPage() {
         receiptOptions: JSON.stringify(receipt),
       });
       adopt(updated);
-      setNotice("Enregistré — les caisses sont mises à jour.");
+      setNotice(t("settings.design.savedNotice"));
     } catch (e) {
-      setError(errorMessage(e, "Impossible d'enregistrer."));
+      setError(errorMessage(e, t("settings.saveError")));
     }
   };
 
   const reset = async () => {
     const ok = await confirm({
-      title: tab === "ticket" ? "Revenir au billet par défaut ?" : "Revenir au reçu par défaut ?",
-      message: "Les réglages de cet onglet reprennent leurs valeurs par défaut. Rien n'est enregistré tant que vous ne cliquez pas sur « Enregistrer ».",
-      confirmLabel: "Réinitialiser",
+      title: tab === "ticket" ? t("settings.design.resetTicketTitle") : t("settings.design.resetReceiptTitle"),
+      message: t("settings.design.resetMessage"),
+      confirmLabel: t("settings.design.reset"),
       tone: "danger",
     });
     if (!ok) return;
     if (tab === "ticket") {
       setTicket(TICKET_OPTION_DEFAULTS);
-      setTexts({ ...texts, ticketTitle: null, ticketSubtitle: null, ticketTagline: null, ticketLocation: null, ticketFooter: null, ticketBannerUrl: null });
+      setTexts({
+        ...texts,
+        ticketTitle: null,
+        ticketSubtitle: null,
+        ticketTagline: null,
+        ticketLocation: null,
+        ticketFooter: null,
+        ticketBannerUrl: null,
+      });
     } else {
       setReceipt(RECEIPT_OPTION_DEFAULTS);
       setTexts({ ...texts, receiptFooter: null });
@@ -219,15 +231,15 @@ export default function TicketDesignPage() {
       <style>{"@page { margin: 0; }"}</style>
       <div className="no-print">
         <PageHeader
-          title="Billet & reçu"
-          subtitle="Personnalisez ce qui est imprimé. L'aperçu montre exactement ce que les caisses imprimeront."
+          title={t("settings.design.title")}
+          subtitle={t("settings.design.subtitle")}
           actions={
             <>
               <button onClick={reset} className="btn-outline">
-                <RotateCcw className="h-4 w-4" /> Réinitialiser
+                <RotateCcw className="h-4 w-4" /> {t("settings.design.reset")}
               </button>
               <button onClick={save} disabled={!dirty} className="btn-gold">
-                <Save className="h-4 w-4" /> Enregistrer
+                <Save className="h-4 w-4" /> {t("common.save")}
               </button>
             </>
           }
@@ -238,8 +250,8 @@ export default function TicketDesignPage() {
         <div className="inline-flex rounded-xl border border-border bg-card p-1">
           {(
             [
-              ["ticket", "Billet d'entrée", Ticket],
-              ["receipt", "Reçu de caisse", ReceiptIcon],
+              ["ticket", t("settings.design.tabTicket"), Ticket],
+              ["receipt", t("settings.design.tabReceipt"), ReceiptIcon],
             ] as const
           ).map(([value, label, Icon]) => (
             <button
@@ -253,7 +265,9 @@ export default function TicketDesignPage() {
             </button>
           ))}
         </div>
-        {dirty && <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Modifications non enregistrées</span>}
+        {dirty && (
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{t("settings.design.unsaved")}</span>
+        )}
         {notice && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{notice}</span>}
         {error && <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-destructive">{error}</span>}
       </div>
@@ -263,19 +277,21 @@ export default function TicketDesignPage() {
           {tab === "ticket" ? (
             <>
               <div className="card">
-                <CardHeader title="Textes du billet" />
+                <CardHeader title={t("settings.design.ticketTexts")} />
                 <div className="grid gap-4 px-5 pb-5 sm:grid-cols-2">
-                  {textField("ticketTitle", "Titre", "Affiché sur deux lignes à côté du logo")}
-                  {textField("ticketSubtitle", "Sous-titre")}
-                  {textField("ticketTagline", "Slogan")}
-                  {textField("ticketLocation", "Lieu")}
-                  <div className="sm:col-span-2">{textField("ticketFooter", "Mention en bas du billet", "{porte} = nom de la porte")}</div>
+                  {textField("ticketTitle", t("settings.design.ticketTitle"), t("settings.design.ticketTitleHint"))}
+                  {textField("ticketSubtitle", t("settings.design.subtitleField"))}
+                  {textField("ticketTagline", t("settings.design.tagline"))}
+                  {textField("ticketLocation", t("settings.design.location"))}
                   <div className="sm:col-span-2">
-                    <label className="field-label">Note supplémentaire (facultative)</label>
+                    {textField("ticketFooter", t("settings.design.footer"), t("settings.design.footerHint"))}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="field-label">{t("settings.design.extraNote")}</label>
                     <input
                       value={ticket.note}
                       onChange={(e) => setT({ note: e.target.value })}
-                      placeholder="Ex. : Non remboursable — à présenter à l'entrée"
+                      placeholder={t("settings.design.extraNotePlaceholder")}
                       maxLength={120}
                       className="field"
                     />
@@ -284,10 +300,10 @@ export default function TicketDesignPage() {
               </div>
 
               <div className="card">
-                <CardHeader title="Apparence" />
+                <CardHeader title={t("settings.design.appearance")} />
                 <div className="space-y-4 px-5 pb-5">
                   <div>
-                    <label className="field-label">Couleur principale (titre, cadre, numéro)</label>
+                    <label className="field-label">{t("settings.design.accent")}</label>
                     <div className="flex flex-wrap items-center gap-2">
                       {ACCENTS.map((c) => (
                         <button
@@ -301,71 +317,82 @@ export default function TicketDesignPage() {
                         />
                       ))}
                       <label className="ml-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        Autre
-                        <input type="color" value={ticket.accent} onChange={(e) => setT({ accent: e.target.value })} className="h-8 w-10 cursor-pointer rounded border border-border" />
+                        {t("settings.design.otherColor")}
+                        <input
+                          type="color"
+                          value={ticket.accent}
+                          onChange={(e) => setT({ accent: e.target.value })}
+                          className="h-8 w-10 cursor-pointer rounded border border-border"
+                        />
                       </label>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-6">
                     <div>
-                      <label className="field-label">Cadre</label>
+                      <label className="field-label">{t("settings.design.frame")}</label>
                       <Segmented
                         value={ticket.frame}
                         onChange={(frame) => setT({ frame })}
                         options={[
-                          { value: "pattern", label: "Motif Bamoun" },
-                          { value: "solid", label: "Couleur unie" },
-                          { value: "none", label: "Simple bordure" },
+                          { value: "pattern", label: t("settings.design.frame.pattern") },
+                          { value: "solid", label: t("settings.design.frame.solid") },
+                          { value: "none", label: t("settings.design.frame.none") },
                         ]}
                       />
                     </div>
                     <div>
-                      <label className="field-label">Taille du QR code</label>
+                      <label className="field-label">{t("settings.design.qrSize")}</label>
                       <Segmented
                         value={ticket.qrSize}
                         onChange={(qrSize) => setT({ qrSize })}
                         options={[
-                          { value: "s", label: "Petit" },
-                          { value: "m", label: "Moyen" },
-                          { value: "l", label: "Grand" },
+                          { value: "s", label: t("settings.design.qrSize.s") },
+                          { value: "m", label: t("settings.design.qrSize.m") },
+                          { value: "l", label: t("settings.design.qrSize.l") },
                         ]}
                       />
                     </div>
                   </div>
                   <ImageField
-                    label="Image en bas du billet"
+                    label={t("settings.design.banner")}
                     value={texts.ticketBannerUrl}
                     onChange={(url) => setText("ticketBannerUrl", url)}
                     fallback={TICKET_DEFAULTS.ticketBannerUrl}
-                    hint="Palais de Foumban par défaut — non imprimée sur imprimante thermique"
+                    hint={t("settings.design.bannerHint")}
                   />
                 </div>
               </div>
 
               <div className="card">
-                <CardHeader title="Éléments affichés" />
+                <CardHeader title={t("settings.design.shownItems")} />
                 <div className="grid gap-1 px-3 pb-3 sm:grid-cols-2">
-                  <Toggle label="Logo" checked={ticket.showLogo} onChange={(v) => setT({ showLogo: v })} />
-                  <Toggle label="Sous-titre" checked={ticket.showSubtitle} onChange={(v) => setT({ showSubtitle: v })} />
-                  <Toggle label="Slogan" checked={ticket.showTagline} onChange={(v) => setT({ showTagline: v })} />
-                  <Toggle label="Date et heure" checked={ticket.showDate} onChange={(v) => setT({ showDate: v })} />
-                  <Toggle label="Lieu et porte" checked={ticket.showLocation} onChange={(v) => setT({ showLocation: v })} />
-                  <Toggle label="Prix" checked={ticket.showPrice} onChange={(v) => setT({ showPrice: v })} />
-                  <Toggle label="Image du bas" checked={ticket.showBanner} onChange={(v) => setT({ showBanner: v })} />
-                  <Toggle label="Mention en bas" checked={ticket.showFooter} onChange={(v) => setT({ showFooter: v })} />
+                  <Toggle label={t("settings.design.logo")} checked={ticket.showLogo} onChange={(v) => setT({ showLogo: v })} />
+                  <Toggle
+                    label={t("settings.design.subtitleField")}
+                    checked={ticket.showSubtitle}
+                    onChange={(v) => setT({ showSubtitle: v })}
+                  />
+                  <Toggle label={t("settings.design.tagline")} checked={ticket.showTagline} onChange={(v) => setT({ showTagline: v })} />
+                  <Toggle label={t("settings.design.dateTime")} checked={ticket.showDate} onChange={(v) => setT({ showDate: v })} />
+                  <Toggle
+                    label={t("settings.design.locationGate")}
+                    checked={ticket.showLocation}
+                    onChange={(v) => setT({ showLocation: v })}
+                  />
+                  <Toggle label={t("settings.price")} checked={ticket.showPrice} onChange={(v) => setT({ showPrice: v })} />
+                  <Toggle label={t("settings.design.bottomImage")} checked={ticket.showBanner} onChange={(v) => setT({ showBanner: v })} />
+                  <Toggle label={t("settings.design.bottomText")} checked={ticket.showFooter} onChange={(v) => setT({ showFooter: v })} />
                 </div>
-                <p className="px-5 pb-4 text-[11px] text-muted-foreground">
-                  Le QR code, le type de billet et le numéro sont toujours imprimés : ce sont eux qui permettent le contrôle à l'entrée.
-                </p>
+                <p className="px-5 pb-4 text-[11px] text-muted-foreground">{t("settings.design.alwaysPrinted")}</p>
               </div>
             </>
           ) : (
             <>
               <div className="card">
-                <CardHeader title="Papier" />
+                <CardHeader title={t("settings.design.paper")} />
                 <div className="flex flex-wrap gap-6 px-5 pb-5">
                   <div>
-                    <label className="field-label">Largeur du rouleau</label>
+                    <label className="field-label">{t("settings.design.paperWidth")}</label>
                     <Segmented
                       value={receipt.paperWidth}
                       onChange={(paperWidth) => setR({ paperWidth })}
@@ -376,13 +403,13 @@ export default function TicketDesignPage() {
                     />
                   </div>
                   <div>
-                    <label className="field-label">Taille du texte</label>
+                    <label className="field-label">{t("settings.design.fontSize")}</label>
                     <Segmented
                       value={receipt.fontSize}
                       onChange={(fontSize) => setR({ fontSize })}
                       options={[
-                        { value: "s", label: "Compact" },
-                        { value: "m", label: "Normal" },
+                        { value: "s", label: t("settings.design.fontSize.s") },
+                        { value: "m", label: t("settings.design.fontSize.m") },
                       ]}
                     />
                   </div>
@@ -390,20 +417,20 @@ export default function TicketDesignPage() {
               </div>
 
               <div className="card">
-                <CardHeader title="En-tête" />
+                <CardHeader title={t("settings.design.header")} />
                 <div className="space-y-3 px-5 pb-5">
                   <div className="-mx-3 grid gap-1 sm:grid-cols-3">
-                    <Toggle label="Logo" checked={receipt.showLogo} onChange={(v) => setR({ showLogo: v })} />
-                    <Toggle label="Nom" checked={receipt.showName} onChange={(v) => setR({ showName: v })} />
-                    <Toggle label="Porte" checked={receipt.showGate} onChange={(v) => setR({ showGate: v })} />
+                    <Toggle label={t("settings.design.logo")} checked={receipt.showLogo} onChange={(v) => setR({ showLogo: v })} />
+                    <Toggle label={t("settings.name")} checked={receipt.showName} onChange={(v) => setR({ showName: v })} />
+                    <Toggle label={t("settings.gate")} checked={receipt.showGate} onChange={(v) => setR({ showGate: v })} />
                   </div>
                   <div>
-                    <label className="field-label">Coordonnées (une par ligne)</label>
+                    <label className="field-label">{t("settings.design.contactLines")}</label>
                     <textarea
                       rows={4}
                       value={receipt.headerLines}
                       onChange={(e) => setR({ headerLines: e.target.value })}
-                      placeholder={"BP 123, Foumban\nTél : +237 6 00 00 00 00\nNIU : M000000000000X — RCCM : …"}
+                      placeholder={t("settings.design.contactPlaceholder")}
                       className="field font-mono text-xs"
                     />
                   </div>
@@ -411,31 +438,54 @@ export default function TicketDesignPage() {
               </div>
 
               <div className="card">
-                <CardHeader title="Contenu" />
+                <CardHeader title={t("settings.design.content")} />
                 <div className="grid gap-1 px-3 pb-3 sm:grid-cols-2">
-                  <Toggle label="Nom du caissier" checked={receipt.showCashier} onChange={(v) => setR({ showCashier: v })} />
-                  <Toggle label="Prix unitaires" checked={receipt.showUnitPrices} onChange={(v) => setR({ showUnitPrices: v })} hint="Sinon une ligne par article" />
-                  <Toggle label="Moyen de paiement" checked={receipt.showPayment} onChange={(v) => setR({ showPayment: v })} />
-                  <Toggle label="Montant reçu et rendu" checked={receipt.showCashDetails} onChange={(v) => setR({ showCashDetails: v })} hint="Paiements en espèces" />
-                  <Toggle label="Nombre de billets" checked={receipt.showTicketCount} onChange={(v) => setR({ showTicketCount: v })} />
-                  <Toggle label="QR de vérification" checked={receipt.showQr} onChange={(v) => setR({ showQr: v })} hint="Contient la référence de la vente" />
+                  <Toggle label={t("settings.design.cashier")} checked={receipt.showCashier} onChange={(v) => setR({ showCashier: v })} />
+                  <Toggle
+                    label={t("settings.design.unitPrices")}
+                    checked={receipt.showUnitPrices}
+                    onChange={(v) => setR({ showUnitPrices: v })}
+                    hint={t("settings.design.unitPricesHint")}
+                  />
+                  <Toggle
+                    label={t("settings.design.paymentMethod")}
+                    checked={receipt.showPayment}
+                    onChange={(v) => setR({ showPayment: v })}
+                  />
+                  <Toggle
+                    label={t("settings.design.cashDetails")}
+                    checked={receipt.showCashDetails}
+                    onChange={(v) => setR({ showCashDetails: v })}
+                    hint={t("settings.design.cashDetailsHint")}
+                  />
+                  <Toggle
+                    label={t("settings.design.ticketCount")}
+                    checked={receipt.showTicketCount}
+                    onChange={(v) => setR({ showTicketCount: v })}
+                  />
+                  <Toggle
+                    label={t("settings.design.qr")}
+                    checked={receipt.showQr}
+                    onChange={(v) => setR({ showQr: v })}
+                    hint={t("settings.design.qrHint")}
+                  />
                 </div>
               </div>
 
               <div className="card">
-                <CardHeader title="Pied du reçu" />
+                <CardHeader title={t("settings.design.receiptFooter")} />
                 <div className="space-y-3 px-5 pb-5">
                   <div>
-                    <label className="field-label">Mentions légales / fiscales (une par ligne)</label>
+                    <label className="field-label">{t("settings.design.legalLines")}</label>
                     <textarea
                       rows={3}
                       value={receipt.legalLines}
                       onChange={(e) => setR({ legalLines: e.target.value })}
-                      placeholder={"TVA non applicable\nBillet non remboursable"}
+                      placeholder={t("settings.design.legalPlaceholder")}
                       className="field font-mono text-xs"
                     />
                   </div>
-                  {textField("receiptFooter", "Message de fin", "{annee} = année en cours")}
+                  {textField("receiptFooter", t("settings.design.endMessage"), t("settings.design.endMessageHint"))}
                 </div>
               </div>
             </>
@@ -444,9 +494,9 @@ export default function TicketDesignPage() {
 
         <div className="space-y-3 xl:sticky xl:top-20 xl:self-start">
           <div className="no-print flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Aperçu</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("settings.preview")}</p>
             <button onClick={testPrint} className="btn-blue px-3 py-2 text-xs">
-              <Printer className="h-4 w-4" /> Imprimer un test
+              <Printer className="h-4 w-4" /> {t("settings.design.testPrint")}
             </button>
           </div>
           <div
@@ -458,9 +508,9 @@ export default function TicketDesignPage() {
               <TicketCard
                 design={design}
                 logoUrl={saved.logoUrl || logoUrl}
-                gateName="Porte A"
+                gateName={t("settings.sample.gate")}
                 ticketNumber="TEST-0000-0-0"
-                ticketTypeName="Entrée générale"
+                ticketTypeName={t("settings.sample.generalAdmission")}
                 price={2000}
                 currency="XAF"
                 createdAtClient={new Date().toISOString()}
@@ -473,11 +523,11 @@ export default function TicketDesignPage() {
                 design={design}
                 logoUrl={saved.logoUrl || logoUrl}
                 establishmentName={saved.name}
-                gateName="Porte A"
+                gateName={t("settings.sample.gate")}
                 cashierName={session.fullName}
                 reference="TEST-000000"
                 createdAtClient={new Date().toISOString()}
-                lines={SAMPLE_LINES}
+                lines={sampleLines()}
                 currency="XAF"
                 paymentMethod="CASH"
                 ticketCount={3}
@@ -486,7 +536,7 @@ export default function TicketDesignPage() {
             )}
           </div>
           <p className="no-print text-center text-[11px] text-muted-foreground">
-            Exemple — {tab === "ticket" ? "le QR code d'un vrai billet est signé par la porte." : "vente fictive en espèces."}
+            {tab === "ticket" ? t("settings.design.exampleTicket") : t("settings.design.exampleReceipt")}
           </p>
         </div>
       </div>

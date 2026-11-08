@@ -1,6 +1,7 @@
 import { MapPin } from "lucide-react";
 import { formatMoney } from "../../lib/format";
 import { fillPlaceholders, type ResolvedTicketDesign } from "../../lib/ticketDesign";
+import { locale, useI18n } from "../../i18n";
 
 export type TicketCardProps = {
   design: ResolvedTicketDesign;
@@ -45,6 +46,7 @@ export default function TicketCard({
   index,
   total,
 }: TicketCardProps) {
+  const { t } = useI18n();
   const o = design.ticket;
   const date = new Date(createdAtClient);
   // "NGUON FESTIVAL" stacks as two lines like the mockup; any title works.
@@ -97,11 +99,11 @@ export default function TicketCard({
           <h3 className="mt-3 font-display text-xl font-extrabold print:!text-black" style={accent}>
             {ticketTypeName}
           </h3>
-          <p className="mt-0.5 font-mono text-xs font-bold text-foreground">N° : {ticketNumber}</p>
+          <p className="mt-0.5 font-mono text-xs font-bold text-foreground">{t("gate.ticket.number", { number: ticketNumber })}</p>
           {o.showDate && (
             <p className="mt-1 text-xs text-muted-foreground print:text-black">
-              {date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" })} ·{" "}
-              {date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+              {date.toLocaleDateString(locale(), { weekday: "short", day: "numeric", month: "long", year: "numeric" })} ·{" "}
+              {date.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}
             </p>
           )}
           {o.showLocation && (
@@ -109,8 +111,14 @@ export default function TicketCard({
               <MapPin className="h-3 w-3" /> {design.ticketLocation} — {gateName}
             </p>
           )}
-          {o.showPrice && <p className="mt-2 font-display text-base font-extrabold text-foreground">Prix : {formatMoney(price, currency)}</p>}
-          {o.note && <p className="mt-2 rounded-lg bg-muted/70 px-3 py-1 text-[11px] font-semibold text-foreground print:bg-white">{o.note}</p>}
+          {o.showPrice && (
+            <p className="mt-2 font-display text-base font-extrabold text-foreground">
+              {t("gate.ticket.price", { price: formatMoney(price, currency) })}
+            </p>
+          )}
+          {o.note && (
+            <p className="mt-2 rounded-lg bg-muted/70 px-3 py-1 text-[11px] font-semibold text-foreground print:bg-white">{o.note}</p>
+          )}
         </div>
 
         {o.showBanner ? (

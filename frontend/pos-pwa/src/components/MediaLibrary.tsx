@@ -7,16 +7,28 @@ import type { MediaItem } from "../lib/api/types";
 import { formatDateTime } from "../lib/format";
 import { Pagination, usePaged } from "./Pagination";
 import { Empty, Loading, Modal, RefreshButton } from "./ui";
+import { translate, useI18n } from "../i18n";
 
 function formatSize(bytes: number): string {
-  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} Mo` : `${Math.max(1, Math.round(bytes / 1024))} Ko`;
+  return bytes >= 1024 * 1024
+    ? translate("settings.media.sizeMb", { n: (bytes / 1024 / 1024).toFixed(1) })
+    : translate("settings.media.sizeKb", { n: String(Math.max(1, Math.round(bytes / 1024))) });
 }
 
 /**
  * The image grid behind both the Médiathèque page (manage: upload/delete)
  * and the image picker (select: click an image to use it).
  */
-export function MediaLibrary({ mode, selectedUrl, onSelect }: { mode: "manage" | "select"; selectedUrl?: string | null; onSelect?: (item: MediaItem) => void }) {
+export function MediaLibrary({
+  mode,
+  selectedUrl,
+  onSelect,
+}: {
+  mode: "manage" | "select";
+  selectedUrl?: string | null;
+  onSelect?: (item: MediaItem) => void;
+}) {
+  const { t } = useI18n();
   const { session } = useSession();
   const confirm = useConfirm();
   const [items, setItems] = useState<MediaItem[] | null>(null);
@@ -47,16 +59,14 @@ export function MediaLibrary({ mode, selectedUrl, onSelect }: { mode: "manage" |
     if (!file) return;
     const preview = URL.createObjectURL(file);
     const ok = await confirm({
-      title: "Ajouter cette image ?",
+      title: t("settings.media.confirmAddTitle"),
       message: (
         <div className="space-y-2">
           <img src={preview} alt="" className="max-h-40 rounded-lg border border-border" />
-          <p>
-            « {file.name} » ({formatSize(file.size)}) sera ajoutée à la médiathèque.
-          </p>
+          <p>{t("settings.media.confirmAddMessage", { name: file.name, size: formatSize(file.size) })}</p>
         </div>
       ),
-      confirmLabel: "Ajouter",
+      confirmLabel: t("common.add"),
     });
     URL.revokeObjectURL(preview);
     if (!ok) return;
@@ -67,7 +77,7 @@ export function MediaLibrary({ mode, selectedUrl, onSelect }: { mode: "manage" |
       await load();
       if (mode === "select") onSelect?.(item);
     } catch (e) {
-      setError(errorMessage(e, "Échec de l'envoi de l'image."));
+      setError(errorMessage(e, t("settings.media.uploadError")));
     } finally {
       setUploading(false);
     }
@@ -75,13 +85,9 @@ export function MediaLibrary({ mode, selectedUrl, onSelect }: { mode: "manage" |
 
   const remove = async (item: MediaItem) => {
     const ok = await confirm({
-      title: "Supprimer cette image ?",
-      message: (
-        <>
-          « {item.originalName} » sera supprimée définitivement. Si elle est utilisée (logo, billet…), elle n'y apparaîtra plus.
-        </>
-      ),
-      confirmLabel: "Supprimer",
+      title: t("settings.media.confirmDeleteTitle"),
+      message: t("settings.media.confirmDeleteMessage", { name: item.originalName }),
+      confirmLabel: t("common.delete"),
       tone: "danger",
     });
     if (!ok) return;
@@ -109,10 +115,10 @@ export function MediaLibrary({ mode, selectedUrl, onSelect }: { mode: "manage" |
           ) : (
             <Upload className="h-4 w-4" />
           )}
-          {uploading ? "Envoi…" : "Téléverser une image"}
+          {uploading ? t("settings.media.uploading") : t("settings.media.upload")}
         </button>
         <RefreshButton onRefresh={load} />
-        <p className="text-xs text-muted-foreground">PNG, JPEG, WebP ou GIF — 5 Mo maximum.</p>
+        <p className="text-xs text-muted-foreground">{t("settings.media.formats")}</p>
       </div>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
 
@@ -121,7 +127,7 @@ export function MediaLibrary({ mode, selectedUrl, onSelect }: { mode: "manage" |
       ) : items.length === 0 ? (
         <Empty>
           <ImagePlus className="mx-auto mb-2 h-8 w-8 text-muted-foreground/60" />
-          Aucune image pour le moment. Téléversez votre logo et vos visuels de billets.
+          {t("settings.media.empty")}
         </Empty>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -147,7 +153,7 @@ export function MediaLibrary({ mode, selectedUrl, onSelect }: { mode: "manage" |
                   <button
                     onClick={() => remove(item)}
                     className="absolute right-2 top-2 rounded-lg bg-white/90 p-1.5 text-destructive opacity-0 shadow transition-opacity group-hover:opacity-100 focus:opacity-100"
-                    aria-label={`Supprimer ${item.originalName}`}
+                    aria-label={t("settings.media.deleteNamed", { name: item.originalName })}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -167,7 +173,14 @@ export function MediaLibrary({ mode, selectedUrl, onSelect }: { mode: "manage" |
       )}
       {items && items.length > 0 && (
         <div className="-mx-4 -mb-4 sm:-mx-5 sm:-mb-5">
-          <Pagination page={paged.page} pages={paged.pages} total={paged.total} size={paged.size} onPage={paged.setPage} unit="images" />
+          <Pagination
+            page={paged.page}
+            pages={paged.pages}
+            total={paged.total}
+            size={paged.size}
+            onPage={paged.setPage}
+            unit={t("settings.media.unit")}
+          />
         </div>
       )}
     </div>
@@ -189,6 +202,7 @@ export function ImageField({
   fallback?: string;
   hint?: string;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const shown = value || fallback;
   return (
@@ -205,15 +219,17 @@ export function ImageField({
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setOpen(true)} className="btn-outline px-3 py-1.5 text-xs">
-              <ImagePlus className="h-3.5 w-3.5" /> {value ? "Changer" : "Choisir"}
+              <ImagePlus className="h-3.5 w-3.5" /> {value ? t("settings.media.change") : t("settings.media.choose")}
             </button>
             {value && (
               <button type="button" onClick={() => onChange(null)} className="btn-outline px-3 py-1.5 text-xs text-destructive">
-                Retirer
+                {t("settings.media.remove")}
               </button>
             )}
           </div>
-          <p className="text-[11px] text-muted-foreground">{value ? "Image personnalisée" : hint ?? "Image par défaut"}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {value ? t("settings.media.customImage") : (hint ?? t("settings.media.defaultImage"))}
+          </p>
         </div>
       </div>
       {open && (

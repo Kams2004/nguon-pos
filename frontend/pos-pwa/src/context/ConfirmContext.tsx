@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, HelpCircle } from "lucide-react";
 import { Modal } from "../components/ui";
+import { useI18n } from "../i18n";
 
 type ConfirmOptions = {
   title: string;
@@ -20,6 +21,7 @@ const ConfirmContext = createContext<ConfirmFn | null>(null);
  */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
+  const { t } = useI18n();
   const resolver = useRef<((ok: boolean) => void) | null>(null);
 
   const confirm = useCallback<ConfirmFn>((opts) => {
@@ -53,14 +55,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           </div>
           <div className="mt-5 flex gap-3">
             <button onClick={() => close(false)} className="btn-outline flex-1">
-              Annuler
+              {t("common.cancel")}
             </button>
-            <button
-              autoFocus
-              onClick={() => close(true)}
-              className={danger ? "btn flex-1 bg-destructive text-white" : "btn-blue flex-1"}
-            >
-              {options.confirmLabel ?? "Confirmer"}
+            <button autoFocus onClick={() => close(true)} className={danger ? "btn flex-1 bg-destructive text-white" : "btn-blue flex-1"}>
+              {options.confirmLabel ?? t("common.confirm")}
             </button>
           </div>
         </Modal>

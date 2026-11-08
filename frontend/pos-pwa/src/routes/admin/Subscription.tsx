@@ -13,35 +13,49 @@ import type {
 import { formatDateTime, formatMoney } from "../../lib/format";
 import { Pagination, usePaged } from "../../components/Pagination";
 import { CardHeader, Loading, Modal, PageHeader, Pill, RefreshButton } from "../../components/ui";
+import { translate, useI18n, type MessageKey } from "../../i18n";
 
-export const STATE_LABELS: Record<SubscriptionState, { label: string; tone: "success" | "warning" | "danger" | "neutral" | "info" }> = {
-  NOT_ACTIVATED: { label: "Non activé", tone: "neutral" },
-  ACTIVE: { label: "Actif", tone: "success" },
-  TO_RENEW: { label: "À renouveler", tone: "warning" },
-  EXPIRED: { label: "Expiré", tone: "danger" },
-  PENDING_PAYMENT: { label: "En attente de paiement", tone: "warning" },
+type Tone = "success" | "warning" | "danger" | "neutral" | "info";
+
+/** `label` is read at use time, so it follows the current language. */
+function stateLabel(state: SubscriptionState, tone: Tone): { label: string; tone: Tone } {
+  return {
+    get label() {
+      return translate(`settings.subscription.state.${state}`);
+    },
+    tone,
+  };
+}
+
+export const STATE_LABELS: Record<SubscriptionState, { label: string; tone: Tone }> = {
+  NOT_ACTIVATED: stateLabel("NOT_ACTIVATED", "neutral"),
+  ACTIVE: stateLabel("ACTIVE", "success"),
+  TO_RENEW: stateLabel("TO_RENEW", "warning"),
+  EXPIRED: stateLabel("EXPIRED", "danger"),
+  PENDING_PAYMENT: stateLabel("PENDING_PAYMENT", "warning"),
 };
 
-const PERIOD_STATUS: Record<SubscriptionPeriod["status"], { label: string; tone: "success" | "warning" | "neutral" }> = {
-  PAID: { label: "Réglée", tone: "success" },
-  PENDING_PAYMENT: { label: "À payer", tone: "warning" },
-  CANCELLED: { label: "Annulée", tone: "neutral" },
+const PERIOD_STATUS: Record<SubscriptionPeriod["status"], { tone: "success" | "warning" | "neutral" }> = {
+  PAID: { tone: "success" },
+  PENDING_PAYMENT: { tone: "warning" },
+  CANCELLED: { tone: "neutral" },
 };
 
-const METHODS: { value: SubscriptionPaymentMethod; label: string }[] = [
-  { value: "CASH", label: "Espèces" },
-  { value: "BANK_TRANSFER", label: "Virement bancaire" },
-  { value: "MOBILE_MONEY", label: "Mobile Money" },
-  { value: "CARD", label: "Carte" },
-  { value: "OTHER", label: "Autre" },
+// Payment method choices (long labels) and how a recorded method is shown (short labels).
+const METHODS: { value: SubscriptionPaymentMethod; label: MessageKey }[] = [
+  { value: "CASH", label: "payment.CASH" },
+  { value: "BANK_TRANSFER", label: "settings.subscription.method.BANK_TRANSFER_long" },
+  { value: "MOBILE_MONEY", label: "payment.MOBILE_MONEY" },
+  { value: "CARD", label: "settings.subscription.method.CARD" },
+  { value: "OTHER", label: "payment.OTHER" },
 ];
-const METHOD_LABELS: Record<SubscriptionPaymentMethod, string> = {
-  CASH: "Espèces",
-  BANK_TRANSFER: "Virement",
-  MOBILE_MONEY: "Mobile Money",
-  CARD: "Carte",
-  ONLINE: "En ligne",
-  OTHER: "Autre",
+const METHOD_LABELS: Record<SubscriptionPaymentMethod, MessageKey> = {
+  CASH: "payment.CASH",
+  BANK_TRANSFER: "settings.subscription.method.BANK_TRANSFER",
+  MOBILE_MONEY: "payment.MOBILE_MONEY",
+  CARD: "settings.subscription.method.CARD",
+  ONLINE: "settings.subscription.method.ONLINE",
+  OTHER: "payment.OTHER",
 };
 
 /** "2026-10-28" → "28/10/2026", without any timezone shift. */
@@ -66,6 +80,7 @@ function todayKey(): string {
  * it only informs — sales, printing and sync never depend on it.
  */
 export default function Subscription() {
+  const { t } = useI18n();
   const { session } = useSession();
   const confirm = useConfirm();
   const [data, setData] = useState<SubscriptionOverview | null>(null);
@@ -127,24 +142,21 @@ export default function Subscription() {
     e.preventDefault();
     const priceChanged = Number(form.annualPrice) !== Number(settings.annualPrice);
     const ok = await confirm({
-      title: "Enregistrer les paramètres d'abonnement ?",
+      title: t("settings.subscription.confirmSaveTitle"),
       message: (
         <>
           {form.moduleEnabled !== settings.moduleEnabled && (
             <p className="mb-2 font-semibold">
-              {form.moduleEnabled ? "Le module d'abonnement sera activé." : "Le module d'abonnement sera désactivé."}
+              {form.moduleEnabled ? t("settings.subscription.moduleWillEnable") : t("settings.subscription.moduleWillDisable")}
             </p>
           )}
           {priceChanged && (
-            <p>
-              Le nouveau tarif ({formatMoney(Number(form.annualPrice), form.currency)}) s'appliquera aux prochaines périodes uniquement :
-              les périodes déjà créées gardent leur prix.
-            </p>
+            <p>{t("settings.subscription.priceChangeNote", { price: formatMoney(Number(form.annualPrice), form.currency) })}</p>
           )}
-          {!priceChanged && form.moduleEnabled === settings.moduleEnabled && <p>Les règles d'abonnement seront mises à jour.</p>}
+          {!priceChanged && form.moduleEnabled === settings.moduleEnabled && <p>{t("settings.subscription.rulesUpdated")}</p>}
         </>
       ),
-      confirmLabel: "Enregistrer",
+      confirmLabel: t("common.save"),
     });
     if (!ok) return;
     if (await run(() => api.updateSubscriptionSettings(session.token, { ...form, annualPrice: Number(form.annualPrice) }))) setSaved(true);
@@ -159,9 +171,13 @@ export default function Subscription() {
     e.preventDefault();
     if (!newPeriod) return;
     const ok = await confirm({
-      title: "Créer cette période ?",
-      message: `Période de ${settings.durationMonths} mois à partir du ${formatDay(newPeriod.startDate)}, au tarif actuel de ${formatMoney(settings.annualPrice, settings.currency)}.`,
-      confirmLabel: "Créer la période",
+      title: t("settings.subscription.confirmCreateTitle"),
+      message: t("settings.subscription.confirmCreateMessage", {
+        months: settings.durationMonths,
+        date: formatDay(newPeriod.startDate),
+        price: formatMoney(settings.annualPrice, settings.currency),
+      }),
+      confirmLabel: t("settings.subscription.createPeriod"),
     });
     if (!ok) return;
     if (
@@ -173,9 +189,9 @@ export default function Subscription() {
 
   const cancelPeriod = async (p: SubscriptionPeriod) => {
     const ok = await confirm({
-      title: "Annuler cette période ?",
-      message: `La période du ${formatDay(p.startDate)} au ${formatDay(p.endDate)} sera annulée. Elle reste visible dans l'historique.`,
-      confirmLabel: "Annuler la période",
+      title: t("settings.subscription.confirmCancelTitle"),
+      message: t("settings.subscription.confirmCancelMessage", { from: formatDay(p.startDate), to: formatDay(p.endDate) }),
+      confirmLabel: t("settings.subscription.cancelPeriod"),
       tone: "danger",
     });
     if (ok) await run(() => api.cancelSubscriptionPeriod(session.token, p.id));
@@ -191,9 +207,14 @@ export default function Subscription() {
     if (!payFor) return;
     const amount = Number(payment.amount);
     const ok = await confirm({
-      title: "Enregistrer ce paiement ?",
-      message: `${formatMoney(amount, payFor.currency)} (${METHOD_LABELS[payment.method]}) pour la période du ${formatDay(payFor.startDate)} au ${formatDay(payFor.endDate)}. Un paiement enregistré ne peut pas être supprimé.`,
-      confirmLabel: "Enregistrer le paiement",
+      title: t("settings.subscription.confirmPaymentTitle"),
+      message: t("settings.subscription.confirmPaymentMessage", {
+        amount: formatMoney(amount, payFor.currency),
+        method: t(METHOD_LABELS[payment.method]),
+        from: formatDay(payFor.startDate),
+        to: formatDay(payFor.endDate),
+      }),
+      confirmLabel: t("settings.subscription.recordPayment"),
     });
     if (!ok) return;
     const [y, m, d] = payment.paidAt.split("-").map(Number);
@@ -210,12 +231,16 @@ export default function Subscription() {
   };
 
   const periodOf = (id: string) => data.periods.find((p) => p.id === id);
+  // The bold balance sits where its placeholder is in the translated sentence.
+  const paymentSummary =
+    payFor &&
+    t("settings.subscription.paymentSummary", { from: formatDay(payFor.startDate), to: formatDay(payFor.endDate) }).split("{amount}");
 
   return (
     <>
       <PageHeader
-        title="Abonnement"
-        subtitle="Abonnement annuel de l'établissement — paramètres, périodes et paiements"
+        title={t("settings.subscription.title")}
+        subtitle={t("settings.subscription.subtitle")}
         actions={<RefreshButton onRefresh={load} />}
       />
 
@@ -229,41 +254,46 @@ export default function Subscription() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-display text-lg font-bold text-foreground">Statut</h2>
+                <h2 className="font-display text-lg font-bold text-foreground">{t("settings.status")}</h2>
                 <Pill tone={state.tone} dot>
                   {state.label}
                 </Pill>
-                {!settings.moduleEnabled && <Pill tone="neutral">Module désactivé</Pill>}
+                {!settings.moduleEnabled && <Pill tone="neutral">{t("settings.subscription.moduleDisabled")}</Pill>}
               </div>
               <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
                 {status.coveredUntil && (
                   <div>
-                    <dt className="text-xs text-muted-foreground">{status.state === "EXPIRED" ? "Expiré le" : "Couvert jusqu'au"}</dt>
+                    <dt className="text-xs text-muted-foreground">
+                      {status.state === "EXPIRED" ? t("settings.subscription.expiredOn") : t("settings.subscription.coveredUntil")}
+                    </dt>
                     <dd className="font-semibold">{formatDay(status.coveredUntil)}</dd>
                   </div>
                 )}
                 {status.daysRemaining !== null && status.state !== "EXPIRED" && (
                   <div>
-                    <dt className="text-xs text-muted-foreground">Jours restants</dt>
+                    <dt className="text-xs text-muted-foreground">{t("settings.subscription.daysRemaining")}</dt>
                     <dd className="font-semibold">{status.daysRemaining}</dd>
                   </div>
                 )}
                 {status.graceUntil && (
                   <div>
-                    <dt className="text-xs text-muted-foreground">Fin du délai de grâce</dt>
+                    <dt className="text-xs text-muted-foreground">{t("settings.subscription.graceEnd")}</dt>
                     <dd className="font-semibold">{formatDay(status.graceUntil)}</dd>
                   </div>
                 )}
                 {status.nextStart && (
                   <div>
-                    <dt className="text-xs text-muted-foreground">Prochaine période</dt>
-                    <dd className="font-semibold">à partir du {formatDay(status.nextStart)}</dd>
+                    <dt className="text-xs text-muted-foreground">{t("settings.subscription.nextPeriod")}</dt>
+                    <dd className="font-semibold">{t("settings.subscription.startingFrom", { date: formatDay(status.nextStart) })}</dd>
                   </div>
                 )}
                 <div>
-                  <dt className="text-xs text-muted-foreground">Tarif actuel</dt>
+                  <dt className="text-xs text-muted-foreground">{t("settings.subscription.currentRate")}</dt>
                   <dd className="font-semibold">
-                    {formatMoney(settings.annualPrice, settings.currency)} / {settings.durationMonths} mois
+                    {t("settings.subscription.pricePerDuration", {
+                      price: formatMoney(settings.annualPrice, settings.currency),
+                      months: settings.durationMonths,
+                    })}
                   </dd>
                 </div>
               </dl>
@@ -271,20 +301,17 @@ export default function Subscription() {
           </div>
           <p className="mt-4 flex gap-2 rounded-xl bg-blue-50 px-3 py-2.5 text-xs text-secondary">
             <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
-            Le statut est informatif : quel qu'il soit, les caisses continuent de vendre, d'imprimer et de synchroniser. Aucune restriction
-            liée à l'expiration n'est appliquée.
+            {t("settings.subscription.infoNote")}
           </p>
         </div>
 
         <form onSubmit={saveSettings} className="card">
-          <CardHeader title="Paramètres" />
+          <CardHeader title={t("settings.title")} />
           <div className="space-y-4 px-5 pb-5">
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border p-3">
               <span>
-                <span className="block text-sm font-semibold text-foreground">Module d'abonnement</span>
-                <span className="block text-xs text-muted-foreground">
-                  Désactivé au lancement ; à activer selon la politique commerciale.
-                </span>
+                <span className="block text-sm font-semibold text-foreground">{t("settings.subscription.module")}</span>
+                <span className="block text-xs text-muted-foreground">{t("settings.subscription.moduleHint")}</span>
               </span>
               <input
                 type="checkbox"
@@ -295,7 +322,7 @@ export default function Subscription() {
             </label>
             <div className="grid gap-3 sm:grid-cols-[1fr_110px]">
               <div>
-                <label className="field-label">Montant de l'abonnement</label>
+                <label className="field-label">{t("settings.subscription.amount")}</label>
                 <input
                   type="number"
                   min={0}
@@ -307,7 +334,7 @@ export default function Subscription() {
                 />
               </div>
               <div>
-                <label className="field-label">Devise</label>
+                <label className="field-label">{t("settings.subscription.currency")}</label>
                 <input
                   required
                   maxLength={10}
@@ -319,7 +346,7 @@ export default function Subscription() {
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <label className="field-label">Durée (mois)</label>
+                <label className="field-label">{t("settings.subscription.duration")}</label>
                 <input
                   type="number"
                   min={1}
@@ -331,7 +358,7 @@ export default function Subscription() {
                 />
               </div>
               <div>
-                <label className="field-label">Alerte (jours avant)</label>
+                <label className="field-label">{t("settings.subscription.reminder")}</label>
                 <input
                   type="number"
                   min={0}
@@ -343,7 +370,7 @@ export default function Subscription() {
                 />
               </div>
               <div>
-                <label className="field-label">Délai de grâce (jours)</label>
+                <label className="field-label">{t("settings.subscription.grace")}</label>
                 <input
                   type="number"
                   min={0}
@@ -362,15 +389,15 @@ export default function Subscription() {
                 onChange={(e) => set({ autoRenew: e.target.checked })}
                 className="h-4 w-4 accent-secondary"
               />
-              Créer automatiquement la période suivante (à payer) à l'approche de l'échéance
+              {t("settings.subscription.autoRenew")}
             </label>
             <div className="flex items-center gap-3">
               <button type="submit" className="btn-gold">
-                Enregistrer
+                {t("common.save")}
               </button>
               {saved && (
                 <span className="flex items-center gap-1.5 text-sm font-semibold text-success">
-                  <Check className="h-4 w-4" /> Enregistré
+                  <Check className="h-4 w-4" /> {t("common.saved")}
                 </span>
               )}
             </div>
@@ -380,10 +407,10 @@ export default function Subscription() {
 
       <div className="card overflow-hidden">
         <CardHeader
-          title={`Périodes d'abonnement (${data.periods.length})`}
+          title={t("settings.subscription.periodsTitle", { n: data.periods.length })}
           action={
             <button onClick={openNewPeriod} className="btn-blue px-3 py-1.5 text-xs">
-              <CalendarPlus className="h-4 w-4" /> Nouvelle période
+              <CalendarPlus className="h-4 w-4" /> {t("settings.subscription.newPeriod")}
             </button>
           }
         />
@@ -391,11 +418,11 @@ export default function Subscription() {
           <table className="w-full text-sm">
             <thead className="border-y border-border bg-muted/40">
               <tr>
-                <th className="th">Période</th>
-                <th className="th text-right">Prix</th>
-                <th className="th text-right">Payé</th>
-                <th className="th">Statut</th>
-                <th className="th">Créée</th>
+                <th className="th">{t("settings.subscription.col.period")}</th>
+                <th className="th text-right">{t("settings.price")}</th>
+                <th className="th text-right">{t("settings.subscription.col.paid")}</th>
+                <th className="th">{t("settings.status")}</th>
+                <th className="th">{t("settings.subscription.col.created")}</th>
                 <th className="th" />
               </tr>
             </thead>
@@ -403,7 +430,7 @@ export default function Subscription() {
               {data.periods.length === 0 && (
                 <tr>
                   <td colSpan={6} className="td text-center text-muted-foreground">
-                    Aucune période. Le logiciel reste pleinement utilisable sans abonnement.
+                    {t("settings.subscription.noPeriods")}
                   </td>
                 </tr>
               )}
@@ -421,7 +448,7 @@ export default function Subscription() {
                   <td className="td text-right">{formatMoney(p.price, p.currency)}</td>
                   <td className="td text-right">{formatMoney(p.paidAmount, p.currency)}</td>
                   <td className="td">
-                    <Pill tone={PERIOD_STATUS[p.status].tone}>{PERIOD_STATUS[p.status].label}</Pill>
+                    <Pill tone={PERIOD_STATUS[p.status].tone}>{t(`settings.subscription.periodStatus.${p.status}`)}</Pill>
                   </td>
                   <td className="td text-xs text-muted-foreground">
                     {formatDateTime(p.createdAt)}
@@ -431,11 +458,11 @@ export default function Subscription() {
                     {p.status === "PENDING_PAYMENT" && (
                       <div className="flex justify-end gap-2">
                         <button onClick={() => openPayment(p)} className="btn-outline px-2.5 py-1 text-xs">
-                          <Wallet className="h-3.5 w-3.5" /> Paiement
+                          <Wallet className="h-3.5 w-3.5" /> {t("settings.subscription.payment")}
                         </button>
                         {p.paidAmount === 0 && (
                           <button onClick={() => cancelPeriod(p)} className="btn-outline px-2.5 py-1 text-xs text-destructive">
-                            Annuler
+                            {t("common.cancel")}
                           </button>
                         )}
                       </div>
@@ -454,30 +481,30 @@ export default function Subscription() {
             size={periodsPaged.size}
             onPage={periodsPaged.setPage}
             onSize={periodsPaged.setSize}
-            unit="périodes"
+            unit={t("settings.subscription.unitPeriods")}
           />
         )}
       </div>
 
       <div className="card overflow-hidden">
-        <CardHeader title={`Historique des paiements (${data.payments.length})`} />
+        <CardHeader title={t("settings.subscription.paymentsTitle", { n: data.payments.length })} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-y border-border bg-muted/40">
               <tr>
-                <th className="th">Date</th>
-                <th className="th">Période</th>
-                <th className="th">Moyen</th>
-                <th className="th">Référence</th>
-                <th className="th text-right">Montant</th>
-                <th className="th">Enregistré par</th>
+                <th className="th">{t("settings.subscription.col.date")}</th>
+                <th className="th">{t("settings.subscription.col.period")}</th>
+                <th className="th">{t("settings.subscription.col.method")}</th>
+                <th className="th">{t("settings.subscription.col.reference")}</th>
+                <th className="th text-right">{t("settings.subscription.col.amount")}</th>
+                <th className="th">{t("settings.subscription.col.recordedBy")}</th>
               </tr>
             </thead>
             <tbody>
               {data.payments.length === 0 && (
                 <tr>
                   <td colSpan={6} className="td text-center text-muted-foreground">
-                    Aucun paiement enregistré.
+                    {t("settings.subscription.noPayments")}
                   </td>
                 </tr>
               )}
@@ -488,7 +515,7 @@ export default function Subscription() {
                     <td className="td">{formatDateTime(x.paidAt)}</td>
                     <td className="td text-xs">{p ? `${formatDay(p.startDate)} → ${formatDay(p.endDate)}` : "—"}</td>
                     <td className="td">
-                      {METHOD_LABELS[x.method]}
+                      {t(METHOD_LABELS[x.method])}
                       {x.provider ? ` · ${x.provider}` : ""}
                     </td>
                     <td className="td font-mono text-xs">{x.providerReference ?? "—"}</td>
@@ -508,20 +535,22 @@ export default function Subscription() {
             size={paymentsPaged.size}
             onPage={paymentsPaged.setPage}
             onSize={paymentsPaged.setSize}
-            unit="paiements"
+            unit={t("settings.subscription.unitPayments")}
           />
         )}
       </div>
 
       {newPeriod && (
-        <Modal title="Nouvelle période d'abonnement" onClose={() => setNewPeriod(null)}>
+        <Modal title={t("settings.subscription.newPeriodModal")} onClose={() => setNewPeriod(null)}>
           <form onSubmit={createPeriod} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Durée : {settings.durationMonths} mois · Tarif : {formatMoney(settings.annualPrice, settings.currency)} (figé pour cette
-              période)
+              {t("settings.subscription.newPeriodSummary", {
+                months: settings.durationMonths,
+                price: formatMoney(settings.annualPrice, settings.currency),
+              })}
             </p>
             <div>
-              <label className="field-label">Date de début</label>
+              <label className="field-label">{t("settings.subscription.startDate")}</label>
               <input
                 type="date"
                 required
@@ -531,7 +560,7 @@ export default function Subscription() {
               />
             </div>
             <div>
-              <label className="field-label">Note (facultatif)</label>
+              <label className="field-label">{t("settings.noteOptional")}</label>
               <input
                 maxLength={500}
                 value={newPeriod.note}
@@ -541,26 +570,27 @@ export default function Subscription() {
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => setNewPeriod(null)} className="btn-outline flex-1">
-                Retour
+                {t("common.back")}
               </button>
               <button type="submit" className="btn-blue flex-1">
-                Créer la période
+                {t("settings.subscription.createPeriod")}
               </button>
             </div>
           </form>
         </Modal>
       )}
 
-      {payFor && (
-        <Modal title="Enregistrer un paiement" onClose={() => setPayFor(null)}>
+      {payFor && paymentSummary && (
+        <Modal title={t("settings.subscription.recordPaymentModal")} onClose={() => setPayFor(null)}>
           <form onSubmit={recordPayment} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Période du {formatDay(payFor.startDate)} au {formatDay(payFor.endDate)} — reste à payer{" "}
+              {paymentSummary[0]}
               <strong className="text-foreground">{formatMoney(Math.max(0, payFor.price - payFor.paidAmount), payFor.currency)}</strong>
+              {paymentSummary[1]}
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="field-label">Montant ({payFor.currency})</label>
+                <label className="field-label">{t("settings.subscription.amountWithCurrency", { currency: payFor.currency })}</label>
                 <input
                   type="number"
                   min={1}
@@ -572,7 +602,7 @@ export default function Subscription() {
                 />
               </div>
               <div>
-                <label className="field-label">Date du paiement</label>
+                <label className="field-label">{t("settings.subscription.paidAt")}</label>
                 <input
                   type="date"
                   required
@@ -583,7 +613,7 @@ export default function Subscription() {
               </div>
             </div>
             <div>
-              <label className="field-label">Moyen de paiement</label>
+              <label className="field-label">{t("settings.subscription.method")}</label>
               <select
                 value={payment.method}
                 onChange={(e) => setPayment({ ...payment, method: e.target.value as SubscriptionPaymentMethod })}
@@ -591,13 +621,13 @@ export default function Subscription() {
               >
                 {METHODS.map((m) => (
                   <option key={m.value} value={m.value}>
-                    {m.label}
+                    {t(m.label)}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="field-label">Référence (reçu, transaction…)</label>
+              <label className="field-label">{t("settings.subscription.reference")}</label>
               <input
                 maxLength={200}
                 value={payment.reference}
@@ -606,7 +636,7 @@ export default function Subscription() {
               />
             </div>
             <div>
-              <label className="field-label">Note (facultatif)</label>
+              <label className="field-label">{t("settings.noteOptional")}</label>
               <input
                 maxLength={500}
                 value={payment.note}
@@ -616,10 +646,10 @@ export default function Subscription() {
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => setPayFor(null)} className="btn-outline flex-1">
-                Retour
+                {t("common.back")}
               </button>
               <button type="submit" className="btn-gold flex-1">
-                Enregistrer le paiement
+                {t("settings.subscription.recordPayment")}
               </button>
             </div>
           </form>

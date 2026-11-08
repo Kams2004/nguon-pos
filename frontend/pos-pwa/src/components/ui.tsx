@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { RefreshCw, Search, X, type LucideIcon } from "lucide-react";
 import { useBranding } from "../context/BrandingContext";
 import { useSession } from "../context/SessionContext";
+import { translate, useI18n } from "../i18n";
 
 /** Logo + "NGUON FESTIVAL" wordmark, as on every screen of the mockup. The logo is the one set in Paramètres. */
 export function BrandLockup({ tone = "light", compact = false }: { tone?: "light" | "dark"; compact?: boolean }) {
@@ -9,11 +10,7 @@ export function BrandLockup({ tone = "light", compact = false }: { tone?: "light
   const text = tone === "light" ? "text-white" : "text-royal";
   return (
     <div className="flex items-center gap-2.5 min-w-0">
-      <img
-        src={logoUrl}
-        alt="Nguon"
-        className={`${compact ? "h-9 w-9" : "h-11 w-11"} flex-shrink-0 rounded-lg bg-white p-0.5 shadow-sm`}
-      />
+      <img src={logoUrl} alt="Nguon" className={`${compact ? "h-9 w-9" : "h-11 w-11"} flex-shrink-0 rounded-lg bg-white p-0.5 shadow-sm`} />
       <div className={`min-w-0 leading-none ${text}`}>
         <p className={`font-display font-extrabold tracking-wide ${compact ? "text-sm" : "text-base"}`}>NGUON</p>
         <p className={`font-display font-extrabold tracking-wide ${compact ? "text-sm" : "text-base"}`}>FESTIVAL</p>
@@ -67,16 +64,18 @@ export function StatCard({
       </div>
       <div className="min-w-0">
         <p className="stat-label text-xs font-semibold text-muted-foreground">{label}</p>
-        <p className="stat-value mt-0.5 truncate font-display text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{value}</p>
+        <p className="stat-value mt-0.5 truncate font-display text-2xl font-extrabold tabular-nums tracking-tight text-foreground">
+          {value}
+        </p>
         {hint && <div className="stat-hint mt-0.5 text-[11px] text-muted-foreground">{hint}</div>}
       </div>
     </div>
   );
 }
 
-/** "+18% par rapport à hier" — up is green, down is red, with an arrow so it never relies on color alone. */
+/** "+18% vs yesterday" — up is green, down is red, with an arrow so it never relies on color alone. */
 export function Delta({ current, previous, suffix }: { current: number; previous: number; suffix: string }) {
-  if (previous === 0) return <span className="text-muted-foreground">{current > 0 ? "Pas de comparaison possible (0 hier)" : ""}</span>;
+  if (previous === 0) return <span className="text-muted-foreground">{current > 0 ? translate("ui.noComparison") : ""}</span>;
   const pct = Math.round(((current - previous) / previous) * 100);
   const up = pct >= 0;
   return (
@@ -179,7 +178,7 @@ export function Modal({
       <div className={`card my-auto w-full ${MODAL_WIDTHS[size]} overflow-hidden animate-in fade-in zoom-in-95`}>
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="font-display text-base font-bold">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted" aria-label="Fermer">
+          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted" aria-label={translate("common.close")}>
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -189,8 +188,9 @@ export function Modal({
   );
 }
 
-/** "Actualiser" — the icon spins while the reload runs (at least briefly, so a fast reload still visibly happened). */
-export function RefreshButton({ onRefresh, label = "Actualiser" }: { onRefresh: () => unknown; label?: string }) {
+/** "Refresh" — the icon spins while the reload runs (at least briefly, so a fast reload still visibly happened). */
+export function RefreshButton({ onRefresh, label }: { onRefresh: () => unknown; label?: string }) {
+  const { t } = useI18n();
   const [spinning, setSpinning] = useState(false);
   const run = async () => {
     if (spinning) return;
@@ -205,7 +205,7 @@ export function RefreshButton({ onRefresh, label = "Actualiser" }: { onRefresh: 
   return (
     <button onClick={run} className="btn-outline" disabled={spinning} aria-busy={spinning}>
       <RefreshCw className={`h-4 w-4 ${spinning ? "animate-spin text-secondary" : ""}`} />
-      {label}
+      {label ?? t("common.refresh")}
     </button>
   );
 }
@@ -213,32 +213,25 @@ export function RefreshButton({ onRefresh, label = "Actualiser" }: { onRefresh: 
 /** Shows that this screen updates by itself (live stream connected). */
 export function LiveBadge() {
   const { liveConnected } = useSession();
+  const { t } = useI18n();
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
         liveConnected ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"
       }`}
-      title={liveConnected ? "Mise à jour automatique active" : "Reconnexion au flux en direct…"}
+      title={liveConnected ? t("ui.liveTitle") : t("ui.reconnectingTitle")}
     >
       <span className="relative flex h-2 w-2">
         {liveConnected && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}
         <span className={`relative inline-flex h-2 w-2 rounded-full ${liveConnected ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
       </span>
-      {liveConnected ? "En direct" : "Reconnexion…"}
+      {liveConnected ? t("common.live") : t("ui.reconnecting")}
     </span>
   );
 }
 
 /** Search box with a leading magnifier, as in the mockup's list headers. */
-export function SearchInput({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-}) {
+export function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <div className="relative w-full max-w-sm">
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

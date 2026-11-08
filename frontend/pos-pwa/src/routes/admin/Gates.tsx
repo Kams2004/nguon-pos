@@ -5,8 +5,10 @@ import { useConfirm } from "../../context/ConfirmContext";
 import { api, errorMessage } from "../../lib/api/client";
 import type { AdminGate, AdminTicketType, TerminalStatus } from "../../lib/api/types";
 import { Loading, Modal, PageHeader, Pill, RefreshButton } from "../../components/ui";
+import { useI18n } from "../../i18n";
 
 export default function Gates() {
+  const { t } = useI18n();
   const { session } = useSession();
   const confirm = useConfirm();
   const [gates, setGates] = useState<AdminGate[] | null>(null);
@@ -54,17 +56,11 @@ export default function Gates() {
     if (!editing) return;
     const isNew = editing === "new";
     const ok = await confirm({
-      title: isNew ? "Créer cette porte ?" : "Renommer cette porte ?",
-      message: isNew ? (
-        <>
-          La porte « {name} » ({code}) recevra sa propre clé de signature des QR codes. Le code ne pourra plus être modifié.
-        </>
-      ) : (
-        <>
-          « {editing.name} » deviendra « {name} ». Le nouveau nom apparaîtra sur les prochains billets imprimés.
-        </>
-      ),
-      confirmLabel: isNew ? "Créer" : "Enregistrer",
+      title: isNew ? t("settings.gates.confirmCreateTitle") : t("settings.gates.confirmRenameTitle"),
+      message: isNew
+        ? t("settings.gates.confirmCreateMessage", { name, code })
+        : t("settings.gates.confirmRenameMessage", { old: editing.name, name }),
+      confirmLabel: isNew ? t("settings.create") : t("common.save"),
     });
     if (!ok) return;
     try {
@@ -73,17 +69,15 @@ export default function Gates() {
       setEditing(null);
       await load();
     } catch (err) {
-      setError(errorMessage(err, isNew ? "Impossible de créer la porte (code déjà utilisé ?)." : "Impossible d'enregistrer."));
+      setError(errorMessage(err, isNew ? t("settings.gates.createError") : t("settings.saveError")));
     }
   };
 
   const toggleActive = async (gate: AdminGate) => {
     const ok = await confirm({
-      title: gate.active ? `Désactiver « ${gate.name} » ?` : `Activer « ${gate.name} » ?`,
-      message: gate.active
-        ? "Cette porte n'apparaîtra plus comme active. Les billets déjà vendus pour elle restent valables."
-        : "Cette porte sera de nouveau active.",
-      confirmLabel: gate.active ? "Désactiver" : "Activer",
+      title: gate.active ? t("settings.deactivateNamed", { name: gate.name }) : t("settings.activateNamed", { name: gate.name }),
+      message: gate.active ? t("settings.gates.deactivateMessage") : t("settings.gates.activateMessage"),
+      confirmLabel: gate.active ? t("common.deactivate") : t("common.activate"),
       tone: gate.active ? "danger" : "default",
     });
     if (!ok) return;
@@ -94,13 +88,13 @@ export default function Gates() {
   return (
     <>
       <PageHeader
-        title="Portes & caisses"
-        subtitle="Chaque porte a sa propre clé de signature des QR codes"
+        title={t("settings.gates.title")}
+        subtitle={t("settings.gates.subtitle")}
         actions={
           <>
             <RefreshButton onRefresh={load} />
             <button onClick={openCreate} className="btn-blue">
-              <Plus className="h-4 w-4" /> Nouvelle porte
+              <Plus className="h-4 w-4" /> {t("settings.gates.newGate")}
             </button>
           </>
         }
@@ -120,7 +114,9 @@ export default function Gates() {
                 <div className="flex items-start gap-4">
                   <div
                     className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl ${
-                      g.active ? "bg-gradient-to-br from-royal to-secondary text-white shadow-md shadow-secondary/30" : "bg-muted text-muted-foreground"
+                      g.active
+                        ? "bg-gradient-to-br from-royal to-secondary text-white shadow-md shadow-secondary/30"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     <DoorOpen className="h-7 w-7" strokeWidth={1.8} />
@@ -128,7 +124,11 @@ export default function Gates() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate font-display text-lg font-bold text-foreground">{g.name}</p>
-                      {g.active ? <Pill tone="success">Active</Pill> : <Pill tone="warning">Désactivée</Pill>}
+                      {g.active ? (
+                        <Pill tone="success">{t("common.activeFem")}</Pill>
+                      ) : (
+                        <Pill tone="warning">{t("settings.gates.deactivated")}</Pill>
+                      )}
                     </div>
                     <p className="font-mono text-xs text-muted-foreground">{g.code}</p>
                   </div>
@@ -136,7 +136,7 @@ export default function Gates() {
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <div className="rounded-xl bg-muted/60 px-3 py-2">
                     <p className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-                      <MonitorSmartphone className="h-3.5 w-3.5" /> Caisses en ligne
+                      <MonitorSmartphone className="h-3.5 w-3.5" /> {t("settings.gates.tillsOnline")}
                     </p>
                     <p className="font-display text-base font-bold text-foreground">
                       {online} / {tills.length}
@@ -144,20 +144,20 @@ export default function Gates() {
                   </div>
                   <div className="rounded-xl bg-muted/60 px-3 py-2">
                     <p className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-                      <Ticket className="h-3.5 w-3.5" /> Billets vendus ici
+                      <Ticket className="h-3.5 w-3.5" /> {t("settings.gates.ticketsSoldHere")}
                     </p>
-                    <p className="font-display text-base font-bold text-foreground">{types} type{types > 1 ? "s" : ""}</p>
+                    <p className="font-display text-base font-bold text-foreground">{t("settings.gates.typeCount", { count: types })}</p>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-2">
                   <button onClick={() => openEdit(g)} className="btn-outline flex-1 py-2 text-xs">
-                    <Pencil className="h-3.5 w-3.5" /> Modifier
+                    <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
                   </button>
                   <button
                     onClick={() => toggleActive(g)}
                     className={`btn-outline flex-1 py-2 text-xs ${g.active ? "text-destructive" : "text-success"}`}
                   >
-                    {g.active ? "Désactiver" : "Activer"}
+                    {g.active ? t("common.deactivate") : t("common.activate")}
                   </button>
                 </div>
               </div>
@@ -167,15 +167,24 @@ export default function Gates() {
       )}
 
       {editing && (
-        <Modal title={editing === "new" ? "Nouvelle porte" : `Modifier « ${editing.name} »`} onClose={() => setEditing(null)}>
+        <Modal
+          title={editing === "new" ? t("settings.gates.newGate") : t("settings.editNamed", { name: editing.name })}
+          onClose={() => setEditing(null)}
+        >
           <form onSubmit={submit} className="space-y-3">
             {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
             <div>
-              <label className="field-label">Nom</label>
-              <input required value={name} onChange={(e) => setName(e.target.value)} className="field" placeholder="Porte C" />
+              <label className="field-label">{t("settings.name")}</label>
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="field"
+                placeholder={t("settings.gates.namePlaceholder")}
+              />
             </div>
             <div>
-              <label className="field-label">Code</label>
+              <label className="field-label">{t("settings.gates.code")}</label>
               <input
                 required
                 disabled={editing !== "new"}
@@ -184,16 +193,14 @@ export default function Gates() {
                 className="field font-mono disabled:bg-muted disabled:text-muted-foreground"
                 placeholder="GATE-C"
               />
-              {editing !== "new" && (
-                <p className="mt-1 text-[11px] text-muted-foreground">Le code est imprimé dans chaque QR code : il ne peut pas changer.</p>
-              )}
+              {editing !== "new" && <p className="mt-1 text-[11px] text-muted-foreground">{t("settings.gates.codeLocked")}</p>}
             </div>
             <div className="flex gap-3 pt-1">
               <button type="button" onClick={() => setEditing(null)} className="btn-outline flex-1">
-                Annuler
+                {t("common.cancel")}
               </button>
               <button type="submit" className="btn-gold flex-1">
-                {editing === "new" ? "Créer la porte" : "Enregistrer"}
+                {editing === "new" ? t("settings.gates.createGate") : t("common.save")}
               </button>
             </div>
           </form>

@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import type { PaymentMethod } from "../../lib/api/types";
 import { PAYMENT_LABELS, formatMoney } from "../../lib/format";
 import { fillPlaceholders, type ResolvedTicketDesign } from "../../lib/ticketDesign";
+import { locale, useI18n } from "../../i18n";
 
 export type ReceiptLine = { name: string; quantity: number; unitPrice: number };
 /** An entry printed on the receipt itself (print mode "Standard"). */
@@ -57,6 +58,7 @@ export default function Receipt({
   received = null,
   entries = [],
 }: ReceiptProps) {
+  const { t } = useI18n();
   const o = design.receipt;
   const total = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
   const date = new Date(createdAtClient);
@@ -100,15 +102,15 @@ export default function Receipt({
       <Rule />
 
       <div className="space-y-0.5">
-        <Row label="Réf." value={reference} />
+        <Row label={t("gate.receipt.ref")} value={reference} />
         <Row
-          label="Date"
-          value={date.toLocaleString("fr-FR", {
+          label={t("gate.receipt.date")}
+          value={date.toLocaleString(locale(), {
             dateStyle: "short",
             timeStyle: "short",
           })}
         />
-        {o.showCashier && <Row label="Caissier" value={cashierName} />}
+        {o.showCashier && <Row label={t("role.CASHIER")} value={cashierName} />}
       </div>
 
       <Rule />
@@ -139,23 +141,21 @@ export default function Receipt({
       <Rule />
 
       <div className="flex justify-between text-sm font-bold">
-        <span>TOTAL</span>
+        <span>{t("gate.receipt.total")}</span>
         <span>{formatMoney(total, currency)}</span>
       </div>
-      {o.showPayment && <Row label="Paiement" value={PAYMENT_LABELS[paymentMethod]} />}
+      {o.showPayment && <Row label={t("gate.receipt.payment")} value={PAYMENT_LABELS[paymentMethod]} />}
       {showCash && (
         <>
-          <Row label="Reçu" value={formatMoney(received!, currency)} />
-          <Row label="Rendu" value={formatMoney(received! - total, currency)} />
+          <Row label={t("gate.receipt.received")} value={formatMoney(received!, currency)} />
+          <Row label={t("gate.receipt.change")} value={formatMoney(received! - total, currency)} />
         </>
       )}
 
       {entries.length > 0 && (
         <>
           <Rule />
-          <p className="text-center text-[10px] font-bold uppercase">
-            {entries.length > 1 ? `${entries.length} entrées — une par personne` : "Entrée"}
-          </p>
+          <p className="text-center text-[10px] font-bold uppercase">{t("gate.receipt.entries", { count: entries.length })}</p>
           <div className={`mt-2 grid gap-x-2 gap-y-3 ${o.paperWidth === 58 || entries.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
             {entries.map((e, i) => (
               <div key={e.ticketNumber} className="break-inside-avoid text-center">
@@ -172,17 +172,13 @@ export default function Receipt({
               </div>
             ))}
           </div>
-          <p className="mt-2 text-center text-[9px]">Chaque code n'est valable que pour une seule entrée.</p>
+          <p className="mt-2 text-center text-[9px]">{t("gate.receipt.singleUse")}</p>
         </>
       )}
       {o.showTicketCount && ticketCount > entries.length && (
         <>
           <Rule />
-          <p className="text-center text-[9px]">
-            {ticketCount - entries.length} billet
-            {ticketCount - entries.length > 1 ? "s" : ""} — voir carte
-            {ticketCount - entries.length > 1 ? "s" : ""} ci-après
-          </p>
+          <p className="text-center text-[9px]">{t("gate.receipt.seeTickets", { count: ticketCount - entries.length })}</p>
         </>
       )}
       {qr && (

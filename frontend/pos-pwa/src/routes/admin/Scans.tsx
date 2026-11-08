@@ -8,24 +8,18 @@ import { useCatalog } from "../../lib/useCatalog";
 import { TicketTypeBadge } from "../../lib/ticketIcons";
 import { Pagination } from "../../components/Pagination";
 import { Loading, PageHeader, Pill, RefreshButton, StatCard } from "../../components/ui";
+import { locale, translate, useI18n, type MessageKey } from "../../i18n";
 
-const RESULT_LABELS: Record<ScanResultValue, string> = {
-  ACCEPTED: "Entrée validée",
-  REJECTED_ALREADY_REDEEMED: "Déjà utilisé",
-  REJECTED_INVALID_SIGNATURE: "QR falsifié",
-  REJECTED_WRONG_GATE: "Mauvaise porte",
-  REJECTED_UNKNOWN_TICKET: "Billet inconnu",
-  REJECTED_VOIDED: "Vente annulée",
-  PENDING_TICKET: "En attente de la vente",
-};
+/** Read at render time, so it follows the current language. */
+const resultLabel = (r: ScanResultValue) => translate(`reports.scans.result.${r}`);
 
-const RESULT_FILTERS: { value: ScanFilter | ""; label: string }[] = [
-  { value: "", label: "Tous" },
-  { value: "ACCEPTED", label: "Validées" },
-  { value: "REJECTED", label: "Refusées" },
-  { value: "REJECTED_ALREADY_REDEEMED", label: "Déjà utilisés" },
-  { value: "REJECTED_UNKNOWN_TICKET", label: "Inconnus" },
-  { value: "PENDING_TICKET", label: "En attente" },
+const RESULT_FILTERS: { value: ScanFilter | ""; labelKey: MessageKey }[] = [
+  { value: "", labelKey: "common.all" },
+  { value: "ACCEPTED", labelKey: "reports.scans.filter.accepted" },
+  { value: "REJECTED", labelKey: "reports.scans.filter.rejected" },
+  { value: "REJECTED_ALREADY_REDEEMED", labelKey: "reports.scans.filter.alreadyUsed" },
+  { value: "REJECTED_UNKNOWN_TICKET", labelKey: "reports.scans.filter.unknown" },
+  { value: "PENDING_TICKET", labelKey: "reports.scans.filter.pending" },
 ];
 
 type Filters = { result: ScanFilter | ""; gateId: string; from: string; to: string };
@@ -43,6 +37,7 @@ function parseDay(v: string): Date {
  */
 export default function Scans() {
   const { session } = useSession();
+  const { t } = useI18n();
   const { gates, gateName, ticketType, userName } = useCatalog();
   const [scans, setScans] = useState<ScanEntry[] | null>(null);
   const [counts, setCounts] = useState({ accepted: 0, rejected: 0, pending: 0 });
@@ -91,41 +86,39 @@ export default function Scans() {
     setFilter({ from: dayKey(addDays(today, -(days - 1))), to: dayKey(today) });
   };
   const terminalLabel = (id: string | null) =>
-    id ? (terminals.find((t) => t.terminalId === id)?.deviceLabel ?? `Caisse ${id.slice(0, 4).toUpperCase()}`) : "—";
+    id
+      ? (terminals.find((term) => term.terminalId === id)?.deviceLabel ?? t("reports.tillFallback", { id: id.slice(0, 4).toUpperCase() }))
+      : "—";
   const total = counts.accepted + counts.rejected + counts.pending;
 
   return (
     <>
-      <PageHeader
-        title="Contrôle des entrées"
-        subtitle="Chaque scan synchronisé, validé ou refusé — les nouveaux apparaissent automatiquement"
-        actions={<RefreshButton onRefresh={load} />}
-      />
+      <PageHeader title={t("reports.scans.title")} subtitle={t("reports.scans.subtitle")} actions={<RefreshButton onRefresh={load} />} />
 
       <div className="stat-strip">
-        <StatCard icon={ScanLine} tone="blue" label="Scans" value={total.toLocaleString("fr-FR")} />
-        <StatCard icon={CheckCircle2} tone="green" label="Entrées validées" value={counts.accepted.toLocaleString("fr-FR")} />
+        <StatCard icon={ScanLine} tone="blue" label={t("reports.scans.scans")} value={total.toLocaleString(locale())} />
+        <StatCard icon={CheckCircle2} tone="green" label={t("reports.scans.accepted")} value={counts.accepted.toLocaleString(locale())} />
         <StatCard
           icon={ShieldAlert}
           tone="gold"
-          label="Refus"
-          value={counts.rejected.toLocaleString("fr-FR")}
-          hint={total > 0 ? `${Math.round((counts.rejected / total) * 100)} % des scans` : undefined}
+          label={t("reports.scans.rejected")}
+          value={counts.rejected.toLocaleString(locale())}
+          hint={total > 0 ? t("reports.scans.rejectedShare", { n: Math.round((counts.rejected / total) * 100) }) : undefined}
         />
         {counts.pending > 0 && (
           <StatCard
             icon={Clock}
             tone="blue"
-            label="En attente de la vente"
-            value={counts.pending.toLocaleString("fr-FR")}
-            hint="Réglés dès que la caisse émettrice se synchronise"
+            label={t("reports.scans.result.PENDING_TICKET")}
+            value={counts.pending.toLocaleString(locale())}
+            hint={t("reports.scans.pendingHint")}
           />
         )}
       </div>
 
       <div className="card flex flex-wrap items-end gap-3 p-4">
         <div>
-          <label className="field-label">Résultat</label>
+          <label className="field-label">{t("reports.scans.result")}</label>
           <div className="flex flex-wrap rounded-xl bg-muted p-1">
             {RESULT_FILTERS.map((r) => (
               <button
@@ -135,15 +128,15 @@ export default function Scans() {
                   filters.result === r.value ? "bg-secondary text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {r.label}
+                {t(r.labelKey)}
               </button>
             ))}
           </div>
         </div>
         <div className="min-w-[160px] flex-1">
-          <label className="field-label">Porte</label>
+          <label className="field-label">{t("reports.col.gate")}</label>
           <select value={filters.gateId} onChange={(e) => setFilter({ gateId: e.target.value })} className="field">
-            <option value="">Toutes les portes</option>
+            <option value="">{t("reports.filter.allGates")}</option>
             {gates.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -152,7 +145,7 @@ export default function Scans() {
           </select>
         </div>
         <div>
-          <label className="field-label">Du</label>
+          <label className="field-label">{t("common.from")}</label>
           <input
             type="date"
             value={filters.from}
@@ -162,7 +155,7 @@ export default function Scans() {
           />
         </div>
         <div>
-          <label className="field-label">Au</label>
+          <label className="field-label">{t("common.to")}</label>
           <input
             type="date"
             value={filters.to}
@@ -173,15 +166,15 @@ export default function Scans() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => preset(1)} className="btn-outline px-3 text-xs">
-            Aujourd'hui
+            {t("common.today")}
           </button>
           <button onClick={() => preset(7)} className="btn-outline px-3 text-xs">
-            7 jours
+            {t("common.days7")}
           </button>
         </div>
         {active && (
           <button onClick={() => setFilter(NO_FILTERS)} className="btn-outline px-3 text-xs text-destructive">
-            <FilterX className="h-4 w-4" /> Effacer les filtres
+            <FilterX className="h-4 w-4" /> {t("common.clearFilters")}
           </button>
         )}
       </div>
@@ -191,20 +184,20 @@ export default function Scans() {
           <table className="w-full text-sm">
             <thead className="border-b border-border bg-muted/40">
               <tr>
-                <th className="th">Date du scan</th>
-                <th className="th">Billet</th>
-                <th className="th">Porte</th>
-                <th className="th">Caisse</th>
-                <th className="th">Contrôleur</th>
-                <th className="th">Résultat</th>
-                <th className="th">Détail</th>
+                <th className="th">{t("reports.scans.scanDate")}</th>
+                <th className="th">{t("reports.ticket")}</th>
+                <th className="th">{t("reports.col.gate")}</th>
+                <th className="th">{t("reports.till")}</th>
+                <th className="th">{t("reports.scans.checker")}</th>
+                <th className="th">{t("reports.scans.result")}</th>
+                <th className="th">{t("reports.scans.detail")}</th>
               </tr>
             </thead>
             <tbody>
               {scans.length === 0 && (
                 <tr>
                   <td colSpan={7} className="td text-center text-muted-foreground">
-                    {active ? "Aucun scan ne correspond à ces filtres." : "Aucun scan synchronisé pour le moment."}
+                    {active ? t("reports.scans.noMatch") : t("reports.scans.none")}
                   </td>
                 </tr>
               )}
@@ -212,7 +205,10 @@ export default function Scans() {
                 const type = s.ticketTypeId ? ticketType(s.ticketTypeId) : undefined;
                 const firstEntryElsewhere = s.result === "REJECTED_ALREADY_REDEEMED" && s.redeemedAt;
                 return (
-                  <tr key={s.id} className={`border-b border-border/60 last:border-0 ${s.result === "ACCEPTED" ? "" : s.result === "PENDING_TICKET" ? "bg-amber-50/40" : "bg-red-50/40"}`}>
+                  <tr
+                    key={s.id}
+                    className={`border-b border-border/60 last:border-0 ${s.result === "ACCEPTED" ? "" : s.result === "PENDING_TICKET" ? "bg-amber-50/40" : "bg-red-50/40"}`}
+                  >
                     <td className="td text-muted-foreground">{formatDateTime(s.scannedAt)}</td>
                     <td className="td">
                       <div className="flex items-center gap-2.5">
@@ -220,7 +216,7 @@ export default function Scans() {
                         <div className="min-w-0">
                           <p className="font-mono text-xs font-semibold">{s.ticketNumber ?? s.ticketId.slice(0, 8)}</p>
                           <p className="text-xs text-muted-foreground">
-                            {type?.name ?? (s.ticketNumber ? "Billet" : "Inconnu du serveur")}
+                            {type?.name ?? (s.ticketNumber ? t("reports.ticket") : t("reports.scans.unknownToServer"))}
                           </p>
                         </div>
                       </div>
@@ -230,18 +226,18 @@ export default function Scans() {
                     <td className="td">{userName(s.scannedByUserId)}</td>
                     <td className="td">
                       <Pill tone={s.result === "ACCEPTED" ? "success" : s.result === "PENDING_TICKET" ? "warning" : "danger"}>
-                        {RESULT_LABELS[s.result]}
+                        {resultLabel(s.result)}
                       </Pill>
                     </td>
                     <td className="td whitespace-normal text-xs text-muted-foreground">
                       {firstEntryElsewhere
-                        ? `Entré le ${formatDateTime(s.redeemedAt!)} via ${terminalLabel(s.redeemedByTerminalId)}`
+                        ? t("reports.scans.enteredAt", { date: formatDateTime(s.redeemedAt!), till: terminalLabel(s.redeemedByTerminalId) })
                         : s.result === "REJECTED_UNKNOWN_TICKET"
-                          ? "Billet d'un autre établissement"
+                          ? t("reports.scans.otherVenue")
                           : s.result === "PENDING_TICKET"
-                            ? "La caisse qui a vendu ce billet ne s'est pas encore synchronisée"
+                            ? t("reports.scans.sellerNotSynced")
                             : s.result === "REJECTED_VOIDED"
-                              ? "La vente de ce billet a été annulée"
+                              ? t("reports.scans.saleVoided")
                               : ""}
                     </td>
                   </tr>
@@ -260,7 +256,7 @@ export default function Scans() {
             setPageSize(n);
             setPage(0);
           }}
-          unit="scans"
+          unit={t("reports.unit.scans")}
         />
       </div>
     </>

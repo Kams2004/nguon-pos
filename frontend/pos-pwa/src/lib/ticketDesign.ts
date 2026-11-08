@@ -1,15 +1,25 @@
 import type { DesignOptions, TicketDesign } from "./api/types";
+import { translate } from "../i18n";
 
 // What the ticket and receipt say when the Super Admin hasn't customised a
 // field (every field is optional server-side). Edited in "Billet & reçu".
+// The wording ones are getters, read at use time in the current language.
 export const TICKET_DEFAULTS = {
   ticketTitle: "NGUON FESTIVAL",
-  ticketSubtitle: "Le NGUON",
-  ticketTagline: "Patrimoine Culturel du Royaume Bamoun",
+  get ticketSubtitle() {
+    return translate("gate.design.ticketSubtitle");
+  },
+  get ticketTagline() {
+    return translate("gate.design.ticketTagline");
+  },
   ticketLocation: "Foumban",
-  ticketFooter: "Valable uniquement à {porte} — usage unique",
+  get ticketFooter() {
+    return translate("gate.design.ticketFooter");
+  },
   ticketBannerUrl: "/img/banners/palace.jpg",
-  receiptFooter: "Merci de votre visite — Nguon {annee}",
+  get receiptFooter() {
+    return translate("gate.design.receiptFooter");
+  },
 } satisfies Record<keyof TicketDesign, string>;
 
 /** Ticket layout: colours, frame and which blocks are printed. */

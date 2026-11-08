@@ -4,6 +4,7 @@ import { useSession } from "../../context/SessionContext";
 import { scanTicket, type ScanOutcome } from "../../lib/offline/scan";
 import type { GateSession } from "../../lib/offline/session";
 import GateHeader from "./GateHeader";
+import { locale, useI18n } from "../../i18n";
 
 // A real USB QR/barcode scanner acts as a keyboard-emulation (HID) device:
 // it "types" the decoded content into whatever input is focused, then sends
@@ -11,6 +12,7 @@ import GateHeader from "./GateHeader";
 // it works identically with a real scanner or with manual paste-and-Enter
 // during testing, and needs no camera/getUserMedia support.
 export default function Scan() {
+  const { t } = useI18n();
   const { session, syncNow, refreshPendingCount } = useSession();
   const [value, setValue] = useState("");
   const [result, setResult] = useState<{ outcome: ScanOutcome; at: Date } | null>(null);
@@ -51,11 +53,14 @@ export default function Scan() {
       <GateHeader />
       <div className="mx-auto grid max-w-[1400px] gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="space-y-5">
-          <form onSubmit={handleSubmit} className="relative overflow-hidden rounded-2xl bg-royal-deep px-6 pb-7 pt-6 shadow-[0_10px_30px_-14px_hsl(var(--royal-deep)/0.6)]">
+          <form
+            onSubmit={handleSubmit}
+            className="relative overflow-hidden rounded-2xl bg-royal-deep px-6 pb-7 pt-6 shadow-[0_10px_30px_-14px_hsl(var(--royal-deep)/0.6)]"
+          >
             <img src="/img/banners/navy-palace.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-50" />
             <div className="absolute inset-0 bg-gradient-to-b from-royal-deep/60 via-transparent to-royal-deep/80" />
             <div className="relative text-center">
-              <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Validation de billet</h1>
+              <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">{t("gate.scan.title")}</h1>
               <p className="text-sm text-white/75">{session.bootstrap.gate.name}</p>
             </div>
             {/* Viewfinder frame — a visual nod to camera-style scanning, though
@@ -79,15 +84,15 @@ export default function Scan() {
               />
               <ScanLine className={`h-16 w-16 ${scanning ? "animate-pulse text-primary" : "text-white/40"}`} strokeWidth={1.4} />
             </div>
-            <p className="relative mt-5 text-center text-sm text-white/85">Présentez le QR code au lecteur</p>
+            <p className="relative mt-5 text-center text-sm text-white/85">{t("gate.scan.prompt")}</p>
             <input
               ref={inputRef}
               type="text"
               autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder="ou collez le code puis Entrée"
-              aria-label="Code du billet"
+              placeholder={t("gate.scan.placeholder")}
+              aria-label={t("gate.scan.codeLabel")}
               className="relative mt-3 w-full rounded-xl border border-white/20 bg-white/95 px-4 py-3.5 text-center font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               disabled={scanning}
             />
@@ -96,15 +101,15 @@ export default function Scan() {
           <div className="card grid grid-cols-3 divide-x divide-border text-center">
             <div className="px-3 py-4">
               <p className="font-display text-2xl font-extrabold tabular-nums">{history.length}</p>
-              <p className="text-xs font-semibold text-muted-foreground">Scans</p>
+              <p className="text-xs font-semibold text-muted-foreground">{t("gate.scan.scans")}</p>
             </div>
             <div className="px-3 py-4">
               <p className="font-display text-2xl font-extrabold tabular-nums text-success">{accepted}</p>
-              <p className="text-xs font-semibold text-muted-foreground">Entrées validées</p>
+              <p className="text-xs font-semibold text-muted-foreground">{t("gate.scan.accepted")}</p>
             </div>
             <div className="px-3 py-4">
               <p className="font-display text-2xl font-extrabold tabular-nums text-destructive">{history.length - accepted}</p>
-              <p className="text-xs font-semibold text-muted-foreground">Refus</p>
+              <p className="text-xs font-semibold text-muted-foreground">{t("gate.scan.refused")}</p>
             </div>
           </div>
         </div>
@@ -118,20 +123,18 @@ export default function Scan() {
               <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-royal/10 text-royal">
                 <ScanLine className="h-8 w-8" strokeWidth={1.8} />
               </span>
-              <p className="mt-4 font-display text-xl font-bold text-foreground">Prêt à scanner</p>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Le résultat s'affiche ici en grand dès qu'un billet est lu : vert pour entrer, rouge pour refuser.
-              </p>
+              <p className="mt-4 font-display text-xl font-bold text-foreground">{t("gate.scan.ready")}</p>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t("gate.scan.readyHint")}</p>
             </div>
           )}
 
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between px-5 pb-3 pt-4">
-              <h2 className="font-display text-sm font-bold text-foreground">Derniers scans</h2>
-              <span className="text-xs text-muted-foreground">cette session</span>
+              <h2 className="font-display text-sm font-bold text-foreground">{t("gate.scan.recent")}</h2>
+              <span className="text-xs text-muted-foreground">{t("gate.scan.thisSession")}</span>
             </div>
             {history.length === 0 ? (
-              <p className="px-5 pb-5 text-sm text-muted-foreground">Aucun billet scanné depuis l'ouverture de cet écran.</p>
+              <p className="px-5 pb-5 text-sm text-muted-foreground">{t("gate.scan.none")}</p>
             ) : (
               <ul className="divide-y divide-border border-t border-border">
                 {history.slice(0, 8).map((h) => {
@@ -142,11 +145,13 @@ export default function Scan() {
                       <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${st.panel}`}>
                         <Icon className="h-4 w-4" strokeWidth={3} />
                       </span>
-                      <span className="min-w-0 flex-1 truncate font-semibold">{st.title}</span>
+                      <span className="min-w-0 flex-1 truncate font-semibold">{t(`gate.scan.${h.outcome.kind}.title`)}</span>
                       <span className="hidden truncate font-mono text-xs text-muted-foreground sm:block">
                         {"ticketNumber" in h.outcome ? h.outcome.ticketNumber : ""}
                       </span>
-                      <span className="w-16 text-right text-xs tabular-nums text-muted-foreground">{h.at.toLocaleTimeString("fr-FR")}</span>
+                      <span className="w-16 text-right text-xs tabular-nums text-muted-foreground">
+                        {h.at.toLocaleTimeString(locale())}
+                      </span>
                     </li>
                   );
                 })}
@@ -159,43 +164,32 @@ export default function Scan() {
   );
 }
 
-const STYLES: Record<
-  ScanOutcome["kind"],
-  { icon: LucideIcon; title: string; barLabel: string; panel: string }
-> = {
+// Titles and bar labels come from gate.scan.<kind>.title / .bar.
+const STYLES: Record<ScanOutcome["kind"], { icon: LucideIcon; panel: string }> = {
   ACCEPTED: {
     icon: Check,
-    title: "Billet valide",
-    barLabel: "Accès autorisé",
     panel: "bg-success text-white",
   },
   REJECTED_ALREADY_REDEEMED: {
     icon: X,
-    title: "Billet déjà utilisé",
-    barLabel: "Accès refusé",
     panel: "bg-destructive text-white",
   },
   REJECTED_INVALID_SIGNATURE: {
     icon: X,
-    title: "Billet invalide",
-    barLabel: "Accès refusé",
     panel: "bg-destructive text-white",
   },
   REJECTED_WRONG_GATE: {
     icon: AlertTriangle,
-    title: "Mauvaise porte",
-    barLabel: "Orienter vers la bonne porte",
     panel: "bg-amber-400 text-amber-950",
   },
   NOT_RECOGNIZED: {
     icon: HelpCircle,
-    title: "Non reconnu sur cet appareil",
-    barLabel: "Vérifier auprès du coordonnateur",
     panel: "bg-slate-600 text-white",
   },
 };
 
 function ResultPanel({ outcome, at }: { outcome: ScanOutcome; at: Date }) {
+  const { t } = useI18n();
   const style = STYLES[outcome.kind];
   const Icon = style.icon;
   const ticketNumber = "ticketNumber" in outcome ? outcome.ticketNumber : null;
@@ -211,13 +205,15 @@ function ResultPanel({ outcome, at }: { outcome: ScanOutcome; at: Date }) {
           <Icon className="h-11 w-11" strokeWidth={3} />
         </span>
         <div className="min-w-0 pt-1">
-          <p className="font-display text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">{style.title}</p>
+          <p className="font-display text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">
+            {t(`gate.scan.${outcome.kind}.title`)}
+          </p>
           {ticketNumber && <p className="mt-1 truncate font-mono text-sm opacity-90">{ticketNumber}</p>}
-          <p className="mt-0.5 text-sm tabular-nums opacity-80">Scanné à {at.toLocaleTimeString("fr-FR")}</p>
+          <p className="mt-0.5 text-sm tabular-nums opacity-80">{t("gate.scan.scannedAt", { time: at.toLocaleTimeString(locale()) })}</p>
         </div>
       </div>
       <p className="mt-8 rounded-xl bg-black/15 px-5 py-4 text-center font-display text-2xl font-extrabold uppercase tracking-wide">
-        {style.barLabel}
+        {t(`gate.scan.${outcome.kind}.bar`)}
       </p>
     </div>
   );

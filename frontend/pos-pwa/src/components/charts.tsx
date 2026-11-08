@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { formatCompact, formatMoney } from "../lib/format";
+import { formatCompact, formatMoney, hh } from "../lib/format";
+import { useI18n } from "../i18n";
 import type { HourPoint } from "../lib/stats";
 
 export type DailyPoint = { label: string; value: number; count: number };
@@ -55,6 +56,7 @@ function Axes({ max, W }: { max: number; W: number }) {
 }
 
 function Tooltip({ x, y, point }: { x: number; y: number; point: DailyPoint }) {
+  const { t } = useI18n();
   return (
     <div
       className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg"
@@ -62,7 +64,8 @@ function Tooltip({ x, y, point }: { x: number; y: number; point: DailyPoint }) {
     >
       <p className="font-semibold text-foreground">{point.label}</p>
       <p className="text-muted-foreground">
-        <span className="font-bold text-foreground">{formatMoney(point.value)}</span> · {point.count} vente{point.count > 1 ? "s" : ""}
+        <span className="font-bold text-foreground">{formatMoney(point.value)}</span> ·{" "}
+        {t("reports.charts.salesCount", { count: point.count })}
       </p>
     </div>
   );
@@ -70,6 +73,7 @@ function Tooltip({ x, y, point }: { x: number; y: number; point: DailyPoint }) {
 
 /** Revenue per day, one series — the card title names it, so no legend. */
 export function RevenueLineChart({ data }: { data: DailyPoint[] }) {
+  const { t } = useI18n();
   const [ref, W] = useChartWidth();
   const [hover, setHover] = useState<number | null>(null);
   const max = niceMax(Math.max(0, ...data.map((d) => d.value)));
@@ -83,7 +87,15 @@ export function RevenueLineChart({ data }: { data: DailyPoint[] }) {
 
   return (
     <div ref={ref} className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block" onMouseLeave={() => setHover(null)} role="img" aria-label="Ventes par jour">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width={W}
+        height={H}
+        className="block"
+        onMouseLeave={() => setHover(null)}
+        role="img"
+        aria-label={t("reports.charts.salesPerDay")}
+      >
         <defs>
           <linearGradient id="rev-area" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="hsl(var(--secondary))" stopOpacity="0.18" />
@@ -93,7 +105,14 @@ export function RevenueLineChart({ data }: { data: DailyPoint[] }) {
         <Axes max={max} W={W} />
         {data.map((d, i) =>
           i % labelEvery === 0 || i === data.length - 1 ? (
-            <text key={i} x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"} className="text-[10px]" fill="hsl(var(--muted-foreground))">
+            <text
+              key={i}
+              x={x(i)}
+              y={H - 8}
+              textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}
+              className="text-[10px]"
+              fill="hsl(var(--muted-foreground))"
+            >
               {d.label}
             </text>
           ) : null,
@@ -136,6 +155,7 @@ export function RevenueLineChart({ data }: { data: DailyPoint[] }) {
 
 /** Revenue per day as bars — for reports, where each day is a discrete total. */
 export function RevenueBarChart({ data }: { data: DailyPoint[] }) {
+  const { t } = useI18n();
   const [ref, W] = useChartWidth();
   const [hover, setHover] = useState<number | null>(null);
   const max = niceMax(Math.max(0, ...data.map((d) => d.value)));
@@ -147,7 +167,15 @@ export function RevenueBarChart({ data }: { data: DailyPoint[] }) {
 
   return (
     <div ref={ref} className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block" onMouseLeave={() => setHover(null)} role="img" aria-label="Ventes par jour">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width={W}
+        height={H}
+        className="block"
+        onMouseLeave={() => setHover(null)}
+        role="img"
+        aria-label={t("reports.charts.salesPerDay")}
+      >
         <Axes max={max} W={W} />
         {data.map((d, i) => {
           const cx = PAD.left + slot * i + slot / 2;
@@ -174,11 +202,7 @@ export function RevenueBarChart({ data }: { data: DailyPoint[] }) {
         })}
       </svg>
       {hover !== null && data[hover] && (
-        <Tooltip
-          x={PAD.left + slot * hover + slot / 2}
-          y={PAD.top + plotH - (data[hover].value / max) * plotH}
-          point={data[hover]}
-        />
+        <Tooltip x={PAD.left + slot * hover + slot / 2} y={PAD.top + plotH - (data[hover].value / max) * plotH} point={data[hover]} />
       )}
     </div>
   );
@@ -186,8 +210,9 @@ export function RevenueBarChart({ data }: { data: DailyPoint[] }) {
 
 /** Share-of-total rows (label, thin bar, amount, %) — the mockup's "Répartition" card. */
 export function BreakdownList({ rows }: { rows: { key: string; label: string; value: number; count: number; image?: string }[] }) {
+  const { t } = useI18n();
   const total = rows.reduce((s, r) => s + r.value, 0);
-  if (rows.length === 0) return <p className="px-5 pb-5 text-sm text-muted-foreground">Aucune donnée sur la période.</p>;
+  if (rows.length === 0) return <p className="px-5 pb-5 text-sm text-muted-foreground">{t("common.noData")}</p>;
   return (
     <ul className="space-y-3 px-5 pb-5">
       {rows.map((r) => {
@@ -222,6 +247,7 @@ export function BreakdownList({ rows }: { rows: { key: string; label: string; va
  * Legend + crosshair tooltip; values never colour-only.
  */
 export function ProgressionChart({ data }: { data: HourPoint[] }) {
+  const { t } = useI18n();
   const [ref, W] = useChartWidth();
   const [hover, setHover] = useState<number | null>(null);
   const max = niceMax(Math.max(0, ...data.map((d) => Math.max(d.today ?? 0, d.yesterday))));
@@ -242,32 +268,77 @@ export function ProgressionChart({ data }: { data: HourPoint[] }) {
     <div ref={ref} className="relative">
       <div className="mb-2 flex flex-wrap items-center gap-4 px-2 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-5 rounded bg-secondary" /> Aujourd'hui
+          <span className="h-0.5 w-5 rounded bg-secondary" /> {t("common.today")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-0 w-5 border-t-2 border-dashed border-muted-foreground/60" /> Hier
+          <span className="h-0 w-5 border-t-2 border-dashed border-muted-foreground/60" /> {t("common.yesterday")}
         </span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block" onMouseLeave={() => setHover(null)} role="img" aria-label="Progression des ventes par heure">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width={W}
+        height={H}
+        className="block"
+        onMouseLeave={() => setHover(null)}
+        role="img"
+        aria-label={t("reports.charts.progressionAria")}
+      >
         <Axes max={max} W={W} />
         {[0, 6, 12, 18, 23].map((h) => (
-          <text key={h} x={x(h)} y={H - 8} textAnchor={h === 0 ? "start" : h === 23 ? "end" : "middle"} className="text-[10px]" fill="hsl(var(--muted-foreground))">
-            {h}h
+          <text
+            key={h}
+            x={x(h)}
+            y={H - 8}
+            textAnchor={h === 0 ? "start" : h === 23 ? "end" : "middle"}
+            className="text-[10px]"
+            fill="hsl(var(--muted-foreground))"
+          >
+            {t("reports.charts.hour", { h: hh(h) })}
           </text>
         ))}
-        <path d={path(data.map((d) => d.yesterday))} fill="none" stroke="hsl(var(--muted-foreground))" strokeOpacity={0.6} strokeWidth={2} strokeDasharray="5 4" />
+        <path
+          d={path(data.map((d) => d.yesterday))}
+          fill="none"
+          stroke="hsl(var(--muted-foreground))"
+          strokeOpacity={0.6}
+          strokeWidth={2}
+          strokeDasharray="5 4"
+        />
         <path d={todayPath} fill="none" stroke="hsl(var(--secondary))" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         {lastToday && (
           <>
-            <circle cx={x(lastToday.hour)} cy={y(lastToday.today!)} r={4.5} fill="hsl(var(--card))" stroke="hsl(var(--secondary))" strokeWidth={2} />
-            <text x={x(lastToday.hour) + (lastToday.hour > 18 ? -8 : 8)} y={y(lastToday.today!) - 8} textAnchor={lastToday.hour > 18 ? "end" : "start"} className="text-[11px] font-semibold" fill="hsl(var(--foreground))">
+            <circle
+              cx={x(lastToday.hour)}
+              cy={y(lastToday.today!)}
+              r={4.5}
+              fill="hsl(var(--card))"
+              stroke="hsl(var(--secondary))"
+              strokeWidth={2}
+            />
+            <text
+              x={x(lastToday.hour) + (lastToday.hour > 18 ? -8 : 8)}
+              y={y(lastToday.today!) - 8}
+              textAnchor={lastToday.hour > 18 ? "end" : "start"}
+              className="text-[11px] font-semibold"
+              fill="hsl(var(--foreground))"
+            >
               {formatCompact(lastToday.today!)}
             </text>
           </>
         )}
-        {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + plotH} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />}
+        {hover !== null && (
+          <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + plotH} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+        )}
         {data.map((d) => (
-          <rect key={d.hour} x={x(d.hour) - plotW / 46} y={PAD.top} width={plotW / 23} height={plotH} fill="transparent" onMouseEnter={() => setHover(d.hour)} />
+          <rect
+            key={d.hour}
+            x={x(d.hour) - plotW / 46}
+            y={PAD.top}
+            width={plotW / 23}
+            height={plotH}
+            fill="transparent"
+            onMouseEnter={() => setHover(d.hour)}
+          />
         ))}
       </svg>
       {point && (
@@ -275,12 +346,13 @@ export function ProgressionChart({ data }: { data: HourPoint[] }) {
           className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg"
           style={{ left: Math.min(Math.max(x(point.hour), 90), W - 90), top: 24 }}
         >
-          <p className="font-semibold text-foreground">Jusqu'à {point.hour + 1}h</p>
+          <p className="font-semibold text-foreground">{t("reports.charts.until", { h: hh(point.hour + 1) })}</p>
           <p className="text-muted-foreground">
-            Aujourd'hui : <span className="font-bold text-foreground">{point.today === null ? "—" : formatMoney(point.today)}</span>
+            {t("reports.charts.tooltipToday")}{" "}
+            <span className="font-bold text-foreground">{point.today === null ? "—" : formatMoney(point.today)}</span>
           </p>
           <p className="text-muted-foreground">
-            Hier : <span className="font-bold text-foreground">{formatMoney(point.yesterday)}</span>
+            {t("reports.charts.tooltipYesterday")} <span className="font-bold text-foreground">{formatMoney(point.yesterday)}</span>
           </p>
         </div>
       )}
@@ -303,23 +375,33 @@ export function DonutChart({
   colorOf,
   centerLabel,
   formatValue = formatMoney,
-  countUnit = "ventes",
+  countLabel,
 }: {
   rows: ShareRow[];
   colorOf: (key: string, index: number) => string;
   centerLabel: string;
   formatValue?: (v: number) => string;
-  countUnit?: string;
+  /** "3 billets" — the count with its noun; sales by default. */
+  countLabel?: (count: number) => string;
 }) {
+  const { t } = useI18n();
   const [hover, setHover] = useState<string | null>(null);
   const sorted = [...rows].sort((a, b) => b.value - a.value);
   const head = sorted.slice(0, MAX_SLICES);
   const tail = sorted.slice(MAX_SLICES);
   const slices = tail.length
-    ? [...head, { key: "__other", label: `Autres (${tail.length})`, value: tail.reduce((s, r) => s + r.value, 0), count: tail.reduce((s, r) => s + r.count, 0) }]
+    ? [
+        ...head,
+        {
+          key: "__other",
+          label: t("reports.charts.others", { n: tail.length }),
+          value: tail.reduce((s, r) => s + r.value, 0),
+          count: tail.reduce((s, r) => s + r.count, 0),
+        },
+      ]
     : head;
   const total = slices.reduce((s, r) => s + r.value, 0);
-  if (total <= 0) return <p className="px-5 pb-5 text-sm text-muted-foreground">Aucune donnée sur la période.</p>;
+  if (total <= 0) return <p className="px-5 pb-5 text-sm text-muted-foreground">{t("common.noData")}</p>;
 
   const R = 70;
   const r = 46;
@@ -379,7 +461,7 @@ export function DonutChart({
                 {a.label}
               </span>
               <span className="block text-[11px] text-muted-foreground">
-                {a.count} {a.count > 1 ? countUnit : countUnit.replace(/s$/, "")}
+                {countLabel ? countLabel(a.count) : t("reports.charts.salesCount", { count: a.count })}
               </span>
             </span>
             <span className="whitespace-nowrap text-right font-semibold text-foreground">{formatValue(a.value)}</span>
@@ -397,7 +479,8 @@ export type HistogramBin = { label: string; count: number; detail?: string };
  * Distribution: adjacent bins (2px surface gap), count on one axis. For
  * "how many sales fell in each bucket" — hours of the day, amount ranges.
  */
-export function Histogram({ bins, unit = "ventes", labelEvery = 1 }: { bins: HistogramBin[]; unit?: string; labelEvery?: number }) {
+export function Histogram({ bins, unit, labelEvery = 1 }: { bins: HistogramBin[]; unit?: string; labelEvery?: number }) {
+  const { t } = useI18n();
   const [ref, W] = useChartWidth();
   const [hover, setHover] = useState<number | null>(null);
   // Counts are whole numbers: a top that's a multiple of 4 keeps every gridline whole.
@@ -410,14 +493,22 @@ export function Histogram({ bins, unit = "ventes", labelEvery = 1 }: { bins: His
 
   return (
     <div ref={ref} className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block" onMouseLeave={() => setHover(null)} role="img" aria-label="Histogramme">
-        {[0, 0.25, 0.5, 0.75, 1].map((t) => {
-          const y = PAD.top + plotH * (1 - t);
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width={W}
+        height={H}
+        className="block"
+        onMouseLeave={() => setHover(null)}
+        role="img"
+        aria-label={t("reports.charts.histogramAria")}
+      >
+        {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+          const y = PAD.top + plotH * (1 - tick);
           return (
-            <g key={t}>
-              <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke="hsl(var(--border))" strokeDasharray={t === 0 ? "" : "3 4"} />
+            <g key={tick}>
+              <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke="hsl(var(--border))" strokeDasharray={tick === 0 ? "" : "3 4"} />
               <text x={PAD.left - 8} y={y + 3} textAnchor="end" className="text-[10px]" fill="hsl(var(--muted-foreground))">
-                {Math.round(max * t)}
+                {Math.round(max * tick)}
               </text>
             </g>
           );
@@ -455,7 +546,7 @@ export function Histogram({ bins, unit = "ventes", labelEvery = 1 }: { bins: His
         >
           <p className="font-semibold text-foreground">{point.label}</p>
           <p className="text-muted-foreground">
-            <span className="font-bold text-foreground">{point.count}</span> {unit}
+            <span className="font-bold text-foreground">{point.count}</span> {unit ?? t("reports.unit.sales")}
             {point.detail ? ` · ${point.detail}` : ""}
           </p>
         </div>

@@ -31,53 +31,117 @@ import {
   Utensils,
   type LucideIcon,
 } from "lucide-react";
+import { translate, type MessageKey } from "../i18n";
+
+/** An icon whose label is read at use time, in the current language. */
+const iconEntry = (icon: LucideIcon, key: MessageKey) => ({
+  icon,
+  get label() {
+    return translate(key);
+  },
+});
 
 // The icon set a ticket type can be given (Billetterie → icône). Stored by
 // key, so renaming a label here never breaks existing ticket types.
-export const TICKET_ICONS: Record<string, { icon: LucideIcon; label: string }> = {
-  ticket: { icon: Ticket, label: "Entrée" },
-  crown: { icon: Crown, label: "VIP" },
-  star: { icon: Star, label: "Premium" },
-  gem: { icon: Gem, label: "Prestige" },
-  users: { icon: Users, label: "Groupe" },
-  baby: { icon: Baby, label: "Enfant" },
-  student: { icon: GraduationCap, label: "Étudiant" },
-  accessibility: { icon: Accessibility, label: "PMR" },
-  heart: { icon: Heart, label: "Solidaire" },
-  palette: { icon: Palette, label: "Ateliers" },
-  drama: { icon: Drama, label: "Spectacle" },
-  music: { icon: Music, label: "Concert" },
-  mic: { icon: Mic, label: "Conférence" },
-  landmark: { icon: Landmark, label: "Palais / visite" },
-  camera: { icon: Camera, label: "Photo" },
-  backstage: { icon: Sparkles, label: "Backstage" },
-  award: { icon: Award, label: "Invité" },
-  trophy: { icon: Trophy, label: "Concours" },
-  party: { icon: PartyPopper, label: "Soirée" },
-  tent: { icon: Tent, label: "Camping" },
-  utensils: { icon: Utensils, label: "Repas" },
-  coffee: { icon: Coffee, label: "Boisson" },
-  beer: { icon: Beer, label: "Bar" },
-  popcorn: { icon: Popcorn, label: "Snack" },
-  shirt: { icon: Shirt, label: "Tee-shirt" },
-  gift: { icon: Gift, label: "Souvenir" },
-  backpack: { icon: Backpack, label: "Kit" },
-  car: { icon: Car, label: "Parking" },
-  bus: { icon: Bus, label: "Navette" },
-  briefcase: { icon: Briefcase, label: "Professionnel" },
+export const TICKET_ICONS: Record<string, { icon: LucideIcon; readonly label: string }> = {
+  ticket: iconEntry(Ticket, "gate.icon.ticket"),
+  crown: iconEntry(Crown, "gate.icon.crown"),
+  star: iconEntry(Star, "gate.icon.star"),
+  gem: iconEntry(Gem, "gate.icon.gem"),
+  users: iconEntry(Users, "gate.icon.users"),
+  baby: iconEntry(Baby, "gate.icon.baby"),
+  student: iconEntry(GraduationCap, "gate.icon.student"),
+  accessibility: iconEntry(Accessibility, "gate.icon.accessibility"),
+  heart: iconEntry(Heart, "gate.icon.heart"),
+  palette: iconEntry(Palette, "gate.icon.palette"),
+  drama: iconEntry(Drama, "gate.icon.drama"),
+  music: iconEntry(Music, "gate.icon.music"),
+  mic: iconEntry(Mic, "gate.icon.mic"),
+  landmark: iconEntry(Landmark, "gate.icon.landmark"),
+  camera: iconEntry(Camera, "gate.icon.camera"),
+  backstage: iconEntry(Sparkles, "gate.icon.backstage"),
+  award: iconEntry(Award, "gate.icon.award"),
+  trophy: iconEntry(Trophy, "gate.icon.trophy"),
+  party: iconEntry(PartyPopper, "gate.icon.party"),
+  tent: iconEntry(Tent, "gate.icon.tent"),
+  utensils: iconEntry(Utensils, "gate.icon.utensils"),
+  coffee: iconEntry(Coffee, "gate.icon.coffee"),
+  beer: iconEntry(Beer, "gate.icon.beer"),
+  popcorn: iconEntry(Popcorn, "gate.icon.popcorn"),
+  shirt: iconEntry(Shirt, "gate.icon.shirt"),
+  gift: iconEntry(Gift, "gate.icon.gift"),
+  backpack: iconEntry(Backpack, "gate.icon.backpack"),
+  car: iconEntry(Car, "gate.icon.car"),
+  bus: iconEntry(Bus, "gate.icon.bus"),
+  briefcase: iconEntry(Briefcase, "gate.icon.briefcase"),
 };
 
+type TicketColor = { readonly label: string; swatch: string; soft: string; solid: string; ring: string };
+
+/** A colour whose label is read at use time, in the current language. */
+const colorEntry = (key: MessageKey, classes: Omit<TicketColor, "label">): TicketColor => ({
+  ...classes,
+  get label() {
+    return translate(key);
+  },
+});
+
 // Full class strings (not built dynamically) so Tailwind keeps them.
-export const TICKET_COLORS: Record<string, { label: string; swatch: string; soft: string; solid: string; ring: string }> = {
-  blue: { label: "Bleu", swatch: "bg-blue-600", soft: "bg-blue-50 text-blue-700", solid: "bg-blue-600 text-white", ring: "ring-blue-500" },
-  gold: { label: "Or", swatch: "bg-amber-400", soft: "bg-amber-50 text-amber-700", solid: "bg-amber-400 text-amber-950", ring: "ring-amber-400" },
-  green: { label: "Vert", swatch: "bg-emerald-600", soft: "bg-emerald-50 text-emerald-700", solid: "bg-emerald-600 text-white", ring: "ring-emerald-500" },
-  violet: { label: "Violet", swatch: "bg-violet-600", soft: "bg-violet-50 text-violet-700", solid: "bg-violet-600 text-white", ring: "ring-violet-500" },
-  red: { label: "Rouge", swatch: "bg-rose-600", soft: "bg-rose-50 text-rose-700", solid: "bg-rose-600 text-white", ring: "ring-rose-500" },
-  teal: { label: "Turquoise", swatch: "bg-teal-600", soft: "bg-teal-50 text-teal-700", solid: "bg-teal-600 text-white", ring: "ring-teal-500" },
-  orange: { label: "Orange", swatch: "bg-orange-500", soft: "bg-orange-50 text-orange-700", solid: "bg-orange-500 text-white", ring: "ring-orange-500" },
-  pink: { label: "Rose", swatch: "bg-pink-500", soft: "bg-pink-50 text-pink-700", solid: "bg-pink-500 text-white", ring: "ring-pink-500" },
-  slate: { label: "Ardoise", swatch: "bg-slate-700", soft: "bg-slate-100 text-slate-700", solid: "bg-slate-700 text-white", ring: "ring-slate-500" },
+export const TICKET_COLORS: Record<string, TicketColor> = {
+  blue: colorEntry("gate.color.blue", {
+    swatch: "bg-blue-600",
+    soft: "bg-blue-50 text-blue-700",
+    solid: "bg-blue-600 text-white",
+    ring: "ring-blue-500",
+  }),
+  gold: colorEntry("gate.color.gold", {
+    swatch: "bg-amber-400",
+    soft: "bg-amber-50 text-amber-700",
+    solid: "bg-amber-400 text-amber-950",
+    ring: "ring-amber-400",
+  }),
+  green: colorEntry("gate.color.green", {
+    swatch: "bg-emerald-600",
+    soft: "bg-emerald-50 text-emerald-700",
+    solid: "bg-emerald-600 text-white",
+    ring: "ring-emerald-500",
+  }),
+  violet: colorEntry("gate.color.violet", {
+    swatch: "bg-violet-600",
+    soft: "bg-violet-50 text-violet-700",
+    solid: "bg-violet-600 text-white",
+    ring: "ring-violet-500",
+  }),
+  red: colorEntry("gate.color.red", {
+    swatch: "bg-rose-600",
+    soft: "bg-rose-50 text-rose-700",
+    solid: "bg-rose-600 text-white",
+    ring: "ring-rose-500",
+  }),
+  teal: colorEntry("gate.color.teal", {
+    swatch: "bg-teal-600",
+    soft: "bg-teal-50 text-teal-700",
+    solid: "bg-teal-600 text-white",
+    ring: "ring-teal-500",
+  }),
+  orange: colorEntry("gate.color.orange", {
+    swatch: "bg-orange-500",
+    soft: "bg-orange-50 text-orange-700",
+    solid: "bg-orange-500 text-white",
+    ring: "ring-orange-500",
+  }),
+  pink: colorEntry("gate.color.pink", {
+    swatch: "bg-pink-500",
+    soft: "bg-pink-50 text-pink-700",
+    solid: "bg-pink-500 text-white",
+    ring: "ring-pink-500",
+  }),
+  slate: colorEntry("gate.color.slate", {
+    swatch: "bg-slate-700",
+    soft: "bg-slate-100 text-slate-700",
+    solid: "bg-slate-700 text-white",
+    ring: "ring-slate-500",
+  }),
 };
 
 // The same colours as hex, for charts (SVG fills can't use Tailwind classes).

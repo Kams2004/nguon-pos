@@ -1,23 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  CloudOff,
-  LayoutGrid,
-  List,
-  MonitorSmartphone,
-  UserCheck,
-  UserRound,
-  Wifi,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, CloudOff, LayoutGrid, List, MonitorSmartphone, UserCheck, UserRound, Wifi } from "lucide-react";
 import { useLiveEvents, useLiveRefresh, useSession } from "../../context/SessionContext";
 import { api } from "../../lib/api/client";
 import type { AdminGate, TerminalStatus } from "../../lib/api/types";
 import { timeAgo, useNow } from "../../lib/useNow";
 import { Loading, PageHeader, Pill, RefreshButton, StatCard } from "../../components/ui";
 import { TerminalState } from "../../components/TerminalState";
+import { useI18n } from "../../i18n";
 
 type View = "cards" | "table";
 type StateFilter = "all" | "online" | "offline";
@@ -34,6 +24,7 @@ function readView(): View {
 
 export default function SyncStatus() {
   const { session } = useSession();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const now = useNow();
   const [terminals, setTerminals] = useState<TerminalStatus[] | null>(null);
@@ -94,26 +85,22 @@ export default function SyncStatus() {
 
   return (
     <>
-      <PageHeader
-        title="Caisses en direct"
-        subtitle="État mis à jour automatiquement — une caisse fermée ou coupée du réseau passe « hors-ligne » en 15 à 25 s. Cliquez une caisse pour voir ses transactions."
-        actions={<RefreshButton onRefresh={load} />}
-      />
+      <PageHeader title={t("reports.tills.title")} subtitle={t("reports.tills.subtitle")} actions={<RefreshButton onRefresh={load} />} />
 
       <div className="stat-strip">
-        <StatCard icon={MonitorSmartphone} tone="blue" label="Caisses connues" value={String(all.length)} />
-        <StatCard icon={Wifi} tone="green" label="En ligne" value={`${online} / ${all.length}`} />
-        <StatCard icon={UserCheck} tone="violet" label="Utilisateurs connectés" value={String(loggedIn)} />
-        <StatCard icon={CloudOff} tone="gold" label="Opérations en attente" value={String(pending)} />
+        <StatCard icon={MonitorSmartphone} tone="blue" label={t("reports.tills.known")} value={String(all.length)} />
+        <StatCard icon={Wifi} tone="green" label={t("common.online")} value={`${online} / ${all.length}`} />
+        <StatCard icon={UserCheck} tone="violet" label={t("reports.tills.usersSignedIn")} value={String(loggedIn)} />
+        <StatCard icon={CloudOff} tone="gold" label={t("reports.tills.pendingOps")} value={String(pending)} />
       </div>
 
       <div className="card flex flex-wrap items-center gap-3 p-3">
         <div className="flex rounded-xl bg-muted p-1">
           {(
             [
-              ["all", `Toutes (${all.length})`],
-              ["online", `En ligne (${online})`],
-              ["offline", `Hors-ligne (${all.length - online})`],
+              ["all", t("reports.tills.filterAll", { n: all.length })],
+              ["online", t("reports.tills.filterOnline", { n: online })],
+              ["offline", t("reports.tills.filterOffline", { n: all.length - online })],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -138,14 +125,14 @@ export default function SyncStatus() {
           }}
           className="field w-auto py-2"
         >
-          <option value="">Toutes les portes</option>
+          <option value="">{t("reports.filter.allGates")}</option>
           {gates.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
             </option>
           ))}
         </select>
-        <div className="ml-auto flex rounded-xl border border-border p-1" role="group" aria-label="Affichage">
+        <div className="ml-auto flex rounded-xl border border-border p-1" role="group" aria-label={t("reports.tills.view")}>
           <button
             onClick={() => setView("cards")}
             aria-pressed={view === "cards"}
@@ -153,7 +140,7 @@ export default function SyncStatus() {
               view === "cards" ? "bg-secondary text-white" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <LayoutGrid className="h-4 w-4" /> Cartes
+            <LayoutGrid className="h-4 w-4" /> {t("reports.tills.cards")}
           </button>
           <button
             onClick={() => setView("table")}
@@ -162,7 +149,7 @@ export default function SyncStatus() {
               view === "table" ? "bg-secondary text-white" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <List className="h-4 w-4" /> Tableau
+            <List className="h-4 w-4" /> {t("reports.tills.table")}
           </button>
         </div>
       </div>
@@ -170,42 +157,42 @@ export default function SyncStatus() {
       {terminals === null ? (
         <Loading />
       ) : filtered.length === 0 ? (
-        <p className="card p-8 text-center text-sm text-muted-foreground">Aucune caisse pour ces critères.</p>
+        <p className="card p-8 text-center text-sm text-muted-foreground">{t("reports.tills.noMatch")}</p>
       ) : view === "cards" ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {visible.map((t) => (
+          {visible.map((term) => (
             <button
-              key={t.terminalId}
-              onClick={() => open(t)}
+              key={term.terminalId}
+              onClick={() => open(term)}
               className={`card relative overflow-hidden p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg ${
-                t.online ? "" : "opacity-80"
+                term.online ? "" : "opacity-80"
               }`}
             >
-              <span className={`absolute inset-x-0 top-0 h-1 ${t.online ? "bg-success" : "bg-muted-foreground/30"}`} />
+              <span className={`absolute inset-x-0 top-0 h-1 ${term.online ? "bg-success" : "bg-muted-foreground/30"}`} />
               <div className="flex items-start gap-3">
                 <span
                   className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${
-                    t.online ? "bg-emerald-50 text-emerald-600" : "bg-muted text-muted-foreground"
+                    term.online ? "bg-emerald-50 text-emerald-600" : "bg-muted text-muted-foreground"
                   }`}
                 >
                   <MonitorSmartphone className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-foreground">{t.deviceLabel ?? "Caisse"}</p>
-                  <p className="text-xs text-muted-foreground">{gateName(t.gateId)}</p>
+                  <p className="truncate font-bold text-foreground">{term.deviceLabel ?? t("reports.till")}</p>
+                  <p className="text-xs text-muted-foreground">{gateName(term.gateId)}</p>
                 </div>
-                {t.localPendingCount > 0 && <Pill tone="warning">{t.localPendingCount} en attente</Pill>}
+                {term.localPendingCount > 0 && <Pill tone="warning">{t("reports.tills.pendingCount", { n: term.localPendingCount })}</Pill>}
               </div>
               <div className="mt-3">
-                <TerminalState t={t} />
+                <TerminalState t={term} />
               </div>
               <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5 whitespace-nowrap">
-                  <Clock className="h-3.5 w-3.5" /> {timeAgo(t.lastSeenAt, now)}
+                  <Clock className="h-3.5 w-3.5" /> {timeAgo(term.lastSeenAt, now)}
                 </span>
                 <span className="flex min-w-0 items-center gap-1">
                   <UserRound className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="truncate">{t.currentUserName ?? "—"}</span>
+                  <span className="truncate">{term.currentUserName ?? "—"}</span>
                 </span>
               </div>
             </button>
@@ -217,32 +204,36 @@ export default function SyncStatus() {
             <table className="w-full text-sm">
               <thead className="border-b border-border bg-muted/40">
                 <tr>
-                  <th className="th">Caisse</th>
-                  <th className="th">Porte</th>
-                  <th className="th">État</th>
-                  <th className="th">Dernier signal</th>
-                  <th className="th text-right">En attente</th>
+                  <th className="th">{t("reports.till")}</th>
+                  <th className="th">{t("reports.col.gate")}</th>
+                  <th className="th">{t("reports.tills.state")}</th>
+                  <th className="th">{t("reports.tills.lastSeen")}</th>
+                  <th className="th text-right">{t("reports.tills.pending")}</th>
                   <th className="th" />
                 </tr>
               </thead>
               <tbody>
-                {visible.map((t) => (
+                {visible.map((term) => (
                   <tr
-                    key={t.terminalId}
-                    onClick={() => open(t)}
+                    key={term.terminalId}
+                    onClick={() => open(term)}
                     className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-blue-50/50"
                   >
                     <td className="td">
-                      <p className="font-semibold text-foreground">{t.deviceLabel ?? "Caisse"}</p>
-                      <p className="font-mono text-[11px] text-muted-foreground">{t.terminalId.slice(0, 13)}</p>
+                      <p className="font-semibold text-foreground">{term.deviceLabel ?? t("reports.till")}</p>
+                      <p className="font-mono text-[11px] text-muted-foreground">{term.terminalId.slice(0, 13)}</p>
                     </td>
-                    <td className="td">{gateName(t.gateId)}</td>
+                    <td className="td">{gateName(term.gateId)}</td>
                     <td className="td">
-                      <TerminalState t={t} />
+                      <TerminalState t={term} />
                     </td>
-                    <td className="td text-muted-foreground">{timeAgo(t.lastSeenAt, now)}</td>
+                    <td className="td text-muted-foreground">{timeAgo(term.lastSeenAt, now)}</td>
                     <td className="td text-right">
-                      {t.localPendingCount > 0 ? <Pill tone="warning">{t.localPendingCount}</Pill> : <span className="text-muted-foreground">0</span>}
+                      {term.localPendingCount > 0 ? (
+                        <Pill tone="warning">{term.localPendingCount}</Pill>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
                     </td>
                     <td className="td text-right text-muted-foreground">
                       <ChevronRight className="ml-auto h-4 w-4" />
@@ -258,10 +249,20 @@ export default function SyncStatus() {
       {filtered.length > size && (
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>
-            {current * size + 1}–{Math.min(filtered.length, current * size + size)} sur {filtered.length} caisses
+            {t("pagination.range", {
+              from: current * size + 1,
+              to: Math.min(filtered.length, current * size + size),
+              total: filtered.length,
+              unit: t("reports.unit.tills"),
+            })}
           </span>
           <div className="flex items-center gap-1">
-            <button disabled={current === 0} onClick={() => setPage(current - 1)} className="btn-outline px-2 py-1.5" aria-label="Page précédente">
+            <button
+              disabled={current === 0}
+              onClick={() => setPage(current - 1)}
+              className="btn-outline px-2 py-1.5"
+              aria-label={t("pagination.previous")}
+            >
               <ChevronLeft className="h-4 w-4" />
             </button>
             {Array.from({ length: pages }, (_, i) => (
@@ -280,7 +281,7 @@ export default function SyncStatus() {
               disabled={current + 1 >= pages}
               onClick={() => setPage(current + 1)}
               className="btn-outline px-2 py-1.5"
-              aria-label="Page suivante"
+              aria-label={t("pagination.next")}
             >
               <ChevronRight className="h-4 w-4" />
             </button>

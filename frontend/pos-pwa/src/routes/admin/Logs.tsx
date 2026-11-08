@@ -17,24 +17,27 @@ import { api, errorMessage } from "../../lib/api/client";
 import type { AuditCategory, AuditEntry } from "../../lib/api/types";
 import { Pagination } from "../../components/Pagination";
 import { Loading, PageHeader, RefreshButton, SearchInput } from "../../components/ui";
+import { locale, useI18n } from "../../i18n";
 
-const CATEGORIES: { value: AuditCategory; label: string; icon: LucideIcon; tone: string }[] = [
-  { value: "AUTH", label: "Connexions", icon: KeyRound, tone: "bg-slate-100 text-slate-700" },
-  { value: "TERMINAL", label: "Caisses", icon: MonitorSmartphone, tone: "bg-blue-50 text-secondary" },
-  { value: "SALE", label: "Ventes", icon: ShoppingCart, tone: "bg-emerald-50 text-emerald-700" },
-  { value: "SCAN", label: "Contrôle d'entrée", icon: ScanLine, tone: "bg-teal-50 text-teal-700" },
-  { value: "VOID", label: "Annulations", icon: Ban, tone: "bg-red-50 text-destructive" },
-  { value: "CATALOG", label: "Billetterie & portes", icon: Tags, tone: "bg-amber-50 text-amber-700" },
-  { value: "USER", label: "Utilisateurs", icon: UserCog, tone: "bg-violet-50 text-violet-700" },
-  { value: "SETTINGS", label: "Paramètres", icon: Settings, tone: "bg-orange-50 text-orange-700" },
-  { value: "MEDIA", label: "Médiathèque", icon: ImageIcon, tone: "bg-pink-50 text-pink-700" },
-  { value: "SUBSCRIPTION", label: "Abonnement", icon: BadgeCheck, tone: "bg-indigo-50 text-indigo-700" },
+// Labels: `reports.logs.cat.<value>`, read at render time.
+const CATEGORIES: { value: AuditCategory; icon: LucideIcon; tone: string }[] = [
+  { value: "AUTH", icon: KeyRound, tone: "bg-slate-100 text-slate-700" },
+  { value: "TERMINAL", icon: MonitorSmartphone, tone: "bg-blue-50 text-secondary" },
+  { value: "SALE", icon: ShoppingCart, tone: "bg-emerald-50 text-emerald-700" },
+  { value: "SCAN", icon: ScanLine, tone: "bg-teal-50 text-teal-700" },
+  { value: "VOID", icon: Ban, tone: "bg-red-50 text-destructive" },
+  { value: "CATALOG", icon: Tags, tone: "bg-amber-50 text-amber-700" },
+  { value: "USER", icon: UserCog, tone: "bg-violet-50 text-violet-700" },
+  { value: "SETTINGS", icon: Settings, tone: "bg-orange-50 text-orange-700" },
+  { value: "MEDIA", icon: ImageIcon, tone: "bg-pink-50 text-pink-700" },
+  { value: "SUBSCRIPTION", icon: BadgeCheck, tone: "bg-indigo-50 text-indigo-700" },
 ];
 
 // Everything that happened, across all services, newest first — and new
 // entries appear on their own as they happen.
 export default function Logs() {
   const { session } = useSession();
+  const { t } = useI18n();
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [category, setCategory] = useState<AuditCategory | "">("");
   const [query, setQuery] = useState("");
@@ -69,7 +72,6 @@ export default function Logs() {
   // A new search or category starts again from the newest entries.
   useEffect(() => setPage(0), [category, debounced, size]);
 
-
   useLiveEvents(["AUDIT"], (e) => {
     const entry = e.data as AuditEntry;
     if (category && entry.category !== category) return;
@@ -80,11 +82,15 @@ export default function Logs() {
     if (page !== 0) return;
     setEntries((prev) => (prev && !prev.some((p) => p.id === entry.id) ? [entry, ...prev].slice(0, size) : prev));
     setFresh((prev) => new Set(prev).add(entry.id));
-    setTimeout(() => setFresh((prev) => {
-      const next = new Set(prev);
-      next.delete(entry.id);
-      return next;
-    }), 4_000);
+    setTimeout(
+      () =>
+        setFresh((prev) => {
+          const next = new Set(prev);
+          next.delete(entry.id);
+          return next;
+        }),
+      4_000,
+    );
   });
   // After a reconnect, refetch: entries written while the stream was down never arrived live.
   useLiveEvents(["HELLO"], () => load());
@@ -94,8 +100,8 @@ export default function Logs() {
   return (
     <>
       <PageHeader
-        title="Journal d'activité"
-        subtitle="Toutes les actions : connexions, ventes, scans, caisses en ligne/hors-ligne, modifications de la configuration."
+        title={t("reports.logs.title")}
+        subtitle={t("reports.logs.subtitle")}
         actions={
           <>
             <RefreshButton onRefresh={load} />
@@ -104,13 +110,13 @@ export default function Logs() {
       />
 
       <div className="card space-y-3 p-4">
-        <SearchInput value={query} onChange={setQuery} placeholder="Rechercher (nom, référence, billet…)" />
+        <SearchInput value={query} onChange={setQuery} placeholder={t("reports.logs.searchPlaceholder")} />
         <div className="flex flex-wrap gap-1.5">
           <button
             onClick={() => setCategory("")}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${category === "" ? "bg-secondary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
           >
-            Tout
+            {t("reports.logs.all")}
           </button>
           {CATEGORIES.map((c) => (
             <button
@@ -120,7 +126,7 @@ export default function Logs() {
                 category === c.value ? "bg-secondary text-white" : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
-              <c.icon className="h-3.5 w-3.5" /> {c.label}
+              <c.icon className="h-3.5 w-3.5" /> {t(`reports.logs.cat.${c.value}`)}
             </button>
           ))}
         </div>
@@ -131,7 +137,7 @@ export default function Logs() {
         {entries === null ? (
           <Loading />
         ) : entries.length === 0 ? (
-          <p className="p-8 text-center text-sm text-muted-foreground">Aucune activité pour ces critères.</p>
+          <p className="p-8 text-center text-sm text-muted-foreground">{t("reports.logs.none")}</p>
         ) : (
           <ul className="divide-y divide-border">
             {entries.map((e) => {
@@ -149,20 +155,28 @@ export default function Logs() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-foreground">{e.summary}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {e.actorName ?? "Système"} · {c?.label ?? e.category}
+                      {e.actorName ?? t("reports.logs.system")} · {c ? t(`reports.logs.cat.${c.value}`) : e.category}
                     </p>
                   </div>
                   <time className="flex-shrink-0 text-right text-[11px] leading-tight text-muted-foreground" dateTime={e.occurredAt}>
-                    {d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                    {d.toLocaleDateString(locale(), { day: "2-digit", month: "short" })}
                     <br />
-                    <span className="font-semibold text-foreground">{d.toLocaleTimeString("fr-FR")}</span>
+                    <span className="font-semibold text-foreground">{d.toLocaleTimeString(locale())}</span>
                   </time>
                 </li>
               );
             })}
           </ul>
         )}
-        <Pagination page={page} pages={Math.max(1, Math.ceil(total / size))} total={total} size={size} onPage={setPage} onSize={setSize} unit="entrées" />
+        <Pagination
+          page={page}
+          pages={Math.max(1, Math.ceil(total / size))}
+          total={total}
+          size={size}
+          onPage={setPage}
+          onSize={setSize}
+          unit={t("reports.unit.entries")}
+        />
       </div>
     </>
   );

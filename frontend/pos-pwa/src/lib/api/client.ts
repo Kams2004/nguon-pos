@@ -26,6 +26,7 @@ import type {
   TerminalStatus,
   TransactionSummary,
 } from "./types";
+import { translate } from "../../i18n";
 
 // nginx routes by path prefix — /api/auth -> auth-service's own /auth/**,
 // /api/catalog -> catalog-service's /catalog/**, /api/sales -> sales-service's
@@ -79,12 +80,7 @@ export const api = {
     });
   },
 
-  syncTransactions(
-    token: string,
-    terminalId: string,
-    gateId: string,
-    entries: SaleSyncEntry[],
-  ): Promise<{ results: SaleSyncResult[] }> {
+  syncTransactions(token: string, terminalId: string, gateId: string, entries: SaleSyncEntry[]): Promise<{ results: SaleSyncResult[] }> {
     return request(`${SALES_BASE}/sales/sync/transactions`, {
       method: "POST",
       headers: authHeader(token),
@@ -92,12 +88,7 @@ export const api = {
     });
   },
 
-  syncScans(
-    token: string,
-    terminalId: string,
-    gateId: string,
-    entries: ScanSyncEntry[],
-  ): Promise<{ results: ScanSyncResult[] }> {
+  syncScans(token: string, terminalId: string, gateId: string, entries: ScanSyncEntry[]): Promise<{ results: ScanSyncResult[] }> {
     return request(`${SALES_BASE}/sales/sync/scans`, {
       method: "POST",
       headers: authHeader(token),
@@ -205,7 +196,15 @@ export const api = {
 
   createTicketType(
     token: string,
-    data: { gateId: string | null; name: string; price: number; currency: string; printMode: PrintMode; icon: string | null; color: string | null },
+    data: {
+      gateId: string | null;
+      name: string;
+      price: number;
+      currency: string;
+      printMode: PrintMode;
+      icon: string | null;
+      color: string | null;
+    },
   ): Promise<AdminTicketType> {
     return request(`${CATALOG_BASE}/catalog/admin/ticket-types`, {
       method: "POST",
@@ -217,7 +216,15 @@ export const api = {
   updateTicketType(
     token: string,
     id: string,
-    data: { gateId: string | null; name: string; price: number; currency: string; printMode: PrintMode; icon: string | null; color: string | null },
+    data: {
+      gateId: string | null;
+      name: string;
+      price: number;
+      currency: string;
+      printMode: PrintMode;
+      icon: string | null;
+      color: string | null;
+    },
   ): Promise<AdminTicketType> {
     return request(`${CATALOG_BASE}/catalog/admin/ticket-types/${id}`, {
       method: "PUT",
@@ -241,15 +248,26 @@ export const api = {
   },
 
   updateSubscriptionSettings(token: string, data: SubscriptionSettings): Promise<SubscriptionOverview> {
-    return request(`${CATALOG_BASE}/catalog/admin/subscription/settings`, { method: "PUT", headers: authHeader(token), body: JSON.stringify(data) });
+    return request(`${CATALOG_BASE}/catalog/admin/subscription/settings`, {
+      method: "PUT",
+      headers: authHeader(token),
+      body: JSON.stringify(data),
+    });
   },
 
   createSubscriptionPeriod(token: string, data: { startDate: string; note?: string }): Promise<SubscriptionOverview> {
-    return request(`${CATALOG_BASE}/catalog/admin/subscription/periods`, { method: "POST", headers: authHeader(token), body: JSON.stringify(data) });
+    return request(`${CATALOG_BASE}/catalog/admin/subscription/periods`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(data),
+    });
   },
 
   cancelSubscriptionPeriod(token: string, id: string): Promise<SubscriptionOverview> {
-    return request(`${CATALOG_BASE}/catalog/admin/subscription/periods/${encodeURIComponent(id)}/cancel`, { method: "POST", headers: authHeader(token) });
+    return request(`${CATALOG_BASE}/catalog/admin/subscription/periods/${encodeURIComponent(id)}/cancel`, {
+      method: "POST",
+      headers: authHeader(token),
+    });
   },
 
   recordSubscriptionPayment(
@@ -304,7 +322,7 @@ export const api = {
     const res = await fetch(`${CATALOG_BASE}/catalog/admin/media`, { method: "POST", headers: authHeader(token), body: form });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
-      throw new ApiError(body?.message || body?.detail || `Échec de l'envoi (${res.status})`, res.status);
+      throw new ApiError(body?.message || body?.detail || translate("shell.api.uploadFailed", { status: res.status }), res.status);
     }
     return res.json();
   },
@@ -351,7 +369,7 @@ export const api = {
 export { ApiError };
 
 /** A readable French message from a failed call — the server's own reason when it gave one. */
-export function errorMessage(err: unknown, fallback = "Une erreur est survenue."): string {
+export function errorMessage(err: unknown, fallback = translate("common.error")): string {
   if (err instanceof ApiError) {
     try {
       const body = JSON.parse(err.message);

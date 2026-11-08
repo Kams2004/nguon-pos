@@ -25,27 +25,30 @@ import { useSession } from "../../context/SessionContext";
 import { Avatar, BrandLockup, LiveBadge } from "../../components/ui";
 import { SubscriptionAlert } from "../../components/SubscriptionAlert";
 import { ROLE_LABELS } from "../../lib/format";
+import { useI18n, type MessageKey } from "../../i18n";
+import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
-const NAV_ITEMS: { to: string; label: string; icon: LucideIcon; superAdminOnly?: boolean }[] = [
-  { to: "/admin/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { to: "/admin/sales", label: "Ventes", icon: ShoppingCart },
-  { to: "/admin/reports", label: "Rapports", icon: BarChart3 },
-  { to: "/admin/ticket-types", label: "Billetterie", icon: Ticket, superAdminOnly: true },
-  { to: "/admin/gates", label: "Portes & caisses", icon: DoorOpen, superAdminOnly: true },
-  { to: "/admin/sync-status", label: "Caisses en direct", icon: RefreshCw },
-  { to: "/admin/scans", label: "Contrôle des entrées", icon: ScanLine },
-  { to: "/admin/logs", label: "Journal d'activité", icon: ScrollText },
-  { to: "/admin/users", label: "Utilisateurs", icon: Users, superAdminOnly: true },
-  { to: "/admin/design", label: "Billet & reçu", icon: Palette, superAdminOnly: true },
-  { to: "/admin/media", label: "Médiathèque", icon: Images, superAdminOnly: true },
-  { to: "/admin/subscription", label: "Abonnement", icon: BadgeCheck, superAdminOnly: true },
-  { to: "/admin/establishment", label: "Paramètres", icon: Settings, superAdminOnly: true },
+const NAV_ITEMS: { to: string; label: MessageKey; icon: LucideIcon; superAdminOnly?: boolean }[] = [
+  { to: "/admin/dashboard", label: "shell.nav.dashboard", icon: LayoutDashboard },
+  { to: "/admin/sales", label: "shell.nav.sales", icon: ShoppingCart },
+  { to: "/admin/reports", label: "shell.nav.reports", icon: BarChart3 },
+  { to: "/admin/ticket-types", label: "shell.nav.ticketTypes", icon: Ticket, superAdminOnly: true },
+  { to: "/admin/gates", label: "shell.nav.gates", icon: DoorOpen, superAdminOnly: true },
+  { to: "/admin/sync-status", label: "shell.nav.liveTills", icon: RefreshCw },
+  { to: "/admin/scans", label: "shell.nav.scans", icon: ScanLine },
+  { to: "/admin/logs", label: "shell.nav.logs", icon: ScrollText },
+  { to: "/admin/users", label: "shell.nav.users", icon: Users, superAdminOnly: true },
+  { to: "/admin/design", label: "shell.nav.design", icon: Palette, superAdminOnly: true },
+  { to: "/admin/media", label: "shell.nav.media", icon: Images, superAdminOnly: true },
+  { to: "/admin/subscription", label: "shell.nav.subscription", icon: BadgeCheck, superAdminOnly: true },
+  { to: "/admin/establishment", label: "shell.nav.settings", icon: Settings, superAdminOnly: true },
 ];
 
 export default function AdminLayout() {
   const { session, logout } = useSession();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t } = useI18n();
 
   if (!session) return <Navigate to="/login" replace />;
   // Matches the backend's own @PreAuthorize rules: SUPER_ADMIN and
@@ -66,7 +69,7 @@ export default function AdminLayout() {
       />
       <div className="relative flex items-center justify-between px-5 pt-5 pb-7">
         <BrandLockup />
-        <button onClick={() => setMobileOpen(false)} className="lg:hidden text-white/80" aria-label="Fermer le menu">
+        <button onClick={() => setMobileOpen(false)} className="lg:hidden text-white/80" aria-label={t("shell.nav.closeMenu")}>
           <X className="h-5 w-5" />
         </button>
       </div>
@@ -85,7 +88,7 @@ export default function AdminLayout() {
               }`}
             >
               <Icon className="h-[18px] w-[18px]" strokeWidth={1.9} />
-              {label}
+              {t(label)}
             </Link>
           );
         })}
@@ -96,14 +99,14 @@ export default function AdminLayout() {
             to="/gate/sell"
             className="flex items-center gap-3 rounded-xl px-3.5 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white"
           >
-            <ShoppingCart className="h-4 w-4" /> Retour à la caisse
+            <ShoppingCart className="h-4 w-4" /> {t("shell.nav.backToTill")}
           </Link>
         )}
         <button
           onClick={logout}
           className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2 text-left text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white"
         >
-          <LogOut className="h-4 w-4" /> Déconnexion
+          <LogOut className="h-4 w-4" /> {t("shell.logout")}
         </button>
       </div>
     </aside>
@@ -115,28 +118,33 @@ export default function AdminLayout() {
       {mobileOpen && (
         <div className="no-print fixed inset-0 z-40 flex lg:hidden">
           <div className="h-full">{sidebar}</div>
-          <button className="flex-1 bg-black/40" onClick={() => setMobileOpen(false)} aria-label="Fermer le menu" />
+          <button className="flex-1 bg-black/40" onClick={() => setMobileOpen(false)} aria-label={t("shell.nav.closeMenu")} />
         </div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="no-print sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card/90 px-4 py-3 backdrop-blur sm:px-6">
-          <button onClick={() => setMobileOpen(true)} className="rounded-lg p-1.5 hover:bg-muted lg:hidden" aria-label="Ouvrir le menu">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="rounded-lg p-1.5 hover:bg-muted lg:hidden"
+            aria-label={t("shell.nav.openMenu")}
+          >
             <Menu className="h-5 w-5" />
           </button>
           <div className="ml-auto flex items-center gap-2 sm:gap-4">
+            <LanguageSwitcher />
             <LiveBadge />
             <div className="hidden items-center gap-2.5 rounded-xl border border-border px-3 py-1.5 md:flex">
               <CalendarDays className="h-4 w-4 text-secondary" />
               <div className="leading-tight">
                 <p className="text-xs font-bold text-foreground">Nguon Festival {new Date().getFullYear()}</p>
-                <p className="text-[10px] text-muted-foreground">Foumban, Cameroun</p>
+                <p className="text-[10px] text-muted-foreground">{t("shell.brand.place")}</p>
               </div>
             </div>
             <Link
               to="/admin/logs"
               className="relative rounded-full p-2 text-muted-foreground hover:bg-muted"
-              aria-label="Journal d'activité"
+              aria-label={t("shell.nav.logs")}
             >
               <Bell className="h-5 w-5" />
             </Link>

@@ -7,14 +7,13 @@ import { api, errorMessage } from "../../lib/api/client";
 import type { AdminEstablishment, ReceiptMode } from "../../lib/api/types";
 import { CardHeader, Loading, PageHeader } from "../../components/ui";
 import { ImageField } from "../../components/MediaLibrary";
+import { useI18n } from "../../i18n";
 
-const RECEIPT_MODES: { value: ReceiptMode; label: string; hint: string }[] = [
-  { value: "STANDARD", label: "Standard", hint: "Un seul ticket récapitulatif par vente" },
-  { value: "INDIVIDUAL_TICKETS", label: "Individuel", hint: "Un ticket distinct par entrée vendue" },
-  { value: "CONFIGURABLE_PER_TICKET_TYPE", label: "Par type de billet", hint: "Chaque type de billet choisit son mode" },
-];
+// Labels: settings.establishment.mode.<value>.label / .hint
+const RECEIPT_MODES: ReceiptMode[] = ["STANDARD", "INDIVIDUAL_TICKETS", "CONFIGURABLE_PER_TICKET_TYPE"];
 
 export default function Establishment() {
+  const { t } = useI18n();
   const { session } = useSession();
   const confirm = useConfirm();
   const [data, setData] = useState<AdminEstablishment | null>(null);
@@ -37,9 +36,9 @@ export default function Establishment() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const ok = await confirm({
-      title: "Enregistrer les paramètres ?",
-      message: "Le nom, le logo et le fond de connexion seront mis à jour partout, y compris sur les caisses ouvertes.",
-      confirmLabel: "Enregistrer",
+      title: t("settings.establishment.confirmTitle"),
+      message: t("settings.establishment.confirmMessage"),
+      confirmLabel: t("common.save"),
     });
     if (!ok) return;
     setError(null);
@@ -49,27 +48,33 @@ export default function Establishment() {
       setData(await api.updateEstablishment(session.token, payload));
       setSaved(true);
     } catch (err) {
-      setError(errorMessage(err, "Impossible d'enregistrer les paramètres."));
+      setError(errorMessage(err, t("settings.establishment.saveError")));
     }
   };
 
   return (
     <>
-      <PageHeader title="Paramètres" subtitle="Établissement, logo, images et mode de ticket" />
+      <PageHeader title={t("settings.title")} subtitle={t("settings.establishment.subtitle")} />
 
       <form onSubmit={handleSubmit} className="grid gap-4 xl:grid-cols-[1fr_340px]">
         <div className="space-y-4">
           <div className="card">
-            <CardHeader title="Établissement & images" />
+            <CardHeader title={t("settings.establishment.venueImages")} />
             <div className="space-y-4 px-5 pb-5">
               <div>
-                <label className="field-label">Nom</label>
+                <label className="field-label">{t("settings.name")}</label>
                 <input required value={data.name} onChange={(e) => set({ name: e.target.value })} className="field" />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <ImageField label="Logo / icône" value={data.logoUrl} onChange={(logoUrl) => set({ logoUrl })} fallback="/logo.png" hint="Logo Nguon par défaut" />
                 <ImageField
-                  label="Fond de l'écran de connexion"
+                  label={t("settings.establishment.logo")}
+                  value={data.logoUrl}
+                  onChange={(logoUrl) => set({ logoUrl })}
+                  fallback="/logo.png"
+                  hint={t("settings.establishment.logoHint")}
+                />
+                <ImageField
+                  label={t("settings.establishment.loginBackground")}
                   value={data.loginBackgroundUrl}
                   onChange={(loginBackgroundUrl) => set({ loginBackgroundUrl })}
                   fallback="/img/banners/hero.jpg"
@@ -78,10 +83,20 @@ export default function Establishment() {
               <div className="grid grid-cols-2 gap-3">
                 {(["brandPrimaryColor", "brandSecondaryColor"] as const).map((key) => (
                   <div key={key}>
-                    <label className="field-label">{key === "brandPrimaryColor" ? "Couleur principale" : "Couleur secondaire"}</label>
+                    <label className="field-label">
+                      {key === "brandPrimaryColor" ? t("settings.establishment.primaryColor") : t("settings.establishment.secondaryColor")}
+                    </label>
                     <div className="flex items-center gap-2">
-                      <span className="h-10 w-10 flex-shrink-0 rounded-xl border border-border" style={{ background: data[key] ?? "transparent" }} />
-                      <input value={data[key] ?? ""} onChange={(e) => set({ [key]: e.target.value || null })} placeholder="#0A4DA2" className="field font-mono" />
+                      <span
+                        className="h-10 w-10 flex-shrink-0 rounded-xl border border-border"
+                        style={{ background: data[key] ?? "transparent" }}
+                      />
+                      <input
+                        value={data[key] ?? ""}
+                        onChange={(e) => set({ [key]: e.target.value || null })}
+                        placeholder="#0A4DA2"
+                        className="field font-mono"
+                      />
                     </div>
                   </div>
                 ))}
@@ -90,15 +105,15 @@ export default function Establishment() {
           </div>
 
           <div className="card">
-            <CardHeader title="Mode de ticket par défaut" />
+            <CardHeader title={t("settings.establishment.defaultMode")} />
             <div className="grid gap-3 px-5 pb-5 sm:grid-cols-3">
               {RECEIPT_MODES.map((m) => {
-                const active = data.receiptMode === m.value;
+                const active = data.receiptMode === m;
                 return (
                   <button
                     type="button"
-                    key={m.value}
-                    onClick={() => set({ receiptMode: m.value })}
+                    key={m}
+                    onClick={() => set({ receiptMode: m })}
                     className={`relative rounded-xl border-2 p-4 text-left transition-colors ${
                       active ? "border-secondary bg-blue-50/60" : "border-border hover:border-secondary/40"
                     }`}
@@ -108,8 +123,8 @@ export default function Establishment() {
                         <Check className="h-3 w-3" strokeWidth={3} />
                       </span>
                     )}
-                    <p className="text-sm font-bold text-foreground">{m.label}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{m.hint}</p>
+                    <p className="text-sm font-bold text-foreground">{t(`settings.establishment.mode.${m}.label`)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{t(`settings.establishment.mode.${m}.hint`)}</p>
                   </button>
                 );
               })}
@@ -122,19 +137,19 @@ export default function Establishment() {
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
               <Palette className="h-5 w-5" />
             </span>
-            <p className="mt-3 font-display font-bold text-foreground">Personnaliser le billet et le reçu</p>
-            <p className="mt-1 text-sm text-muted-foreground">Textes, couleurs, éléments imprimés, largeur de papier, mentions légales — avec aperçu et impression test.</p>
+            <p className="mt-3 font-display font-bold text-foreground">{t("settings.establishment.customise")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t("settings.establishment.customiseHint")}</p>
             <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-secondary group-hover:underline">
-              Ouvrir <ArrowRight className="h-4 w-4" />
+              {t("settings.establishment.open")} <ArrowRight className="h-4 w-4" />
             </span>
           </Link>
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
           <button type="submit" className="btn-gold w-full">
-            Enregistrer les paramètres
+            {t("settings.establishment.saveSettings")}
           </button>
           {saved && (
             <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-success">
-              <Check className="h-4 w-4" /> Enregistré
+              <Check className="h-4 w-4" /> {t("common.saved")}
             </p>
           )}
         </div>

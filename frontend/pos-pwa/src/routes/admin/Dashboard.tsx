@@ -5,23 +5,25 @@ import { useLiveEvents, useLiveRefresh, useSession } from "../../context/Session
 import { api } from "../../lib/api/client";
 import type { AdminGate, TerminalStatus, TransactionSummary } from "../../lib/api/types";
 import { ALL_TRANSACTIONS_PAGE_SIZE, computeStats, hourlyProgression } from "../../lib/stats";
-import { PAYMENT_LABELS, addDays, formatMoney, formatTime, startOfDay } from "../../lib/format";
+import { PAYMENT_LABELS, addDays, formatMoney, formatTime, hh, startOfDay } from "../../lib/format";
 import { CardHeader, Delta, Loading, PageHeader, Pill, RefreshButton, StatCard } from "../../components/ui";
 import { DonutChart, ProgressionChart, RevenueLineChart } from "../../components/charts";
 import { PAYMENT_COLORS } from "../../lib/chartColors";
 import { TerminalBreakdown } from "../../components/TerminalBreakdown";
 import { TicketLines } from "../../components/TicketLines";
 import { useCatalog } from "../../lib/useCatalog";
+import { locale, useI18n } from "../../i18n";
 
 const PERIODS = [
-  { value: "today", label: "Aujourd'hui", days: 1 },
-  { value: "7d", label: "7 derniers jours", days: 7 },
-  { value: "30d", label: "30 derniers jours", days: 30 },
+  { value: "today", labelKey: "common.today", days: 1 },
+  { value: "7d", labelKey: "reports.dashboard.last7", days: 7 },
+  { value: "30d", labelKey: "reports.dashboard.last30", days: 30 },
 ] as const;
 type Period = (typeof PERIODS)[number]["value"];
 
 export default function Dashboard() {
   const { session } = useSession();
+  const { t, lang } = useI18n();
   const [transactions, setTransactions] = useState<TransactionSummary[] | null>(null);
   const [terminals, setTerminals] = useState<TerminalStatus[]>([]);
   const [gates, setGates] = useState<AdminGate[]>([]);
@@ -32,9 +34,15 @@ export default function Dashboard() {
     if (!session) return;
     await Promise.all([
       api.listTransactions(session.token, 0, ALL_TRANSACTIONS_PAGE_SIZE).then((r) => setTransactions(r.content)),
-      api.syncStatus(session.token).then(setTerminals).catch(() => setTerminals([])),
+      api
+        .syncStatus(session.token)
+        .then(setTerminals)
+        .catch(() => setTerminals([])),
       // Gate names are SUPER_ADMIN-only on the backend; a coordinator just sees codes.
-      api.listGates(session.token).then(setGates).catch(() => setGates([])),
+      api
+        .listGates(session.token)
+        .then(setGates)
+        .catch(() => setGates([])),
     ]);
   }, [session]);
 
@@ -64,13 +72,15 @@ export default function Dashboard() {
       chart: computeStats(tx, addDays(end, -Math.max(days, 7)), end).byDay,
       progression: hourlyProgression(tx),
     };
-  }, [transactions, days]);
+    // Day labels and payment names are built here: rebuild them on a language switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, days, lang]);
 
   if (!session) return null;
   if (!transactions) return <Loading />;
 
   const firstName = session.fullName.split(" ")[0];
-  const compareLabel = period === "today" ? "par rapport à hier" : "vs période précédente";
+  const compareLabel = period === "today" ? t("reports.dashboard.vsYesterday") : t("reports.dashboard.vsPrevious");
   const online = terminals.filter((t) => t.online).length;
   const pending = terminals.reduce((s, t) => s + t.localPendingCount, 0);
   const gateName = (id: string) => gates.find((g) => g.id === id)?.name ?? id.slice(0, 8);
@@ -80,7 +90,7 @@ export default function Dashboard() {
   // Revenue earned within each hour today (difference of the cumulative curve).
   const busiest = progression.reduce(
     (best, p, h) => {
-      const amount = (p.today ?? 0) - (h > 0 ? progression[h - 1].today ?? 0 : 0);
+      const amount = (p.today ?? 0) - (h > 0 ? (progression[h - 1].today ?? 0) : 0);
       return p.today !== null && amount > best.amount ? { hour: h, amount } : best;
     },
     { hour: 0, amount: 0 },
@@ -89,15 +99,15 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader
-        title={`Bonjour ${firstName} !`}
-        subtitle="Voici un aperçu des activités du NGUON."
+        title={t("reports.dashboard.greeting", { name: firstName })}
+        subtitle={t("reports.dashboard.subtitle")}
         actions={
           <>
             <RefreshButton onRefresh={load} />
             <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} className="field w-auto">
               {PERIODS.map((p) => (
                 <option key={p.value} value={p.value}>
-                  {p.label}
+                  {t(p.labelKey)}
                 </option>
               ))}
             </select>
@@ -109,40 +119,40 @@ export default function Dashboard() {
         <StatCard
           icon={Wallet}
           tone="green"
-          label="Ventes totales"
+          label={t("reports.dashboard.totalSales")}
           value={formatMoney(current.revenue)}
           hint={<Delta current={current.revenue} previous={previous.revenue} suffix={compareLabel} />}
         />
         <StatCard
           icon={ReceiptIcon}
           tone="blue"
-          label="Transactions"
-          value={current.count.toLocaleString("fr-FR")}
+          label={t("reports.dashboard.transactions")}
+          value={current.count.toLocaleString(locale())}
           hint={<Delta current={current.count} previous={previous.count} suffix={compareLabel} />}
         />
         <StatCard
           icon={ShoppingBag}
           tone="violet"
-          label="Panier moyen"
+          label={t("reports.kpi.average")}
           value={formatMoney(current.average)}
-          hint={current.voidedCount > 0 ? `${current.voidedCount} annulation${current.voidedCount > 1 ? "s" : ""}` : "Aucune annulation"}
+          hint={current.voidedCount > 0 ? t("reports.dashboard.voids", { count: current.voidedCount }) : t("reports.dashboard.noVoids")}
         />
         <StatCard
           icon={MonitorSmartphone}
           tone="gold"
-          label="Caisses en ligne"
+          label={t("reports.dashboard.tillsOnline")}
           value={`${online} / ${terminals.length}`}
-          hint={pending > 0 ? `${pending} opération${pending > 1 ? "s" : ""} en attente` : "Tout est synchronisé"}
+          hint={pending > 0 ? t("reports.dashboard.pendingOps", { count: pending }) : t("reports.dashboard.allSynced")}
         />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_440px]">
         <div className="card">
           <CardHeader
-            title="Progression de la journée (cumul FCFA)"
+            title={t("reports.dashboard.progression")}
             action={
               <span className="text-xs">
-                <Delta current={nowPoint.today ?? 0} previous={nowPoint.yesterday} suffix="vs hier à la même heure" />
+                <Delta current={nowPoint.today ?? 0} previous={nowPoint.yesterday} suffix={t("reports.dashboard.vsYesterdaySameHour")} />
               </span>
             }
           />
@@ -151,17 +161,17 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-3 gap-3 p-5 pt-3">
             <div className="rounded-xl bg-blue-50 px-3 py-2.5">
-              <p className="text-[11px] font-semibold text-secondary">Aujourd'hui à {hourNow}h</p>
+              <p className="text-[11px] font-semibold text-secondary">{t("reports.dashboard.todayAt", { h: hh(hourNow) })}</p>
               <p className="font-display text-lg font-bold text-foreground">{formatMoney(nowPoint.today ?? 0)}</p>
             </div>
             <div className="rounded-xl bg-muted/60 px-3 py-2.5">
-              <p className="text-[11px] font-semibold text-muted-foreground">Hier à {hourNow}h</p>
+              <p className="text-[11px] font-semibold text-muted-foreground">{t("reports.dashboard.yesterdayAt", { h: hh(hourNow) })}</p>
               <p className="font-display text-lg font-bold text-foreground">{formatMoney(nowPoint.yesterday)}</p>
             </div>
             <div className="rounded-xl bg-amber-50 px-3 py-2.5">
-              <p className="text-[11px] font-semibold text-amber-700">Heure la plus active</p>
+              <p className="text-[11px] font-semibold text-amber-700">{t("reports.dashboard.busiestHour")}</p>
               <p className="font-display text-lg font-bold text-foreground">
-                {busiest.amount > 0 ? `${busiest.hour}h–${busiest.hour + 1}h` : "—"}
+                {busiest.amount > 0 ? t("reports.dashboard.hourRange", { from: hh(busiest.hour), to: hh(busiest.hour + 1) }) : "—"}
               </p>
               {busiest.amount > 0 && <p className="text-[11px] text-muted-foreground">{formatMoney(busiest.amount)}</p>}
             </div>
@@ -172,17 +182,17 @@ export default function Dashboard() {
               card's height and this list scrolls, instead of stretching the
               row and leaving a gap under the chart. */}
           <div className="flex min-h-0 flex-1 flex-col xl:absolute xl:inset-0">
-          <CardHeader
-            title={`Ventes par caisse — ${PERIODS.find((p) => p.value === period)!.label.toLowerCase()}`}
-            action={
-              <Link to="/admin/sync-status" className="btn-outline px-3 py-1.5 text-xs">
-                Toutes les caisses
-              </Link>
-            }
-          />
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <TerminalBreakdown rows={current.byTerminal} terminals={terminals} gateName={gateName} />
-          </div>
+            <CardHeader
+              title={t("reports.dashboard.salesByTill", { period: t(PERIODS.find((p) => p.value === period)!.labelKey).toLowerCase() })}
+              action={
+                <Link to="/admin/sync-status" className="btn-outline px-3 py-1.5 text-xs">
+                  {t("reports.dashboard.allTills")}
+                </Link>
+              }
+            />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <TerminalBreakdown rows={current.byTerminal} terminals={terminals} gateName={gateName} />
+            </div>
           </div>
         </div>
       </div>
@@ -190,10 +200,10 @@ export default function Dashboard() {
       <div className="grid gap-4 xl:grid-cols-[1fr_440px]">
         <div className="card">
           <CardHeader
-            title="Ventes par jour (FCFA)"
+            title={t("reports.charts.salesPerDayFcfa")}
             action={
               <Link to="/admin/reports" className="btn-outline px-3 py-1.5 text-xs">
-                Voir les rapports
+                {t("reports.dashboard.viewReports")}
               </Link>
             }
           />
@@ -202,11 +212,11 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="card">
-          <CardHeader title="Répartition par moyen de paiement" />
+          <CardHeader title={t("reports.dashboard.paymentBreakdown")} />
           <DonutChart
             rows={current.byPayment}
             colorOf={(key) => PAYMENT_COLORS[key as keyof typeof PAYMENT_COLORS] ?? "#475569"}
-            centerLabel="FCFA encaissés"
+            centerLabel={t("reports.charts.fcfaCollected")}
           />
         </div>
       </div>
@@ -214,10 +224,10 @@ export default function Dashboard() {
       <div className="grid gap-4 xl:grid-cols-[1fr_440px]">
         <div className="card overflow-hidden">
           <CardHeader
-            title="Transactions récentes"
+            title={t("reports.dashboard.recent")}
             action={
               <Link to="/admin/sales" className="btn-outline px-3 py-1.5 text-xs">
-                Voir tout
+                {t("common.seeAll")}
               </Link>
             }
           />
@@ -225,35 +235,39 @@ export default function Dashboard() {
             <table className="w-full text-sm">
               <thead className="border-y border-border bg-muted/40">
                 <tr>
-                  <th className="th">Réf.</th>
-                  <th className="th">Heure</th>
-                  <th className="th">Porte</th>
-                  <th className="th">Billets</th>
-                  <th className="th">Paiement</th>
-                  <th className="th text-right">Montant</th>
-                  <th className="th">Statut</th>
+                  <th className="th">{t("reports.col.refShort")}</th>
+                  <th className="th">{t("reports.col.time")}</th>
+                  <th className="th">{t("reports.col.gate")}</th>
+                  <th className="th">{t("reports.col.tickets")}</th>
+                  <th className="th">{t("reports.col.payment")}</th>
+                  <th className="th text-right">{t("reports.col.amount")}</th>
+                  <th className="th">{t("reports.col.status")}</th>
                 </tr>
               </thead>
               <tbody>
                 {recent.length === 0 && (
                   <tr>
                     <td colSpan={7} className="td text-center text-muted-foreground">
-                      Aucune vente synchronisée pour le moment.
+                      {t("reports.dashboard.noSyncedSales")}
                     </td>
                   </tr>
                 )}
-                {recent.map((t) => (
-                  <tr key={t.id} className="border-b border-border/60 last:border-0">
-                    <td className="td font-mono text-xs font-semibold">#{t.referenceNumber}</td>
-                    <td className="td text-muted-foreground">{formatTime(t.createdAtClient)}</td>
-                    <td className="td">{gateName(t.gateId)}</td>
+                {recent.map((tx) => (
+                  <tr key={tx.id} className="border-b border-border/60 last:border-0">
+                    <td className="td font-mono text-xs font-semibold">#{tx.referenceNumber}</td>
+                    <td className="td text-muted-foreground">{formatTime(tx.createdAtClient)}</td>
+                    <td className="td">{gateName(tx.gateId)}</td>
                     <td className="td whitespace-normal">
-                      <TicketLines lines={t.lines} ticketType={ticketType} />
+                      <TicketLines lines={tx.lines} ticketType={ticketType} />
                     </td>
-                    <td className="td">{PAYMENT_LABELS[t.paymentMethod]}</td>
-                    <td className="td text-right font-semibold">{formatMoney(t.totalAmount, t.currency)}</td>
+                    <td className="td">{PAYMENT_LABELS[tx.paymentMethod]}</td>
+                    <td className="td text-right font-semibold">{formatMoney(tx.totalAmount, tx.currency)}</td>
                     <td className="td">
-                      {t.status === "VOIDED" ? <Pill tone="danger">Annulée</Pill> : <Pill tone="success">Payé</Pill>}
+                      {tx.status === "VOIDED" ? (
+                        <Pill tone="danger">{t("reports.status.voided")}</Pill>
+                      ) : (
+                        <Pill tone="success">{t("reports.status.paid")}</Pill>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -263,7 +277,7 @@ export default function Dashboard() {
         </div>
 
         <div className="card overflow-hidden">
-          <CardHeader title="Événement en cours" />
+          <CardHeader title={t("reports.dashboard.currentEvent")} />
           <div className="px-5 pb-5">
             <div className="relative h-36 overflow-hidden rounded-xl">
               <img src="/img/banners/palace.jpg" alt="" className="h-full w-full object-cover" />
@@ -273,10 +287,10 @@ export default function Dashboard() {
               </p>
             </div>
             <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" /> Foumban, Cameroun
+              <MapPin className="h-3.5 w-3.5" /> {t("reports.dashboard.location")}
             </p>
             <Link to="/admin/sync-status" className="btn-gold mt-4 w-full">
-              Voir l'état des caisses
+              {t("reports.dashboard.viewTills")}
             </Link>
           </div>
         </div>

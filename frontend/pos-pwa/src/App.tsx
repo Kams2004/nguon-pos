@@ -2,6 +2,7 @@ import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
 import { SessionProvider, useSession } from "./context/SessionContext";
 import { BrandingProvider } from "./context/BrandingContext";
 import { ConfirmProvider } from "./context/ConfirmContext";
+import { I18nProvider } from "./i18n";
 import Login from "./routes/gate/Login";
 import Sell from "./routes/gate/Sell";
 import Scan from "./routes/gate/Scan";
@@ -82,15 +83,17 @@ function AppRoutes() {
 
 function App() {
   return (
-    <SessionProvider>
-      <BrandingProvider>
-        <ConfirmProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </ConfirmProvider>
-      </BrandingProvider>
-    </SessionProvider>
+    <I18nProvider>
+      <SessionProvider>
+        <BrandingProvider>
+          <ConfirmProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </ConfirmProvider>
+        </BrandingProvider>
+      </SessionProvider>
+    </I18nProvider>
   );
 }
 

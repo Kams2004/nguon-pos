@@ -33,6 +33,7 @@ import GateHeader from "./GateHeader";
 import Receipt, { type ReceiptLine } from "./Receipt";
 import { effectivePrintMode } from "../../lib/printMode";
 import TicketCard from "./TicketCard";
+import { locale, useI18n } from "../../i18n";
 
 const PAYMENT_METHODS: { value: PaymentMethod; icon: LucideIcon }[] = [
   { value: "CASH", icon: Banknote },
@@ -68,6 +69,7 @@ function cashSuggestions(total: number): number[] {
 }
 
 export default function Sell() {
+  const { t } = useI18n();
   const { session, syncNow, refreshPendingCount } = useSession();
   const { logoUrl } = useBranding();
   const ticketTypes = session?.bootstrap?.ticketTypes ?? [];
@@ -190,38 +192,40 @@ export default function Sell() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Rechercher un billet…"
+                placeholder={t("gate.sell.searchPlaceholder")}
                 className="field rounded-2xl py-3.5 pl-12 text-base"
               />
               {query && (
                 <button
                   onClick={() => setQuery("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
-                  aria-label="Effacer la recherche"
+                  aria-label={t("common.clearSearch")}
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
             <span className="hidden rounded-xl bg-card px-4 py-3.5 text-sm font-semibold text-muted-foreground shadow-sm sm:block">
-              {visibleTypes.length} billet{visibleTypes.length > 1 ? "s" : ""}
+              {t("gate.sell.ticketCount", { count: visibleTypes.length })}
             </span>
           </div>
 
           {ticketTypes.length === 0 ? (
-            <p className="card p-8 text-center text-sm text-muted-foreground">Aucun type de billet configuré pour cette porte.</p>
+            <p className="card p-8 text-center text-sm text-muted-foreground">{t("gate.sell.noTypes")}</p>
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-              {visibleTypes.map((t) => {
-                const qty = quantityOf(t.id);
-                const Icon = ticketIcon(t.icon);
-                const c = ticketColor(t.color);
+              {visibleTypes.map((type) => {
+                const qty = quantityOf(type.id);
+                const Icon = ticketIcon(type.icon);
+                const c = ticketColor(type.color);
                 return (
                   <button
-                    key={t.id}
+                    key={type.id}
                     type="button"
-                    onClick={() => setQuantity(t.id, qty + 1)}
-                    aria-label={`Ajouter ${t.name}${qty > 0 ? ` (${qty} dans le panier)` : ""}`}
+                    onClick={() => setQuantity(type.id, qty + 1)}
+                    aria-label={
+                      qty > 0 ? t("gate.sell.addAriaInCart", { name: type.name, qty }) : t("gate.sell.addAria", { name: type.name })
+                    }
                     className={`group text-left transition-[transform,filter] duration-150 ease-out hover:-translate-y-0.5 active:scale-[0.98] ${
                       qty > 0
                         ? "-translate-y-0.5 [filter:drop-shadow(0_12px_18px_hsl(220_60%_20%/0.24))]"
@@ -244,9 +248,9 @@ export default function Sell() {
                           qty > 0 ? c.soft.split(" ")[0] : ""
                         }`}
                       >
-                        <p className="line-clamp-2 text-[15px] font-bold leading-tight text-foreground">{t.name}</p>
+                        <p className="line-clamp-2 text-[15px] font-bold leading-tight text-foreground">{type.name}</p>
                         <p className="mt-2 font-display text-xl font-extrabold tabular-nums tracking-tight text-foreground">
-                          {formatMoney(t.price, t.currency)}
+                          {formatMoney(type.price, type.currency)}
                         </p>
                       </div>
                     </div>
@@ -265,7 +269,7 @@ export default function Sell() {
           <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5 text-secondary" />
-              <h2 className="font-display text-lg font-bold text-foreground">Panier</h2>
+              <h2 className="font-display text-lg font-bold text-foreground">{t("gate.sell.cartTitle")}</h2>
               <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-bold text-white">{itemCount}</span>
             </div>
             <button
@@ -273,7 +277,7 @@ export default function Sell() {
               disabled={cartLines.length === 0}
               className="btn-outline px-3 py-2 text-xs text-destructive disabled:opacity-40"
             >
-              <Trash2 className="h-4 w-4" /> Vider le panier
+              <Trash2 className="h-4 w-4" /> {t("gate.sell.clearCart")}
             </button>
           </div>
 
@@ -281,7 +285,7 @@ export default function Sell() {
             {cartLines.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-2 py-10 text-center text-muted-foreground">
                 <Ticket className="h-10 w-10 opacity-30" />
-                <p className="text-sm">Touchez un billet pour l'ajouter.</p>
+                <p className="text-sm">{t("gate.sell.emptyCart")}</p>
               </div>
             )}
             {cartLines.map((l) => (
@@ -289,12 +293,14 @@ export default function Sell() {
                 <TicketTypeBadge icon={l.type.icon} color={l.type.color} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-foreground">{l.type.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatMoney(l.type.price, l.type.currency)} / unité</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("gate.sell.perUnit", { price: formatMoney(l.type.price, l.type.currency) })}
+                  </p>
                   <div className="mt-2 flex items-center gap-1.5">
                     <button
                       onClick={() => setQuantity(l.ticketTypeId, l.quantity - 1)}
                       className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-foreground hover:bg-muted active:scale-95"
-                      aria-label={`Retirer un ${l.type.name}`}
+                      aria-label={t("gate.sell.removeOne", { name: l.type.name })}
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -302,7 +308,7 @@ export default function Sell() {
                     <button
                       onClick={() => setQuantity(l.ticketTypeId, l.quantity + 1)}
                       className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-white hover:brightness-110 active:scale-95"
-                      aria-label={`Ajouter un ${l.type.name}`}
+                      aria-label={t("gate.sell.addOne", { name: l.type.name })}
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -312,7 +318,7 @@ export default function Sell() {
                   <button
                     onClick={() => setQuantity(l.ticketTypeId, 0)}
                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-destructive hover:bg-red-100"
-                    aria-label={`Supprimer ${l.type.name}`}
+                    aria-label={t("gate.sell.removeLine", { name: l.type.name })}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -327,10 +333,10 @@ export default function Sell() {
           <div className="space-y-4 border-t border-border bg-muted/30 px-5 py-4">
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total à payer</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("gate.sell.totalDue")}</p>
                 <p className="text-xs text-muted-foreground">
-                  {itemCount} billet{itemCount > 1 ? "s" : ""}
-                  {itemCount > 1 && " · imprimés séparément"}
+                  {t("gate.sell.ticketCount", { count: itemCount })}
+                  {itemCount > 1 && ` · ${t("gate.sell.printedSeparately")}`}
                 </p>
               </div>
               <p className="font-display text-3xl font-bold text-foreground">{formatMoney(total, currency)}</p>
@@ -367,13 +373,13 @@ export default function Sell() {
                         receivedAmount === amount ? "border-secondary bg-blue-50 text-secondary" : "border-border bg-card hover:bg-muted"
                       }`}
                     >
-                      {i === 0 ? "Exact" : amount.toLocaleString("fr-FR")}
+                      {i === 0 ? t("gate.sell.exact") : amount.toLocaleString(locale())}
                     </button>
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="field-label">Montant reçu</label>
+                    <label className="field-label">{t("gate.sell.received")}</label>
                     <input
                       type="number"
                       min="0"
@@ -385,7 +391,7 @@ export default function Sell() {
                     />
                   </div>
                   <div>
-                    <label className="field-label">Monnaie à rendre</label>
+                    <label className="field-label">{t("gate.sell.changeDue")}</label>
                     <p
                       className={`rounded-xl border px-3.5 py-2.5 text-base font-bold ${
                         cashShort
@@ -395,7 +401,11 @@ export default function Sell() {
                             : "border-border bg-card text-muted-foreground"
                       }`}
                     >
-                      {received === "" ? "—" : cashShort ? `Manque ${formatMoney(-change, currency)}` : formatMoney(change, currency)}
+                      {received === ""
+                        ? "—"
+                        : cashShort
+                          ? t("gate.sell.short", { amount: formatMoney(-change, currency) })
+                          : formatMoney(change, currency)}
                     </p>
                   </div>
                 </div>
@@ -410,11 +420,11 @@ export default function Sell() {
               {submitting ? (
                 <>
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
-                  Enregistrement…
+                  {t("gate.sell.saving")}
                 </>
               ) : (
                 <>
-                  Encaisser {total > 0 && formatMoney(total, currency)} <ArrowRight className="h-5 w-5" />
+                  {t("gate.sell.charge")} {total > 0 && formatMoney(total, currency)} <ArrowRight className="h-5 w-5" />
                 </>
               )}
             </button>
@@ -429,7 +439,7 @@ export default function Sell() {
           className="fixed inset-x-3 bottom-3 z-20 flex items-center justify-between rounded-2xl bg-royal px-5 py-3.5 text-white shadow-xl shadow-royal/30 lg:hidden"
         >
           <span className="flex items-center gap-2 text-sm font-semibold">
-            <ShoppingCart className="h-4 w-4" /> Panier ({itemCount})
+            <ShoppingCart className="h-4 w-4" /> {t("gate.sell.cartWithCount", { n: itemCount })}
           </span>
           <span className="flex items-center gap-2 font-display font-bold">
             {formatMoney(total, currency)} <ArrowRight className="h-4 w-4 text-primary" />
@@ -491,6 +501,7 @@ function SaleComplete({
   design: ReturnType<typeof resolveTicketDesign>;
   onNewSale: () => void;
 }) {
+  const { t } = useI18n();
   const { pendingCount } = useSession();
   const [printTarget, setPrintTarget] = useState<PrintTarget>("all");
   // Re-read the local store as this sale (and earlier ones) sync.
@@ -560,32 +571,31 @@ function SaleComplete({
                 <Check className="h-9 w-9" strokeWidth={3} />
               </div>
               <div>
-                <h2 className="font-display text-2xl font-bold text-royal">Paiement réussi !</h2>
+                <h2 className="font-display text-2xl font-bold text-royal">{t("gate.done.title")}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {n === 1 ? "1 entrée" : `${n} entrées`}
                   {ns === 0
-                    ? " sur le reçu"
+                    ? t("gate.done.summaryReceipt", { count: n })
                     : ns === n
                       ? n === 1
-                        ? ", 1 billet"
-                        : `, ${n} billets individuels`
-                      : `, dont ${ns} en billet${ns > 1 ? "s" : ""} séparé${ns > 1 ? "s" : ""}`}{" "}
+                        ? t("gate.done.summaryOneTicket")
+                        : t("gate.done.summaryAllTickets", { n })
+                      : t("gate.done.summaryMixed", { entries: t("gate.done.entries", { count: n }), count: ns })}{" "}
                   · {PAYMENT_LABELS[sale.paymentMethod]} · {formatTime(sale.createdAtClient)}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <div className="rounded-2xl bg-muted/60 px-4 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Montant</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("gate.done.amount")}</p>
                   <p className="font-display text-2xl font-bold text-foreground">{formatMoney(saleTotal, sale.currency)}</p>
                 </div>
                 {change !== null && (
                   <div className="rounded-2xl bg-amber-50 px-4 py-2.5 ring-1 ring-amber-200">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Monnaie à rendre</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">{t("gate.sell.changeDue")}</p>
                     <p className="font-display text-2xl font-bold text-amber-800">{formatMoney(change, sale.currency)}</p>
                   </div>
                 )}
                 <div className="rounded-2xl bg-muted/60 px-4 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Référence</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("gate.done.reference")}</p>
                   <p className="font-mono text-sm font-bold text-foreground">
                     {thisSale?.reference ?? `LOC-${sale.transactionId.slice(0, 8)}`}
                   </p>
@@ -593,7 +603,7 @@ function SaleComplete({
                     className={`flex items-center gap-1 text-[11px] font-semibold ${thisSale?.synced ? "text-success" : "text-amber-700"}`}
                   >
                     {thisSale?.synced ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                    {thisSale?.synced ? "Synchronisée" : "En attente d'envoi"}
+                    {thisSale?.synced ? t("gate.done.synced") : t("gate.done.waitingToSend")}
                   </p>
                 </div>
               </div>
@@ -602,21 +612,23 @@ function SaleComplete({
             <div className="grid gap-2 sm:grid-cols-2 xl:w-[420px]">
               <button onClick={() => print("all")} className="btn-blue py-3 sm:col-span-2">
                 <Printer className="h-4 w-4" />
-                {ns === 0 ? "Imprimer le reçu" : `Imprimer reçu + ${ns > 1 ? `${ns} billets` : "billet"}`}
+                {ns === 0 ? t("gate.done.printReceipt") : t("gate.done.printAll", { count: ns })}
               </button>
               {ns > 0 && (
                 <>
                   <button onClick={() => print("receipt")} className="btn-outline py-2.5">
-                    <ReceiptIcon className="h-4 w-4" /> Reçu seul
+                    <ReceiptIcon className="h-4 w-4" /> {t("gate.done.receiptOnly")}
                   </button>
                   <button onClick={() => print("tickets")} className="btn-outline py-2.5">
-                    <Ticket className="h-4 w-4" /> {ns > 1 ? "Billets seuls" : "Billet seul"}
+                    <Ticket className="h-4 w-4" /> {t("gate.done.ticketsOnly", { count: ns })}
                   </button>
                 </>
               )}
               <button ref={newSaleRef} onClick={onNewSale} className="btn-gold py-3.5 text-base sm:col-span-2">
-                <ShoppingCart className="h-5 w-5" /> Nouvelle vente
-                <kbd className="ml-1 rounded border border-primary-foreground/30 px-1.5 text-[10px] font-semibold">Entrée</kbd>
+                <ShoppingCart className="h-5 w-5" /> {t("gate.done.newSale")}
+                <kbd className="ml-1 rounded border border-primary-foreground/30 px-1.5 text-[10px] font-semibold">
+                  {t("gate.done.enterKey")}
+                </kbd>
               </button>
             </div>
           </div>
@@ -627,7 +639,7 @@ function SaleComplete({
           <div className="space-y-5">
             <div className={`print-thermal ${paperClass} ${printTarget === "tickets" ? "print:hidden" : ""}`}>
               <p className="no-print mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                <ReceiptIcon className="h-4 w-4" /> Reçu de caisse
+                <ReceiptIcon className="h-4 w-4" /> {t("gate.done.receiptHeading")}
               </p>
               <Receipt
                 design={design}
@@ -647,27 +659,27 @@ function SaleComplete({
             </div>
 
             <div className="no-print card p-5">
-              <h3 className="font-display text-sm font-bold text-foreground">Cette caisse aujourd'hui</h3>
+              <h3 className="font-display text-sm font-bold text-foreground">{t("gate.done.tillToday")}</h3>
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-xl bg-muted/60 px-2 py-2.5">
                   <p className="font-display text-lg font-bold">{today.length}</p>
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">Ventes</p>
+                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("gate.done.sales")}</p>
                 </div>
                 <div className="rounded-xl bg-muted/60 px-2 py-2.5">
                   <p className="font-display text-lg font-bold">{todayTickets}</p>
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">Billets</p>
+                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("gate.done.tickets")}</p>
                 </div>
                 <div className={`rounded-xl px-2 py-2.5 ${todayPending ? "bg-amber-50" : "bg-emerald-50"}`}>
                   <p className={`font-display text-lg font-bold ${todayPending ? "text-amber-800" : "text-emerald-700"}`}>{todayPending}</p>
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">À envoyer</p>
+                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("gate.done.toSend")}</p>
                 </div>
               </div>
               <p className="mt-3 flex items-baseline justify-between rounded-xl bg-blue-50 px-3 py-2.5">
-                <span className="text-xs font-semibold text-secondary">Encaissé aujourd'hui</span>
+                <span className="text-xs font-semibold text-secondary">{t("gate.done.takenToday")}</span>
                 <span className="font-display text-lg font-bold text-royal">{formatMoney(todayTotal)}</span>
               </p>
 
-              <h4 className="mt-4 text-xs font-bold uppercase tracking-wide text-muted-foreground">Dernières ventes</h4>
+              <h4 className="mt-4 text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("gate.done.recentSales")}</h4>
               <ul className="mt-2 divide-y divide-border">
                 {today.slice(0, 6).map((s) => (
                   <li key={s.id} className={`flex items-center gap-2 py-2 text-xs ${s.id === sale.transactionId ? "font-bold" : ""}`}>
@@ -675,9 +687,9 @@ function SaleComplete({
                     <span className="min-w-0 flex-1 truncate font-mono">{s.reference ?? `LOC-${s.id.slice(0, 8)}`}</span>
                     <span className="whitespace-nowrap">{formatMoney(s.total)}</span>
                     {s.synced ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-success" aria-label="Synchronisée" />
+                      <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-success" aria-label={t("gate.done.synced")} />
                     ) : (
-                      <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-600" aria-label="En attente" />
+                      <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-600" aria-label={t("gate.done.pending")} />
                     )}
                   </li>
                 ))}
@@ -689,15 +701,14 @@ function SaleComplete({
             <div className="no-print card flex h-fit items-start gap-3 p-5 text-sm text-muted-foreground">
               <ReceiptIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-secondary" />
               <p>
-                Mode d'impression <strong className="text-foreground">Standard</strong> : {n > 1 ? `les ${n} entrées sont` : "l'entrée est"}{" "}
-                imprimée
-                {n > 1 ? "s" : ""} sur le reçu, avec un QR code par personne. Aucun billet séparé n'est imprimé.
+                {t("gate.done.printMode")} <strong className="text-foreground">{t("gate.done.standard")}</strong>
+                {t("gate.done.standardBody", { count: n })}
               </p>
             </div>
           ) : (
             <div className={`print-thermal ${paperClass} ${printTarget === "receipt" ? "print:hidden" : ""}`}>
               <p className="no-print mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                <Ticket className="h-4 w-4" /> {ns > 1 ? `Billets individuels — un par entrée (${ns})` : "Billet"}
+                <Ticket className="h-4 w-4" /> {t("gate.done.ticketsHeading", { count: ns })}
               </p>
               <div className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3 print:block">
                 {separateTickets.map((t, i) => {

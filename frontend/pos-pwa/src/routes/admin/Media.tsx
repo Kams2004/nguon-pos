@@ -1,13 +1,12 @@
 import { PageHeader } from "../../components/ui";
 import { MediaLibrary } from "../../components/MediaLibrary";
+import { useI18n } from "../../i18n";
 
 export default function Media() {
+  const { t } = useI18n();
   return (
     <>
-      <PageHeader
-        title="Médiathèque"
-        subtitle="Images stockées sur le serveur (MinIO) : logo, fond de connexion, visuels des billets. Choisissez-les ensuite dans Paramètres et Billetterie."
-      />
+      <PageHeader title={t("settings.media.title")} subtitle={t("settings.media.subtitle")} />
       <div className="card p-5">
         <MediaLibrary mode="manage" />
       </div>

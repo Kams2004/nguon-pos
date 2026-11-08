@@ -1,6 +1,7 @@
 import type { PaymentMethod, TransactionSummary } from "./api/types";
 import type { DailyPoint, HistogramBin } from "../components/charts";
-import { PAYMENT_LABELS, addDays, dayKey, formatDayLabel, startOfDay } from "./format";
+import { PAYMENT_LABELS, addDays, dayKey, formatDayLabel, formatMoney, hh, startOfDay } from "./format";
+import { translate } from "../i18n";
 
 // Dashboard and reports aggregate client-side over the establishment's
 // synced transactions. Fine at festival scale (thousands of sales); a
@@ -23,7 +24,13 @@ export type PeriodStats = {
 };
 
 /** `from` inclusive, `to` exclusive, both local-midnight dates. */
-export function computeStats(transactions: TransactionSummary[], from: Date, to: Date, gateId?: string, cashierUserId?: string): PeriodStats {
+export function computeStats(
+  transactions: TransactionSummary[],
+  from: Date,
+  to: Date,
+  gateId?: string,
+  cashierUserId?: string,
+): PeriodStats {
   const inRange = transactions.filter((t) => {
     const d = new Date(t.createdAtClient);
     return d >= from && d < to && (!gateId || t.gateId === gateId) && (!cashierUserId || t.cashierUserId === cashierUserId);
@@ -72,9 +79,7 @@ export function computeStats(transactions: TransactionSummary[], from: Date, to:
     voidedCount: voided.length,
     voidedAmount: voided.reduce((s, t) => s + t.totalAmount, 0),
     byDay: [...days.values()],
-    byPayment: [...payments.entries()]
-      .map(([key, v]) => ({ key, label: PAYMENT_LABELS[key], ...v }))
-      .sort((a, b) => b.value - a.value),
+    byPayment: [...payments.entries()].map(([key, v]) => ({ key, label: PAYMENT_LABELS[key], ...v })).sort((a, b) => b.value - a.value),
     byGate: [...gates.entries()].map(([key, v]) => ({ key, ...v })).sort((a, b) => b.value - a.value),
     byTerminal: [...terminals.entries()].map(([key, v]) => ({ key, ...v })).sort((a, b) => b.value - a.value),
     byCashier: [...cashiers.entries()].map(([key, v]) => ({ key, ...v })).sort((a, b) => b.value - a.value),
@@ -107,7 +112,6 @@ export function hourlyProgression(transactions: TransactionSummary[], now = new 
   return t.map((v, hour) => ({ hour, today: hour <= now.getHours() ? v : null, yesterday: y[hour] }));
 }
 
-
 /** Sales per hour of the day over a set of sales — when the rush happens. */
 export function hourHistogram(transactions: TransactionSummary[]): HistogramBin[] {
   const counts = new Array<number>(24).fill(0);
@@ -119,9 +123,9 @@ export function hourHistogram(transactions: TransactionSummary[]): HistogramBin[
     amounts[h] += t.totalAmount;
   }
   return counts.map((count, h) => ({
-    label: `${h}h`,
+    label: translate("reports.charts.hour", { h: hh(h) }),
     count,
-    detail: `${Math.round(amounts[h]).toLocaleString("fr-FR")} FCFA`,
+    detail: formatMoney(amounts[h]),
   }));
 }
 
@@ -137,7 +141,9 @@ export function amountHistogram(transactions: TransactionSummary[]): HistogramBi
   });
   for (const t of transactions) {
     if (t.status !== "COMPLETED") continue;
-    let i = AMOUNT_EDGES.findIndex((lo, k) => t.totalAmount >= lo && (AMOUNT_EDGES[k + 1] === undefined || t.totalAmount < AMOUNT_EDGES[k + 1]));
+    let i = AMOUNT_EDGES.findIndex(
+      (lo, k) => t.totalAmount >= lo && (AMOUNT_EDGES[k + 1] === undefined || t.totalAmount < AMOUNT_EDGES[k + 1]),
+    );
     if (i < 0) i = 0;
     bins[i].count += 1;
   }
