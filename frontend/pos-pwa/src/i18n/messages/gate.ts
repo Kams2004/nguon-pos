@@ -24,6 +24,10 @@ export default defineMessages({
     "gate.printer.name": "Imprimante",
     "gate.printer.nameHint": "Nom exact de l'imprimante sur cet ordinateur. Vide : l'imprimante par défaut.",
     "gate.printer.namePlaceholder": "Imprimante par défaut",
+    "gate.printer.dialogEachTime": "Choisir à chaque impression (fenêtre du système)",
+    "gate.printer.missing": "{name} (introuvable)",
+    "gate.printer.silentHint":
+      "Avec une imprimante choisie, reçus et billets s'impriment directement, sans fenêtre. Réglez son papier (rouleau 80 ou 58 mm) une fois dans les paramètres d'imprimante du système.",
     "gate.printer.paper": "Largeur du papier",
     "gate.printer.autoPrint": "Impression automatique après une vente",
     "gate.printer.auto.NONE": "Non : j'appuie sur Imprimer",
@@ -204,6 +208,10 @@ export default defineMessages({
     "gate.printer.name": "Printer",
     "gate.printer.nameHint": "Exact name of the printer on this computer. Empty: the default printer.",
     "gate.printer.namePlaceholder": "Default printer",
+    "gate.printer.dialogEachTime": "Choose each time (system print window)",
+    "gate.printer.missing": "{name} (not found)",
+    "gate.printer.silentHint":
+      "With a printer chosen, receipts and tickets print directly, with no window. Set its paper (80 or 58 mm roll) once in the system's printer settings.",
     "gate.printer.paper": "Paper width",
     "gate.printer.autoPrint": "Print automatically after a sale",
     "gate.printer.auto.NONE": "No: I press Print",

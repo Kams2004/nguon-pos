@@ -3,6 +3,7 @@ import { Check } from "lucide-react";
 import { useI18n } from "../i18n";
 import { usePrinterSettings, type PrinterSettings } from "../lib/till/printerSettings";
 import { errorMessage } from "../lib/api/client";
+import { desktopApp } from "../lib/platform";
 import { Modal } from "./ui";
 
 const AUTO = ["NONE", "RECEIPT", "TICKETS", "ALL"] as const;
@@ -14,10 +15,20 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState<PrinterSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Desktop till: the printers installed on this computer, to pick from.
+  const [printers, setPrinters] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (settings && !form) setForm(settings);
   }, [settings, form]);
+
+  useEffect(() => {
+    if (desktopApp.available())
+      desktopApp
+        .printers()
+        .then(setPrinters)
+        .catch(() => setPrinters([]));
+  }, []);
 
   if (!form) return null;
   const set = (patch: Partial<PrinterSettings>) => {
@@ -42,14 +53,26 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
         <p className="text-sm text-muted-foreground">{t("gate.printer.intro")}</p>
         <div>
           <label className="field-label">{t("gate.printer.name")}</label>
-          <input
-            value={form.printerName}
-            maxLength={200}
-            onChange={(e) => set({ printerName: e.target.value })}
-            placeholder={t("gate.printer.namePlaceholder")}
-            className="field"
-          />
-          <p className="mt-1 text-[11px] text-muted-foreground">{t("gate.printer.nameHint")}</p>
+          {printers ? (
+            <select value={form.printerName} onChange={(e) => set({ printerName: e.target.value })} className="field">
+              <option value="">{t("gate.printer.dialogEachTime")}</option>
+              {/* A saved printer that is unplugged right now stays selectable. */}
+              {[...new Set([...printers, ...(form.printerName ? [form.printerName] : [])])].map((p) => (
+                <option key={p} value={p}>
+                  {printers.includes(p) ? p : t("gate.printer.missing", { name: p })}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={form.printerName}
+              maxLength={200}
+              onChange={(e) => set({ printerName: e.target.value })}
+              placeholder={t("gate.printer.namePlaceholder")}
+              className="field"
+            />
+          )}
+          <p className="mt-1 text-[11px] text-muted-foreground">{printers ? t("gate.printer.silentHint") : t("gate.printer.nameHint")}</p>
         </div>
         <div>
           <label className="field-label">{t("gate.printer.paper")}</label>

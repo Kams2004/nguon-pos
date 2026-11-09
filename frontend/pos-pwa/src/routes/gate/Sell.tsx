@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { printPage } from "../../lib/platform";
 import QRCode from "qrcode";
 import {
   ArrowRight,
@@ -526,8 +527,8 @@ function SaleComplete({
 
   const print = (target: PrintTarget) => {
     setPrintTarget(target);
-    // Let React apply the print:hidden classes before the dialog opens.
-    setTimeout(() => window.print(), 50);
+    // Let React apply the print:hidden classes before printing.
+    setTimeout(() => printPage(printer?.printerName, printer?.paperWidth ?? design.receipt.paperWidth), 50);
   };
 
   // Automatic printing, as set for this till — once every QR code is drawn.

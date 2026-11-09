@@ -4,6 +4,8 @@
 // hands the screens the token that lets them talk to it.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod print;
+
 use std::path::PathBuf;
 use tauri::Manager;
 
@@ -67,7 +69,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![edge_ui_token, restart_app])
+        .invoke_handler(tauri::generate_handler![edge_ui_token, restart_app, print::list_printers, print::print_silent])
         .run(tauri::generate_context!())
         .expect("Nguon POS failed to start");
 }

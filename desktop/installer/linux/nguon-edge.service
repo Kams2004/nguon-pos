@@ -16,6 +16,8 @@ Environment=EDGE_DATA_DIR=/var/lib/nguon-edge
 Environment=EDGE_KEY_PROVIDER=systemd-creds
 ExecStart="/usr/lib/Nguon POS/edge/jre/bin/java" -Xmx256m -XX:+UseSerialGC -jar "/usr/lib/Nguon POS/edge/edge-service.jar"
 Restart=always
+# 143 = stopped by SIGTERM (shutdown, upgrade): a normal stop, not a failure.
+SuccessExitStatus=143
 RestartSec=3
 # Hardening: read-only system, private /tmp, no home access, only its data dir writable.
 NoNewPrivileges=yes

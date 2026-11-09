@@ -26,7 +26,32 @@ export const desktopApp = {
   restart: async (): Promise<void> => {
     await tauri()?.invoke("restart_app");
   },
+  /** The printers installed on this computer. */
+  printers: async (): Promise<string[]> => (await tauri()?.invoke<string[]>("list_printers")) ?? [],
+  /** Prints the page as it is now, straight to `printer`, with no dialog. */
+  printSilent: async (printer: string, paperWidthMm: number): Promise<void> => {
+    const t = tauri();
+    if (!t) throw new Error("NOT_DESKTOP");
+    await t.invoke("print_silent", { printer, paperWidthMm });
+  },
 };
+
+/**
+ * Prints what is on screen (the print styles pick the receipt/tickets): on
+ * a desktop till with a chosen printer, silently; otherwise through the
+ * system's print dialog.
+ */
+export async function printPage(printerName: string | undefined, paperWidthMm: number): Promise<void> {
+  if (printerName && desktopApp.available()) {
+    try {
+      await desktopApp.printSilent(printerName, paperWidthMm);
+      return;
+    } catch (e) {
+      console.warn("Silent printing failed, falling back to the print dialog", e);
+    }
+  }
+  window.print();
+}
 
 /** "0.2.0" > "0.1.9"; anything that isn't MAJOR.MINOR.PATCH ("dev") never counts as newer. */
 export function isNewerVersion(candidate: string | null | undefined, current: string | null | undefined): boolean {
