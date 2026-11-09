@@ -8,6 +8,7 @@ import { formatMoney } from "../../lib/format";
 import { TICKET_COLORS, TICKET_ICONS, TicketTypeBadge, ticketColor, ticketIcon } from "../../lib/ticketIcons";
 import { Pagination, usePaged } from "../../components/Pagination";
 import { Loading, Modal, PageHeader, Pill, RefreshButton, SearchInput } from "../../components/ui";
+import { GuideButton } from "../../components/SetupGuide";
 import { useI18n } from "../../i18n";
 
 // Labels: settings.ticketTypes.printMode.<mode>.label / .short
@@ -131,6 +132,7 @@ export default function TicketTypes() {
         subtitle={t("settings.ticketTypes.subtitle")}
         actions={
           <>
+            <GuideButton here="ticketTypes" />
             <RefreshButton onRefresh={load} />
             <button onClick={openCreate} className="btn-blue">
               <Plus className="h-4 w-4" /> {t("settings.ticketTypes.add")}

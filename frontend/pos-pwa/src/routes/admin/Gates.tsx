@@ -5,6 +5,7 @@ import { useConfirm } from "../../context/ConfirmContext";
 import { api, errorMessage } from "../../lib/api/client";
 import type { AdminGate, AdminTicketType, TerminalStatus } from "../../lib/api/types";
 import { Loading, Modal, PageHeader, Pill, RefreshButton } from "../../components/ui";
+import { GuideButton } from "../../components/SetupGuide";
 import { useI18n } from "../../i18n";
 
 export default function Gates() {
@@ -92,6 +93,7 @@ export default function Gates() {
         subtitle={t("settings.gates.subtitle")}
         actions={
           <>
+            <GuideButton here="gates" />
             <RefreshButton onRefresh={load} />
             <button onClick={openCreate} className="btn-blue">
               <Plus className="h-4 w-4" /> {t("settings.gates.newGate")}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { KeyRound, MonitorSmartphone, ShieldOff } from "lucide-react";
 import { useLiveRefresh, useSession } from "../../context/SessionContext";
 import { useConfirm } from "../../context/ConfirmContext";
+import { GuideButton } from "../../components/SetupGuide";
 import { useI18n } from "../../i18n";
 import { api, errorMessage } from "../../lib/api/client";
 import type { Device, EnrollmentCode } from "../../lib/api/types";
@@ -75,7 +76,12 @@ export default function Devices() {
       <PageHeader
         title={t("settings.devices.title")}
         subtitle={t("settings.devices.subtitle")}
-        actions={<RefreshButton onRefresh={load} />}
+        actions={
+          <>
+            <GuideButton here="devices" />
+            <RefreshButton onRefresh={load} />
+          </>
+        }
       />
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}

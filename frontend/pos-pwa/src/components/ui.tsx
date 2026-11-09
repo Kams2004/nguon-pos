@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { RefreshCw, Search, X, type LucideIcon } from "lucide-react";
 import { useBranding } from "../context/BrandingContext";
 import { useSession } from "../context/SessionContext";
@@ -168,7 +169,9 @@ export function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  // Rendered at the root of the page, so a dialog never picks up the styles
+  // of whatever opened it (a white page banner, the till's blue header…).
+  return createPortal(
     <div
       className="no-print fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-royal-deep/50 p-4 backdrop-blur-sm"
       // mousedown, not click: a text selection dragged from inside the
@@ -185,7 +188,8 @@ export function Modal({
         </div>
         <div className="p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -5,17 +5,19 @@ import shell from "./messages/shell";
 import gate from "./messages/gate";
 import reports from "./messages/reports";
 import settings from "./messages/settings";
+import guide from "./messages/guide";
 
 export { LANGS, getLang, locale, setLang, type Lang } from "./core";
 
 // One module per area of the app; each owns its own key prefix.
-const MODULES = [common, shell, gate, reports, settings];
+const MODULES = [common, shell, gate, reports, settings, guide];
 
 const fr = Object.assign({}, ...MODULES.map((m) => m.fr)) as typeof common.fr &
   typeof shell.fr &
   typeof gate.fr &
   typeof reports.fr &
-  typeof settings.fr;
+  typeof settings.fr &
+  typeof guide.fr;
 const DICTIONARIES: Record<Lang, Record<string, string>> = {
   fr,
   en: Object.assign({}, ...MODULES.map((m) => m.en)),

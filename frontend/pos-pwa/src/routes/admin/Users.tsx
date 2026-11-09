@@ -7,6 +7,7 @@ import type { AdminGate, AdminUser, AuditEntry, Role } from "../../lib/api/types
 import { ROLE_LABELS } from "../../lib/format";
 import { Pagination, usePaged } from "../../components/Pagination";
 import { Avatar, Loading, Modal, PageHeader, Pill, RefreshButton, SearchInput } from "../../components/ui";
+import { GuideButton } from "../../components/SetupGuide";
 import { useI18n } from "../../i18n";
 
 const ROLES: Role[] = ["CASHIER", "COORDINATOR", "SUPER_ADMIN"];
@@ -143,6 +144,7 @@ export default function Users() {
         subtitle={t("settings.users.subtitle")}
         actions={
           <>
+            <GuideButton here="users" />
             <RefreshButton onRefresh={load} />
             <button onClick={openCreate} className="btn-blue">
               <Plus className="h-4 w-4" /> {t("settings.users.newUser")}
