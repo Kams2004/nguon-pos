@@ -9,7 +9,7 @@ import { TicketLines } from "../../components/TicketLines";
 import { PAYMENT_LABELS, formatDateTime, formatMoney } from "../../lib/format";
 import { timeAgo, useNow } from "../../lib/useNow";
 import { Pagination, usePaged } from "../../components/Pagination";
-import { CardHeader, Loading, PageHeader, Pill, RefreshButton, StatCard } from "../../components/ui";
+import { CardHeader, Loading, PageHeader, PageSkeleton, Pill, RefreshButton, StatCard } from "../../components/ui";
 import { TerminalState } from "../../components/TerminalState";
 import { useI18n } from "../../i18n";
 
@@ -63,7 +63,7 @@ export default function TerminalDetail() {
   const paged = usePaged(transactions ?? [], 25);
 
   if (!session) return null;
-  if (terminal === undefined) return <Loading />;
+  if (terminal === undefined) return <PageSkeleton stats={3} rows={6} />;
 
   const userName = (id: string) => users.find((u) => u.id === id)?.fullName ?? id.slice(0, 8);
 

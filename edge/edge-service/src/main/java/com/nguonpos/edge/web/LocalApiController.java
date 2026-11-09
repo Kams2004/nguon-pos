@@ -75,6 +75,7 @@ public class LocalApiController {
         s.put("enrolled", enrollment.enrolled());
         s.put("revoked", enrollment.revoked());
         s.put("deviceNo", enrollment.deviceNo().orElse(null));
+        s.put("deviceLabel", enrollment.label().orElse(null));
         s.put("channelConnected", channel.connected());
         s.put("lastSyncAt", uplink.lastSyncAt());
         s.put("pending", uplink.pendingCount());

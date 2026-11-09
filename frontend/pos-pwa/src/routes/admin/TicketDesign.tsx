@@ -13,7 +13,7 @@ import {
   type ReceiptOptions,
   type TicketOptions,
 } from "../../lib/ticketDesign";
-import { CardHeader, Loading, PageHeader } from "../../components/ui";
+import { CardHeader, PageHeader, PageSkeleton } from "../../components/ui";
 import { ImageField } from "../../components/MediaLibrary";
 import TicketCard from "../gate/TicketCard";
 import Receipt from "../gate/Receipt";
@@ -134,7 +134,7 @@ export default function TicketDesignPage() {
   );
 
   if (!session) return null;
-  if (!saved || !texts) return <Loading />;
+  if (!saved || !texts) return <PageSkeleton stats={0} rows={8} />;
 
   const dirty =
     JSON.stringify(texts) !==

@@ -1,6 +1,7 @@
 import type {
   Device,
   ReleaseOverview,
+  PendingEnrollment,
   EnrollmentCode,
   DirectoryUser,
   SubscriptionOverview,
@@ -176,6 +177,17 @@ export const api = {
       method: "POST",
       headers: authHeader(token),
       body: JSON.stringify({ gateId, label }),
+    });
+  },
+
+  listPendingEnrollments(token: string): Promise<PendingEnrollment[]> {
+    return request(`${SALES_BASE}/sales/admin/devices/enrollment-codes`, { headers: authHeader(token) });
+  },
+
+  cancelEnrollment(token: string, id: string): Promise<void> {
+    return request(`${SALES_BASE}/sales/admin/devices/enrollment-codes/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: authHeader(token),
     });
   },
 

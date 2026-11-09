@@ -12,7 +12,7 @@ import type {
 } from "../../lib/api/types";
 import { formatDateTime, formatMoney } from "../../lib/format";
 import { Pagination, usePaged } from "../../components/Pagination";
-import { CardHeader, Loading, Modal, PageHeader, Pill, RefreshButton } from "../../components/ui";
+import { CardHeader, Modal, PageHeader, PageSkeleton, Pill, RefreshButton } from "../../components/ui";
 import { translate, useI18n, type MessageKey } from "../../i18n";
 
 type Tone = "success" | "warning" | "danger" | "neutral" | "info";
@@ -119,7 +119,11 @@ export default function Subscription() {
 
   if (!session) return null;
   if (!data || !form)
-    return error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p> : <Loading />;
+    return error ? (
+      <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>
+    ) : (
+      <PageSkeleton stats={3} rows={5} />
+    );
 
   const { status, settings } = data;
   const state = STATE_LABELS[status.state];

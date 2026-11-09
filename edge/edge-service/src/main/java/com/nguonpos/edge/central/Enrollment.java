@@ -58,6 +58,11 @@ public class Enrollment {
         return meta.get("ca_chain");
     }
 
+    /** The name the back office gave this till ("Caisse n° 2", "Caisse VIP"…). */
+    public Optional<String> label() {
+        return meta.get("device_label");
+    }
+
     public Optional<Integer> deviceNo() {
         return meta.get("device_no").map(Integer::parseInt);
     }

@@ -50,11 +50,31 @@ public class DeviceRegistry {
         for (int i = 0; i < 10; i++) raw.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));
         String code = raw.substring(0, 4) + "-" + raw.substring(4, 8) + "-" + raw.substring(8);
         Instant expires = Instant.now().plus(CODE_TTL);
+        UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO sales.enrollment_code (code_hash, establishment_id, gate_id, label, created_by_user_id, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?)""", hash(code), establishmentId, gateId, label, AuditService.actorId(admin), Timestamp.from(expires));
+                INSERT INTO sales.enrollment_code (id, code_hash, establishment_id, gate_id, label, created_by_user_id, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""", id, hash(code), establishmentId, gateId, label, AuditService.actorId(admin), Timestamp.from(expires));
         audit.record(admin, "TERMINAL", "DEVICE_CODE_CREATED", "GATE", gateId, label.isBlank() ? "Code d'enrôlement créé" : "Code d'enrôlement créé pour la caisse « " + label + " »");
-        return new EnrollmentCode(code, expires, gateId, label);
+        return new EnrollmentCode(id, code, expires, gateId, label);
+    }
+
+    /** Codes not used yet and still valid: tills about to be enrolled (the code itself is not shown again). */
+    public List<Map<String, Object>> pendingCodes(UUID establishmentId) {
+        return jdbc.queryForList("""
+                SELECT id, gate_id AS "gateId", label, created_at AS "createdAt", expires_at AS "expiresAt"
+                FROM sales.enrollment_code
+                WHERE establishment_id = ? AND used_at IS NULL AND expires_at > now()
+                ORDER BY created_at""", establishmentId);
+    }
+
+    public void cancelCode(UUID establishmentId, UUID id, Claims admin) {
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                DELETE FROM sales.enrollment_code WHERE id = ? AND establishment_id = ? AND used_at IS NULL
+                RETURNING gate_id, label""", id, establishmentId);
+        if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Code introuvable ou déjà utilisé.");
+        String label = (String) rows.getFirst().get("label");
+        audit.record(admin, "TERMINAL", "DEVICE_CODE_CANCELLED", "GATE", rows.getFirst().get("gate_id"),
+                label.isBlank() ? "Code d'enrôlement annulé" : "Code d'enrôlement annulé pour « " + label + " »");
     }
 
     /**
@@ -179,7 +199,7 @@ public class DeviceRegistry {
     public record Device(UUID id, UUID establishmentId, UUID gateId, int deviceNo, String label, String publicKey) {
     }
 
-    public record EnrollmentCode(String code, Instant expiresAt, UUID gateId, String label) {
+    public record EnrollmentCode(UUID id, String code, Instant expiresAt, UUID gateId, String label) {
     }
 
     public record EnrollRequest(UUID deviceId, String code, String csrPem, String label, String os, String appVersion) {

@@ -6,7 +6,7 @@ import { api } from "../../lib/api/client";
 import type { AdminGate, AdminUser, AuditEntry } from "../../lib/api/types";
 import { ROLE_LABELS } from "../../lib/format";
 import { Pagination, usePaged } from "../../components/Pagination";
-import { Avatar, Loading, PageHeader, Pill, RefreshButton, SearchInput } from "../../components/ui";
+import { Avatar, PageHeader, Pill, RefreshButton, SearchInput, SkeletonRows } from "../../components/ui";
 import { GuideButton } from "../../components/SetupGuide";
 import { UserFormModal } from "../../components/UserFormModal";
 import { useI18n } from "../../i18n";
@@ -81,7 +81,7 @@ export default function Users() {
           <SearchInput value={query} onChange={setQuery} placeholder={t("settings.users.search")} />
         </div>
         {users === null ? (
-          <Loading />
+          <SkeletonRows rows={6} cols={4} avatar />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

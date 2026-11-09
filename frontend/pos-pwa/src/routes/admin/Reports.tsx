@@ -6,7 +6,7 @@ import type { AdminGate, TerminalStatus, TransactionSummary } from "../../lib/ap
 import { ALL_TRANSACTIONS_PAGE_SIZE, amountHistogram, computeStats, hourHistogram } from "../../lib/stats";
 import { PAYMENT_LABELS, addDays, dayKey, formatDateTime, formatMoney, startOfDay } from "../../lib/format";
 import { Pagination, usePaged } from "../../components/Pagination";
-import { CardHeader, Loading, PageHeader, RefreshButton, StatCard } from "../../components/ui";
+import { CardHeader, PageHeader, PageSkeleton, RefreshButton, StatCard } from "../../components/ui";
 import { useBranding } from "../../context/BrandingContext";
 import { ReportPrint } from "../../components/ReportPrint";
 import { PAYMENT_COLORS, seriesColor } from "../../lib/chartColors";
@@ -125,7 +125,7 @@ export default function Reports() {
   const paged = usePaged(rows, 25, `${start.getTime()}|${end.getTime()}|${gateId}|${cashierUserId}|${ticketTypeId}`);
 
   if (!session) return null;
-  if (!transactions) return <Loading />;
+  if (!transactions) return <PageSkeleton stats={4} rows={8} />;
 
   const gateName = (id: string) => gates.find((g) => g.id === id)?.name ?? id.slice(0, 8);
   const rangeLabel = `${start.toLocaleDateString(locale())} — ${addDays(end, -1).toLocaleDateString(locale())}`;

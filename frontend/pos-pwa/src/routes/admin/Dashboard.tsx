@@ -6,7 +6,7 @@ import { api } from "../../lib/api/client";
 import type { AdminGate, TerminalStatus, TransactionSummary } from "../../lib/api/types";
 import { ALL_TRANSACTIONS_PAGE_SIZE, computeStats, hourlyProgression } from "../../lib/stats";
 import { PAYMENT_LABELS, addDays, formatMoney, formatTime, hh, startOfDay } from "../../lib/format";
-import { CardHeader, Delta, Loading, PageHeader, Pill, RefreshButton, StatCard } from "../../components/ui";
+import { CardHeader, Delta, PageHeader, PageSkeleton, Pill, RefreshButton, StatCard } from "../../components/ui";
 import { DonutChart, ProgressionChart, RevenueLineChart } from "../../components/charts";
 import { PAYMENT_COLORS } from "../../lib/chartColors";
 import { TerminalBreakdown } from "../../components/TerminalBreakdown";
@@ -77,7 +77,7 @@ export default function Dashboard() {
   }, [transactions, days, lang]);
 
   if (!session) return null;
-  if (!transactions) return <Loading />;
+  if (!transactions) return <PageSkeleton stats={4} rows={6} />;
 
   const firstName = session.fullName.split(" ")[0];
   const compareLabel = period === "today" ? t("reports.dashboard.vsYesterday") : t("reports.dashboard.vsPrevious");

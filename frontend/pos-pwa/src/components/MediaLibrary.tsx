@@ -6,7 +6,7 @@ import { api, errorMessage } from "../lib/api/client";
 import type { MediaItem } from "../lib/api/types";
 import { formatDateTime } from "../lib/format";
 import { Pagination, usePaged } from "./Pagination";
-import { Empty, Loading, Modal, RefreshButton } from "./ui";
+import { Empty, Modal, RefreshButton, SkeletonCards } from "./ui";
 import { translate, useI18n } from "../i18n";
 
 function formatSize(bytes: number): string {
@@ -123,7 +123,7 @@ export function MediaLibrary({
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
 
       {items === null ? (
-        <Loading />
+        <SkeletonCards count={8} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" />
       ) : items.length === 0 ? (
         <Empty>
           <ImagePlus className="mx-auto mb-2 h-8 w-8 text-muted-foreground/60" />

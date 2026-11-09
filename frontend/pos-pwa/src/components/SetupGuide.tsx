@@ -10,7 +10,7 @@ const STEPS: { id: GuideStep; to: string; icon: LucideIcon }[] = [
   { id: "gates", to: "/admin/gates", icon: DoorOpen },
   { id: "ticketTypes", to: "/admin/ticket-types", icon: Ticket },
   { id: "users", to: "/admin/users", icon: Users },
-  { id: "devices", to: "/admin/devices", icon: MonitorSmartphone },
+  { id: "devices", to: "/admin/gates", icon: MonitorSmartphone },
 ];
 
 const CHANGES = ["price", "newCashier", "disable", "move", "void", "revoke"] as const;

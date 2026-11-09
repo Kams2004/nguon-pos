@@ -30,7 +30,7 @@ export default defineMessages({
     "guide.users.admin": "Super administrateur — aucune porte. Administration web uniquement ; jamais enregistré sur une caisse.",
 
     "guide.devices.title": "Enrôler les caisses",
-    "guide.devices.where": "Appareils",
+    "guide.devices.where": "Portes & caisses",
     "guide.devices.body1":
       "Sur la porte, « Enrôler une caisse » affiche un code (valable 30 minutes, une seule fois). Le nom est facultatif : « Caisse n° 1 », « n° 2 »…",
     "guide.devices.body2": "Sur la caisse : installer l'application, « Enrôler cette caisse », saisir le code.",
@@ -92,7 +92,7 @@ export default defineMessages({
     "guide.users.admin": "Super administrator — no gate. Web administration only; never stored on a till.",
 
     "guide.devices.title": "Enroll the tills",
-    "guide.devices.where": "Devices",
+    "guide.devices.where": "Gates & tills",
     "guide.devices.body1":
       'On the gate, "Enroll a till" shows a code (valid 30 minutes, once). The name is optional: "Till no. 1", "no. 2"…',
     "guide.devices.body2": 'On the till: install the app, "Enroll this till", type the code.',

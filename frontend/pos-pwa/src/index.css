@@ -311,3 +311,34 @@ textarea {
     box-shadow: none;
   }
 }
+
+/* Loading placeholders (Skeleton in components/ui.tsx): a soft sheen
+   sweeping across, still when the system asks for reduced motion. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.375rem;
+  background: hsl(var(--muted));
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.6), transparent);
+  animation: skeleton-sheen 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes skeleton-sheen {
+  100% {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+/* On the royal-blue lead figure of a stat strip. */
+.stat-strip > :first-child .skeleton {
+  background: hsl(0 0% 100% / 0.18);
+}

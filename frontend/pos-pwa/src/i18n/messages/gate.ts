@@ -5,7 +5,8 @@ import { defineMessages } from "../core";
 export default defineMessages({
   fr: {
     "gate.enroll.banner": "Cette caisse n'est pas encore enrôlée.",
-    "gate.enroll.bannerHint": "Enrôlez-la avec un code de l'administration (Appareils) pour qu'elle se synchronise en direct.",
+    "gate.enroll.bannerHint":
+      "Demandez un code à l'administration (Portes & caisses → « Enrôler une caisse ») : il indique le nom de cette caisse et sa porte.",
     "gate.enroll.revoked": "Cette caisse a été révoquée par l'administration : elle ne se synchronise plus.",
     "gate.update.restart": "Nouvelle version {version} installée — redémarrer",
     "gate.update.restartHint": "La caisse redémarre en quelques secondes sur la nouvelle version. Terminez d'abord la vente en cours.",
@@ -13,7 +14,10 @@ export default defineMessages({
     "gate.enroll.title": "Enrôler cette caisse",
     "gate.enroll.code": "Code d'enrôlement",
     "gate.enroll.submit": "Enrôler",
-    "gate.enroll.done": "Caisse enrôlée (n° {n}). Elle se synchronise désormais en direct.",
+    "gate.enroll.codeHint": "Le code fourni par l'administration désigne déjà cette caisse et sa porte.",
+    "gate.enroll.tillNo": "Caisse n° {n}",
+    "gate.enroll.thisTill": "Cette caisse",
+    "gate.enroll.done": "Caisse enrôlée : elle se synchronise désormais en direct.",
     "gate.enroll.error.INVALID_CODE": "Code invalide, expiré ou déjà utilisé.",
     "gate.enroll.error.CENTRAL_UNREACHABLE": "Le serveur central est injoignable : une connexion internet est nécessaire pour enrôler.",
     "gate.enroll.error.TOO_MANY_ATTEMPTS": "Trop de tentatives. Réessayez dans quelques minutes.",
@@ -189,7 +193,8 @@ export default defineMessages({
   },
   en: {
     "gate.enroll.banner": "This till is not enrolled yet.",
-    "gate.enroll.bannerHint": "Enroll it with a code from the administration (Devices) so it syncs live.",
+    "gate.enroll.bannerHint":
+      'Ask the administration for a code (Gates & tills → "Enroll a till"): it carries this till\'s name and its gate.',
     "gate.enroll.revoked": "This till was revoked by the administration: it no longer syncs.",
     "gate.update.restart": "Version {version} installed — restart",
     "gate.update.restartHint": "The till restarts on the new version in a few seconds. Finish the current sale first.",
@@ -197,7 +202,10 @@ export default defineMessages({
     "gate.enroll.title": "Enroll this till",
     "gate.enroll.code": "Enrollment code",
     "gate.enroll.submit": "Enroll",
-    "gate.enroll.done": "Till enrolled (no. {n}). It now syncs live.",
+    "gate.enroll.codeHint": "The code from the administration already names this till and its gate.",
+    "gate.enroll.tillNo": "Till no. {n}",
+    "gate.enroll.thisTill": "This till",
+    "gate.enroll.done": "Till enrolled: it now syncs live.",
     "gate.enroll.error.INVALID_CODE": "Invalid, expired or already used code.",
     "gate.enroll.error.CENTRAL_UNREACHABLE": "The central server can't be reached: enrolling needs an internet connection.",
     "gate.enroll.error.TOO_MANY_ATTEMPTS": "Too many attempts. Try again in a few minutes.",

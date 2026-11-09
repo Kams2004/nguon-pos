@@ -171,7 +171,9 @@ export type ReleaseFile = { platform: "linux-deb" | "windows-nsis" | string; url
 export type Release = { version: string; notes: string | null; files: ReleaseFile[]; createdAt: string };
 export type ReleaseOverview = { releases: Release[]; targetVersion: string | null };
 
-export type EnrollmentCode = { code: string; expiresAt: string; gateId: string; label: string };
+export type EnrollmentCode = { id: string; code: string; expiresAt: string; gateId: string; label: string };
+/** A code made for a till that has not used it yet (the code itself is only shown once). */
+export type PendingEnrollment = { id: string; gateId: string; label: string; createdAt: string; expiresAt: string };
 
 export type TerminalStatus = {
   terminalId: string;

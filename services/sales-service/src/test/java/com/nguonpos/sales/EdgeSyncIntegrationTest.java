@@ -222,6 +222,23 @@ class EdgeSyncIntegrationTest {
         assertThat(ch.next("RELEASE").get("frozen").asBoolean()).isTrue();
     }
 
+    @Test
+    void codesWaitingForTheirTillAreListedAndCanBeCancelled() throws Exception {
+        String code = createCode("Caisse VIP");
+        HttpResponse<String> list = http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/devices/enrollment-codes"))
+                .header("Authorization", "Bearer " + adminToken()).GET().build(), HttpResponse.BodyHandlers.ofString());
+        JsonNode pending = null;
+        for (JsonNode c : JSON.readTree(list.body())) if (c.get("label").asString().equals("Caisse VIP")) pending = c;
+        assertThat(pending).as(list.body()).isNotNull();
+        assertThat(pending.get("gateId").asString()).isEqualTo(gate.toString());
+        assertThat(list.body()).doesNotContain(code); // only shown once, when created
+
+        HttpResponse<String> cancelled = http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/devices/enrollment-codes/" + pending.get("id").asString()))
+                .header("Authorization", "Bearer " + adminToken()).DELETE().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(cancelled.statusCode()).isEqualTo(204);
+        assertThat(enrollRequest(UUID.randomUUID(), code, ecKeys()).statusCode()).isEqualTo(403);
+    }
+
     HttpResponse<String> setTarget(String versionJson) throws Exception {
         return http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/releases/target"))
                 .header("Authorization", "Bearer " + adminToken()).header("Content-Type", "application/json")

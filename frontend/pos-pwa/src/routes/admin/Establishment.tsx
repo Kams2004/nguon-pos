@@ -5,7 +5,7 @@ import { useSession } from "../../context/SessionContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { api, errorMessage } from "../../lib/api/client";
 import type { AdminEstablishment, ReceiptMode } from "../../lib/api/types";
-import { CardHeader, Loading, PageHeader } from "../../components/ui";
+import { CardHeader, PageHeader, PageSkeleton } from "../../components/ui";
 import { ImageField } from "../../components/MediaLibrary";
 import { useI18n } from "../../i18n";
 
@@ -26,7 +26,7 @@ export default function Establishment() {
   }, [session]);
 
   if (!session) return null;
-  if (!data) return <Loading />;
+  if (!data) return <PageSkeleton stats={0} rows={6} />;
 
   const set = (patch: Partial<AdminEstablishment>) => {
     setSaved(false);

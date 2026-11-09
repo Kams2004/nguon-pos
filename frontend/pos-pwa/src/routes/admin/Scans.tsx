@@ -7,7 +7,7 @@ import { addDays, dayKey, formatDateTime, startOfDay } from "../../lib/format";
 import { useCatalog } from "../../lib/useCatalog";
 import { TicketTypeBadge } from "../../lib/ticketIcons";
 import { Pagination } from "../../components/Pagination";
-import { Loading, PageHeader, Pill, RefreshButton, StatCard } from "../../components/ui";
+import { PageHeader, PageSkeleton, Pill, RefreshButton, StatCard } from "../../components/ui";
 import { locale, translate, useI18n, type MessageKey } from "../../i18n";
 
 /** Read at render time, so it follows the current language. */
@@ -74,7 +74,7 @@ export default function Scans() {
   useLiveRefresh(["SCANS_CHANGED"], load);
 
   if (!session) return null;
-  if (!scans) return <Loading />;
+  if (!scans) return <PageSkeleton stats={4} rows={8} />;
 
   const active = Object.values(filters).some(Boolean);
   const setFilter = (patch: Partial<Filters>) => {

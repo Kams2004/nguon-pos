@@ -136,13 +136,101 @@ export function CardHeader({ title, action }: { title: string; action?: ReactNod
   );
 }
 
-export function Loading() {
+/** A placeholder block, shimmering while the real content loads. */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <span aria-hidden className={`skeleton block ${className}`} />;
+}
+
+// Varied widths, so the placeholder reads as text rather than a grid of bars.
+const SKELETON_WIDTHS = ["w-3/4", "w-1/2", "w-2/3", "w-5/6", "w-2/5", "w-3/5"];
+
+function Busy({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-secondary/30 border-t-secondary" />
-      Chargement…
+    <div role="status" aria-busy="true" aria-label={translate("common.loading")} className={className}>
+      {children}
     </div>
   );
+}
+
+/** Rows of a table or list still loading. */
+export function SkeletonRows({ rows = 6, cols = 4, avatar = false }: { rows?: number; cols?: number; avatar?: boolean }) {
+  return (
+    <Busy className="divide-y divide-border/60">
+      {Array.from({ length: rows }, (_, r) => (
+        <div key={r} className="flex items-center gap-5 px-5 py-4">
+          {avatar && <Skeleton className="h-8 w-8 flex-shrink-0 rounded-full" />}
+          {Array.from({ length: cols }, (_, c) => (
+            <div key={c} className={c === 0 ? "flex-[1.6]" : "flex-1"}>
+              <Skeleton className={`h-3.5 ${SKELETON_WIDTHS[(r * 2 + c) % SKELETON_WIDTHS.length]}`} />
+              {c === 0 && <Skeleton className="mt-2 h-2.5 w-1/3" />}
+            </div>
+          ))}
+        </div>
+      ))}
+    </Busy>
+  );
+}
+
+/** Cards of a grid still loading. */
+export function SkeletonCards({
+  count = 3,
+  className = "grid gap-4 sm:grid-cols-2 xl:grid-cols-3",
+}: {
+  count?: number;
+  className?: string;
+}) {
+  return (
+    <Busy className={className}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="card space-y-4 p-5">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-11 w-11 rounded-xl" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className={`h-4 ${SKELETON_WIDTHS[i % SKELETON_WIDTHS.length]}`} />
+              <Skeleton className="h-2.5 w-1/4" />
+            </div>
+          </div>
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-3 w-2/3" />
+        </div>
+      ))}
+    </Busy>
+  );
+}
+
+/** A whole page still loading: header, key figures, then a list. */
+export function PageSkeleton({ stats = 4, rows = 6 }: { stats?: number; rows?: number }) {
+  return (
+    <Busy className="space-y-6">
+      <div className="masthead">
+        <div className="relative space-y-2.5 px-6 py-6 sm:px-7">
+          <span className="block h-7 w-56 rounded-md bg-white/20" />
+          <span className="block h-3.5 w-80 max-w-full rounded-md bg-white/15" />
+        </div>
+      </div>
+      {stats > 0 && (
+        <div className="stat-strip">
+          {Array.from({ length: stats }, (_, i) => (
+            <div key={i} className="space-y-3 p-5">
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-7 w-2/3" />
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="card overflow-hidden">
+        <div className="px-5 pb-3 pt-4">
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <SkeletonRows rows={rows} />
+      </div>
+    </Busy>
+  );
+}
+
+/** Content still loading, inside a card: rows of placeholders. */
+export function Loading({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return <SkeletonRows rows={rows} cols={cols} />;
 }
 
 export function Empty({ children }: { children: ReactNode }) {

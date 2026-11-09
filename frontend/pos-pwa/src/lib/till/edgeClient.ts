@@ -62,6 +62,8 @@ export type EdgeStatus = {
   enrolled: boolean;
   revoked: boolean;
   deviceNo: number | null;
+  /** The till's name, given in the back office when its code was made. */
+  deviceLabel: string | null;
   channelConnected: boolean;
   /** The installed version ("dev" from source) and the automatic update's progress. */
   appVersion: string;

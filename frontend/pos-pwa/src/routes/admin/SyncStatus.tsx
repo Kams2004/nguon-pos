@@ -5,7 +5,7 @@ import { useLiveEvents, useLiveRefresh, useSession } from "../../context/Session
 import { api } from "../../lib/api/client";
 import type { AdminGate, TerminalStatus } from "../../lib/api/types";
 import { timeAgo, useNow } from "../../lib/useNow";
-import { Loading, PageHeader, Pill, RefreshButton, StatCard } from "../../components/ui";
+import { PageHeader, Pill, RefreshButton, SkeletonCards, StatCard } from "../../components/ui";
 import { TerminalState } from "../../components/TerminalState";
 import { useI18n } from "../../i18n";
 
@@ -155,7 +155,7 @@ export default function SyncStatus() {
       </div>
 
       {terminals === null ? (
-        <Loading />
+        <SkeletonCards count={6} />
       ) : filtered.length === 0 ? (
         <p className="card p-8 text-center text-sm text-muted-foreground">{t("reports.tills.noMatch")}</p>
       ) : view === "cards" ? (

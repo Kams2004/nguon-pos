@@ -39,6 +39,19 @@ public class DeviceAdminController {
         return registry.createCode(establishmentOf(claims), req.gateId(), req.label() == null ? "" : req.label().strip(), claims);
     }
 
+    @GetMapping("/enrollment-codes")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'COORDINATOR')")
+    public List<Map<String, Object>> pendingCodes(@AuthenticationPrincipal Claims claims) {
+        return registry.pendingCodes(establishmentOf(claims));
+    }
+
+    @DeleteMapping("/enrollment-codes/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<Void> cancelCode(@AuthenticationPrincipal Claims claims, @PathVariable UUID id) {
+        registry.cancelCode(establishmentOf(claims), id, claims);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/revoke")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<Void> revoke(@AuthenticationPrincipal Claims claims, @PathVariable UUID id) {
