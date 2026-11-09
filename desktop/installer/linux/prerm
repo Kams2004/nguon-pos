@@ -3,10 +3,11 @@
 set -e
 case "$1" in
   remove|deconfigure)
-    systemctl stop nguon-edge.service || true
-    systemctl disable nguon-edge.service >/dev/null 2>&1 || true
+    systemctl stop nguon-edge.service nguon-updater.path || true
+    systemctl disable nguon-edge.service nguon-updater.path >/dev/null 2>&1 || true
     ;;
   upgrade)
+    # The watcher stays: an automatic update runs inside nguon-updater.service.
     systemctl stop nguon-edge.service || true
     ;;
 esac

@@ -1,0 +1,58 @@
+#!/bin/sh
+# Nguon POS updater (root). The till's local server runs unprivileged as
+# "nguon-edge": when it has downloaded a new version and the till is quiet,
+# it writes /var/lib/nguon-edge/updates/ready, which starts this script
+# (nguon-updater.path). Nothing from that folder is trusted: the package is
+# copied to a root-only folder and checked again — SHA-256, the Nguon POS
+# release signature, package name and version, newer than installed —
+# before dpkg installs it. Data in /var/lib/nguon-edge is not touched.
+set -eu
+SRC=/var/lib/nguon-edge/updates
+WORK=/var/lib/nguon-updater
+KEY=/usr/lib/nguon-pos-updater/release-signing.pub
+RESULT=$SRC/last-result
+umask 077
+
+result() {
+  printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" > "$WORK/last-result"
+  if [ -d "$SRC" ] && [ ! -L "$SRC" ]; then
+    rm -f "$RESULT"
+    cp "$WORK/last-result" "$RESULT" && chown nguon-edge:nguon-edge "$RESULT" && chmod 0644 "$RESULT" || true
+  fi
+  logger -t nguon-updater "$1" || true
+}
+fail() { result "FAILED $1"; rm -f "$WORK/update.deb"; exit 1; }
+
+install -d -m 0700 -o root -g root "$WORK"
+[ -e "$SRC/ready" ] || exit 0
+# Take the request: copy without following links, then make sure it was a plain file.
+rm -f "$WORK/ready"
+cp -P -- "$SRC/ready" "$WORK/ready"; rm -f -- "$SRC/ready"
+[ -f "$WORK/ready" ] && [ ! -L "$WORK/ready" ] || fail "request is not a regular file"
+
+field() { sed -n "s/^$1=//p" "$WORK/ready" | head -n 1; }
+VERSION=$(field version); SHA=$(field sha256); SIG=$(field signature); NAME=$(field file)
+printf '%s' "$VERSION" | grep -Eqx '[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}' || fail "bad version"
+printf '%s' "$SHA" | grep -Eqx '[0-9a-f]{64}' || fail "bad hash"
+printf '%s' "$SIG" | grep -Eqx '[A-Za-z0-9+/]{86}==' || fail "bad signature format"
+[ "$NAME" = "nguon-pos_${VERSION}_amd64.deb" ] || fail "unexpected file name"
+
+rm -f "$WORK/update.deb"
+cp -P -- "$SRC/$NAME" "$WORK/update.deb" || fail "package missing"
+[ -f "$WORK/update.deb" ] && [ ! -L "$WORK/update.deb" ] || fail "package is not a regular file"
+[ "$(sha256sum "$WORK/update.deb" | cut -d ' ' -f 1)" = "$SHA" ] || fail "SHA-256 mismatch"
+printf 'nguon-pos|%s|linux-deb|%s' "$VERSION" "$SHA" > "$WORK/message"
+printf '%s' "$SIG" | base64 -d > "$WORK/signature"
+openssl pkeyutl -verify -pubin -inkey "$KEY" -rawin -in "$WORK/message" -sigfile "$WORK/signature" >/dev/null 2>&1 \
+  || fail "release signature invalid"
+[ "$(dpkg-deb -f "$WORK/update.deb" Package)" = nguon-pos ] || fail "not the nguon-pos package"
+[ "$(dpkg-deb -f "$WORK/update.deb" Version)" = "$VERSION" ] || fail "package version differs from the signed one"
+INSTALLED=$(dpkg-query -W -f '${Version}' nguon-pos 2>/dev/null || echo 0)
+if ! dpkg --compare-versions "$VERSION" gt "$INSTALLED"; then
+  result "SKIPPED $VERSION is not newer than the installed $INSTALLED"; rm -f "$WORK/update.deb"; exit 0
+fi
+
+result "INSTALLING $VERSION (was $INSTALLED)"
+DEBIAN_FRONTEND=noninteractive dpkg -i "$WORK/update.deb" > "$WORK/dpkg.log" 2>&1 || fail "dpkg: $(tail -n 3 "$WORK/dpkg.log" | tr '\n' ' ')"
+rm -f "$WORK/update.deb" "$SRC/$NAME"
+result "INSTALLED $VERSION"

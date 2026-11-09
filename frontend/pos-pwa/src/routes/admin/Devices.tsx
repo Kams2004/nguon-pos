@@ -9,6 +9,7 @@ import type { Device, EnrollmentCode } from "../../lib/api/types";
 import { formatDateTime } from "../../lib/format";
 import { useCatalog } from "../../lib/useCatalog";
 import { CardHeader, Loading, PageHeader, Pill, RefreshButton } from "../../components/ui";
+import { ReleasesCard } from "./Releases";
 
 /** Desktop tills: enrollment codes, what is installed where, revocation. */
 export default function Devices() {
@@ -200,6 +201,8 @@ export default function Devices() {
           </div>
         )}
       </div>
+
+      <ReleasesCard devices={devices} />
     </>
   );
 }

@@ -47,7 +47,8 @@ public class LocalApiController {
     private final Enrollment enrollment;
 
     public LocalApiController(LocalAuth auth, TillService till, Catalog catalog, Uplink uplink, DeviceIdentity device, LiveEvents live,
-                              EdgeProperties props, JdbcTemplate jdbc, JsonMapper json, EdgeChannel channel, Enrollment enrollment) {
+                              EdgeProperties props, JdbcTemplate jdbc, JsonMapper json, EdgeChannel channel, Enrollment enrollment, com.nguonpos.edge.update.Updater updater) {
+        this.updater = updater;
         this.channel = channel;
         this.enrollment = enrollment;
         this.auth = auth;
@@ -60,6 +61,8 @@ public class LocalApiController {
         this.jdbc = jdbc;
         this.json = json;
     }
+
+    private final com.nguonpos.edge.update.Updater updater;
 
     @GetMapping("/status")
     public Map<String, Object> status() {
@@ -75,6 +78,8 @@ public class LocalApiController {
         s.put("channelConnected", channel.connected());
         s.put("lastSyncAt", uplink.lastSyncAt());
         s.put("pending", uplink.pendingCount());
+        s.put("appVersion", updater.currentVersion());
+        s.put("update", updater.status());
         return s;
     }
 

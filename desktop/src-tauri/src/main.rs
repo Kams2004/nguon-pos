@@ -31,9 +31,16 @@ fn edge_ui_token() -> Result<String, String> {
         .map_err(|e| format!("EDGE_TOKEN_UNREADABLE: {e}"))
 }
 
+/// After an automatic update (Ubuntu), the window still runs the old
+/// screens: the till restarts itself into the new version.
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![edge_ui_token])
+        .invoke_handler(tauri::generate_handler![edge_ui_token, restart_app])
         .run(tauri::generate_context!())
         .expect("Nguon POS failed to start");
 }

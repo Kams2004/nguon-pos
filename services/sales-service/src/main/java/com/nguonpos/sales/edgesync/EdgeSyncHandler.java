@@ -1,5 +1,6 @@
 package com.nguonpos.sales.edgesync;
 
+import com.nguonpos.sales.device.DeviceRegistry;
 import com.nguonpos.sales.device.DeviceRegistry.Device;
 import com.nguonpos.sales.sync.HeartbeatRequest;
 import com.nguonpos.sales.sync.PresenceService;
@@ -40,8 +41,10 @@ public class EdgeSyncHandler extends TextWebSocketHandler {
     private final EdgeIngest ingest;
     private final PresenceService presence;
     private final JsonMapper json;
+    private final DeviceRegistry registry;
 
-    public EdgeSyncHandler(EdgeSessions sessions, EdgeIngest ingest, PresenceService presence, JsonMapper json) {
+    public EdgeSyncHandler(EdgeSessions sessions, EdgeIngest ingest, PresenceService presence, JsonMapper json, DeviceRegistry registry) {
+        this.registry = registry;
         this.sessions = sessions;
         this.ingest = ingest;
         this.presence = presence;
@@ -65,6 +68,7 @@ public class EdgeSyncHandler extends TextWebSocketHandler {
                     sessions.send(live, Map.of("t", "UPGRADE_REQUIRED", "p", PROTOCOL));
                     return;
                 }
+                registry.reportVersion(device.id(), frame.path("appVersion").asString(null), frame.path("os").asString(null));
                 sessions.send(live, Map.of("t", "WELCOME", "p", PROTOCOL, "serverTime", Instant.now().toString(),
                         "deviceNo", device.deviceNo(), "watermark", ingest.watermark(device.id())));
                 sessions.start(live, frame.path("catalogVersion").asString(null), frame.path("usersVersion").asString(null),

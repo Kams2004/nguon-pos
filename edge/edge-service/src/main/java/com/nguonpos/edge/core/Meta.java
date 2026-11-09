@@ -27,6 +27,10 @@ public class Meta {
         jdbc.update("INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", key, value);
     }
 
+    public void remove(String key) {
+        jdbc.update("DELETE FROM meta WHERE k = ?", key);
+    }
+
     /** Next value of a counter; call inside the transaction that uses it. */
     public long increment(String key) {
         jdbc.update("INSERT INTO meta (k, v) VALUES (?, '1') ON CONFLICT (k) DO UPDATE SET v = CAST(v AS INTEGER) + 1", key);

@@ -167,6 +167,10 @@ export type Device = {
   lastSeenAt: string | null;
 };
 
+export type ReleaseFile = { platform: "linux-deb" | "windows-nsis" | string; url: string; sha256: string; size: number };
+export type Release = { version: string; notes: string | null; files: ReleaseFile[]; createdAt: string };
+export type ReleaseOverview = { releases: Release[]; targetVersion: string | null };
+
 export type EnrollmentCode = { code: string; expiresAt: string; gateId: string; label: string };
 
 export type TerminalStatus = {

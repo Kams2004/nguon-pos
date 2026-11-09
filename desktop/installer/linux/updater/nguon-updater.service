@@ -1,0 +1,9 @@
+[Unit]
+Description=Nguon POS — install a verified update
+# Started by nguon-updater.path; the script re-checks the signature itself.
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /usr/lib/nguon-pos-updater/nguon-updater
+TimeoutStartSec=15min

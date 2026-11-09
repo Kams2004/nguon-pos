@@ -31,3 +31,6 @@ frontend/pos-pwa/dist-desktop/
 
 # Device CA material and other secrets
 secrets/
+
+# Till installers published to the VPS (deploy/release/publish-release.sh)
+/releases/

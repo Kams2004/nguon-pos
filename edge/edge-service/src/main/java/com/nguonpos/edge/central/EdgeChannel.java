@@ -8,6 +8,8 @@ import com.nguonpos.edge.core.LiveEvents;
 import com.nguonpos.edge.core.LocalAuth;
 import com.nguonpos.edge.core.Meta;
 import com.nguonpos.edge.till.TillService;
+import com.nguonpos.edge.update.AppVersion;
+import com.nguonpos.edge.update.Updater;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +74,7 @@ public class EdgeChannel {
     private final Meta meta;
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
+    private final Updater updater;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> new Thread(r, "edge-channel"));
 
     private volatile WebSocket ws;
@@ -84,7 +87,8 @@ public class EdgeChannel {
     private final StringBuilder partial = new StringBuilder();
 
     public EdgeChannel(EdgeProperties props, Enrollment enrollment, DeviceIdentity device, EventLog eventLog, Catalog catalog,
-                       LocalAuth auth, TillService till, LiveEvents live, Meta meta, JdbcTemplate jdbc, JsonMapper json) {
+                       LocalAuth auth, TillService till, LiveEvents live, Meta meta, JdbcTemplate jdbc, JsonMapper json, Updater updater) {
+        this.updater = updater;
         this.props = props;
         this.enrollment = enrollment;
         this.device = device;
@@ -121,6 +125,7 @@ public class EdgeChannel {
             status.put("t", "STATUS");
             status.put("pending", eventLog.pendingCount(EventLog.SALE) + eventLog.pendingCount(EventLog.SCAN));
             if (activeUserId != null) status.put("userId", activeUserId);
+            status.put("update", updater.status().get("state"));
             worker.execute(() -> send(status));
         }
     }
@@ -148,7 +153,8 @@ public class EdgeChannel {
                         Map<String, Object> hello = new HashMap<>();
                         hello.put("t", "HELLO");
                         hello.put("p", PROTOCOL);
-                        hello.put("appVersion", "edge");
+                        hello.put("appVersion", updater.currentVersion());
+                        hello.put("os", AppVersion.os());
                         hello.put("feedCursor", meta.get("feed_cursor").map(Long::parseLong).orElse(-1L));
                         meta.get("catalog_version").ifPresent(v -> hello.put("catalogVersion", v));
                         meta.get("users_version").ifPresent(v -> hello.put("usersVersion", v));
@@ -221,6 +227,7 @@ public class EdgeChannel {
                     send(Map.of("t", "FEED_ACK", "cursor", last));
                 }
             }
+            case "RELEASE" -> updater.onRelease(f);
             case "UPGRADE_REQUIRED" -> log.warn("Central needs a newer till version (protocol {}): working offline until updated", f.path("p"));
             default -> log.debug("Ignored frame {}", f.path("t"));
         }

@@ -1,0 +1,9 @@
+[Unit]
+Description=Nguon POS — watch for a downloaded update
+
+[Path]
+PathExists=/var/lib/nguon-edge/updates/ready
+Unit=nguon-updater.service
+
+[Install]
+WantedBy=multi-user.target

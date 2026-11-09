@@ -63,6 +63,13 @@ export type EdgeStatus = {
   revoked: boolean;
   deviceNo: number | null;
   channelConnected: boolean;
+  /** The installed version ("dev" from source) and the automatic update's progress. */
+  appVersion: string;
+  update: {
+    state: "UP_TO_DATE" | "DOWNLOADING" | "READY" | "INSTALLING" | "FAILED" | "UNSUPPORTED";
+    targetVersion: string | null;
+    error: string | null;
+  };
 };
 
 export type EdgeUser = { id: string; username: string; fullName: string; role: Role; assignedGateId: string };

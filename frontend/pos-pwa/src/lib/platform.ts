@@ -12,3 +12,28 @@ export function isEdgeMode(): boolean {
 
 /** The local server's address on this machine. */
 export const EDGE_URL: string = import.meta.env.VITE_EDGE_URL ?? "http://127.0.0.1:47300";
+
+type TauriInternals = { invoke: <T>(cmd: string, args?: Record<string, unknown>) => Promise<T> };
+
+function tauri(): TauriInternals | undefined {
+  return (window as unknown as { __TAURI_INTERNALS__?: TauriInternals }).__TAURI_INTERNALS__;
+}
+
+/** The desktop shell (Tauri): its own version, and a restart into a newly installed one. */
+export const desktopApp = {
+  available: () => tauri() !== undefined,
+  version: async (): Promise<string | null> => (await tauri()?.invoke<string>("plugin:app|version")) ?? null,
+  restart: async (): Promise<void> => {
+    await tauri()?.invoke("restart_app");
+  },
+};
+
+/** "0.2.0" > "0.1.9"; anything that isn't MAJOR.MINOR.PATCH ("dev") never counts as newer. */
+export function isNewerVersion(candidate: string | null | undefined, current: string | null | undefined): boolean {
+  const parse = (v: string | null | undefined) => (v && /^\d+\.\d+\.\d+$/.test(v) ? v.split(".").map(Number) : null);
+  const a = parse(candidate);
+  const b = parse(current);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+}

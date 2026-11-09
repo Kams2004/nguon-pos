@@ -4,7 +4,7 @@
 set -e
 case "$1" in
   purge)
-    rm -rf /var/lib/nguon-edge /etc/systemd/system/nguon-edge.service.d
+    rm -rf /var/lib/nguon-edge /var/lib/nguon-updater /etc/systemd/system/nguon-edge.service.d
     if id nguon-edge >/dev/null 2>&1; then deluser --system nguon-edge >/dev/null 2>&1 || true; fi
     systemctl daemon-reload || true
     ;;

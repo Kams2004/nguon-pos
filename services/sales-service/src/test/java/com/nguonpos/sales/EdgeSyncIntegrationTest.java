@@ -199,6 +199,34 @@ class EdgeSyncIntegrationTest {
         assertThat(refused).isNotNull();
     }
 
+    @Test
+    void tillsAreToldWhichVersionToRunAndAFreezeHoldsThem() throws Exception {
+        jdbc.update("""
+                INSERT INTO sales.release (version, notes, files) VALUES ('0.9.0', 'Notes',
+                  '[{"platform":"linux-deb","url":"/releases/0.9.0/nguon-pos_0.9.0_amd64.deb","sha256":"%s","signature":"s","size":1}]')
+                ON CONFLICT (version) DO NOTHING""".formatted("ab".repeat(32)));
+        Till till = enroll("Caisse V");
+        Channel ch = till.connect();
+        assertThat(ch.next("RELEASE").get("frozen").asBoolean()).isTrue(); // nothing published yet
+        assertThat(jdbc.queryForObject("SELECT app_version FROM sales.device WHERE id = ?", String.class, till.id)).isEqualTo("test");
+
+        assertThat(setTarget("\"0.9.0\"").statusCode()).isEqualTo(200);
+        JsonNode release = ch.next("RELEASE").get("release");
+        assertThat(release.get("version").asString()).isEqualTo("0.9.0");
+        assertThat(release.get("files").get(0).get("platform").asString()).isEqualTo("linux-deb");
+
+        assertThat(setTarget("\"7.7.7\"").statusCode()).isEqualTo(404); // not a registered version
+        assertThat(setTarget("\"1;DROP\"").statusCode()).isEqualTo(400);
+        assertThat(setTarget("null").statusCode()).isEqualTo(200);
+        assertThat(ch.next("RELEASE").get("frozen").asBoolean()).isTrue();
+    }
+
+    HttpResponse<String> setTarget(String versionJson) throws Exception {
+        return http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/releases/target"))
+                .header("Authorization", "Bearer " + adminToken()).header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString("{\"version\":" + versionJson + "}")).build(), HttpResponse.BodyHandlers.ofString());
+    }
+
     // ── tills ────────────────────────────────────────────────────────────
 
     class Till {

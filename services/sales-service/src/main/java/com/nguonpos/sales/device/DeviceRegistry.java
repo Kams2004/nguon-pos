@@ -140,6 +140,13 @@ public class DeviceRegistry {
                         rs.getString(5), rs.getString(6)), DeviceCertificateAuthority.fingerprint(cert)).stream().findFirst();
     }
 
+    /** The version a till says it runs (HELLO), shown in "Appareils". */
+    public void reportVersion(UUID deviceId, String appVersion, String os) {
+        if (appVersion == null || appVersion.isBlank()) return;
+        jdbc.update("UPDATE sales.device SET app_version = ?, os = COALESCE(?, os) WHERE id = ?",
+                appVersion.length() > 40 ? appVersion.substring(0, 40) : appVersion, os != null && os.length() > 100 ? os.substring(0, 100) : os, deviceId);
+    }
+
     /** Any device, active or not (records it signed before a revocation stay verifiable). */
     public Optional<Device> byId(UUID deviceId) {
         return jdbc.query("SELECT id, establishment_id, gate_id, device_no, label, public_key FROM sales.device WHERE id = ?",

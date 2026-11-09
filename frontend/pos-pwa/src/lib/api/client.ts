@@ -1,5 +1,6 @@
 import type {
   Device,
+  ReleaseOverview,
   EnrollmentCode,
   DirectoryUser,
   SubscriptionOverview,
@@ -180,6 +181,19 @@ export const api = {
 
   revokeDevice(token: string, id: string): Promise<void> {
     return request(`${SALES_BASE}/sales/admin/devices/${encodeURIComponent(id)}/revoke`, { method: "POST", headers: authHeader(token) });
+  },
+
+  listReleases(token: string): Promise<ReleaseOverview> {
+    return request(`${SALES_BASE}/sales/admin/releases`, { headers: authHeader(token) });
+  },
+
+  /** Publish a version to the establishment's tills, or freeze them where they are (null). */
+  setReleaseTarget(token: string, version: string | null): Promise<ReleaseOverview> {
+    return request(`${SALES_BASE}/sales/admin/releases/target`, {
+      method: "PUT",
+      headers: authHeader(token),
+      body: JSON.stringify({ version }),
+    });
   },
 
   syncStatus(token: string): Promise<TerminalStatus[]> {

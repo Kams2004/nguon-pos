@@ -26,9 +26,24 @@
     IntCmp $0 60 nguon_token_ready nguon_wait_token nguon_token_ready
   nguon_token_ready:
   nsExec::Exec 'icacls "$COMMONAPPDATA\NguonPOS\edge\ui-token" /grant "*S-1-5-32-545:R"'
+  ; A "Nguon POS" icon on the desktop of every account (perMachine: the
+  ; public desktop), also restored by updates if someone deleted it.
+  SetShellVarContext all
+  CreateShortCut "$DESKTOP\Nguon POS.lnk" "$INSTDIR\nguon-pos.exe" "" "$INSTDIR\nguon-pos.exe" 0
+  ; Automatic updates run this installer silently from a SYSTEM task, which
+  ; closes the till app. This task reopens it in the session of whoever is
+  ; logged on (group Users, by SID).
+  nsExec::Exec `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$$a = New-ScheduledTaskAction -Execute '$INSTDIR\nguon-pos.exe'; $$p = New-ScheduledTaskPrincipal -GroupId 'S-1-5-32-545' -RunLevel Limited; Register-ScheduledTask -TaskPath '\NguonPOS\' -TaskName 'Launch' -Action $$a -Principal $$p -Force | Out-Null"`
+  IfSilent 0 nguon_not_silent
+    nsExec::Exec 'schtasks /Run /TN "NguonPOS\Launch"'
+  nguon_not_silent:
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
   nsExec::Exec '"$INSTDIR\edge\nguon-edge.exe" stop'
   nsExec::Exec '"$INSTDIR\edge\nguon-edge.exe" uninstall'
+  nsExec::Exec 'schtasks /Delete /TN "NguonPOS\Launch" /F'
+  nsExec::Exec 'schtasks /Delete /TN "NguonPOS\Update" /F'
+  SetShellVarContext all
+  Delete "$DESKTOP\Nguon POS.lnk"
 !macroend

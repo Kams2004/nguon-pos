@@ -6,6 +6,7 @@ import { useBranding } from "../../context/BrandingContext";
 import { useI18n } from "../../i18n";
 import { EdgeError } from "../../lib/till/edgeClient";
 import { EnrollmentBanner } from "../../components/EnrollmentBanner";
+import { UpdateNotice } from "../../components/UpdateNotice";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 const REMEMBER_KEY = "nguon-pos.rememberedUsername";
@@ -88,6 +89,7 @@ export default function Login() {
           </div>
 
           <EnrollmentBanner />
+          <UpdateNotice auto tone="dark" />
           {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-destructive">{error}</div>}
 
           <div>

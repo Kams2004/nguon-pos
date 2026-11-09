@@ -27,6 +27,7 @@ import java.util.Set;
 public class LocalAccessFilter extends OncePerRequestFilter {
 
     public static final String USER = "edge.user";
+    private final com.nguonpos.edge.core.Activity activity;
     public static final String TOKEN = "edge.session";
     private static final Set<String> NO_SESSION = Set.of("/local/v1/status", "/local/v1/auth/login", "/local/v1/enroll");
 
@@ -34,7 +35,8 @@ public class LocalAccessFilter extends OncePerRequestFilter {
     private final UiToken uiToken;
     private final LocalAuth auth;
 
-    public LocalAccessFilter(EdgeProperties props, UiToken uiToken, LocalAuth auth) {
+    public LocalAccessFilter(EdgeProperties props, UiToken uiToken, LocalAuth auth, com.nguonpos.edge.core.Activity activity) {
+        this.activity = activity;
         this.props = props;
         this.uiToken = uiToken;
         this.auth = auth;
@@ -84,6 +86,8 @@ public class LocalAccessFilter extends OncePerRequestFilter {
             req.setAttribute(USER, user.get());
             req.setAttribute(TOKEN, session);
         }
+        // Someone is using the till: an update waits (reads and the event stream don't count).
+        if (!"GET".equals(req.getMethod())) activity.touch();
         chain.doFilter(req, res);
     }
 }

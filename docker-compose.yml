@@ -102,6 +102,8 @@ services:
       # testing, or hitting the VPS by bare IP).
       - ./nginx/pos.nguonevents.com.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
+      # Signed till installers, uploaded by deploy/release/publish-release.sh.
+      - ./releases:/usr/share/nginx/releases:ro
     # On the shared VPS: POS_HTTP_BIND=127.0.0.1:8090, behind the host's
     # nginx (TLS for pos.nguonevents.com). Locally it defaults to :8081.
     ports:

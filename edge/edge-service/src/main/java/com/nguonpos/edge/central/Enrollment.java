@@ -70,7 +70,7 @@ public class Enrollment {
         body.put("csrPem", csr(device.keyPair()));
         body.put("label", label == null ? "" : label.strip());
         body.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version"));
-        body.put("appVersion", Optional.ofNullable(Enrollment.class.getPackage().getImplementationVersion()).orElse("dev"));
+        body.put("appVersion", com.nguonpos.edge.update.AppVersion.current());
         CentralClient.Response res;
         try {
             res = central.enroll(body);

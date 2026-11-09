@@ -1,6 +1,7 @@
 package com.nguonpos.sales.edgesync;
 
 import com.nguonpos.sales.device.DeviceRegistry.Device;
+import com.nguonpos.sales.release.Releases;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -42,8 +43,10 @@ public class EdgeSessions {
     private final EdgeFeed feed;
     private final InternalClients internal;
     private final JsonMapper json;
+    private final Releases releases;
 
-    public EdgeSessions(EdgeFeed feed, InternalClients internal, JsonMapper json) {
+    public EdgeSessions(EdgeFeed feed, InternalClients internal, JsonMapper json, Releases releases) {
+        this.releases = releases;
         this.feed = feed;
         this.internal = internal;
         this.json = json;
@@ -81,6 +84,7 @@ public class EdgeSessions {
         live.cursor().set(cursor < 0 ? feed.head(live.device().gateId()) : cursor);
         sendCatalog(live, internal.gateConfig(live.device().establishmentId(), live.device().gateId()), catalogVersion);
         sendUsers(live, internal.gateUsers(live.device().establishmentId(), live.device().gateId()), usersVersion);
+        sendRelease(live);
         pump(live);
     }
 
@@ -107,6 +111,16 @@ public class EdgeSessions {
             JsonNode users = internal.gateUsers(lives.getFirst().device().establishmentId(), gate);
             lives.forEach(l -> sendUsers(l, users, null));
         });
+    }
+
+    /** The version the establishment deploys changed (or was frozen): tell its connected tills. */
+    public void releaseChanged(UUID establishmentId) {
+        byDevice.values().stream().filter(l -> l.device().establishmentId().equals(establishmentId)).forEach(this::sendRelease);
+    }
+
+    private void sendRelease(Live live) {
+        var target = releases.targetRelease(live.device().establishmentId());
+        send(live, target.<Object>map(r -> Map.of("t", "RELEASE", "release", r)).orElse(Map.of("t", "RELEASE", "frozen", true)));
     }
 
     public String userName(UUID gateId, String userId) {

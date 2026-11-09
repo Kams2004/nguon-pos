@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Nguon POS",
   "mainBinaryName": "nguon-pos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.nguonevents.pos",
   "build": {
     "frontendDist": "../../frontend/pos-pwa/dist-desktop",
@@ -26,23 +26,40 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "nsis"],
+    "targets": [
+      "deb",
+      "nsis"
+    ],
     "publisher": "Nguon POS",
     "category": "Business",
     "shortDescription": "Billetterie et caisse du festival Nguon",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png", "icons/icon.ico"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
     "resources": {
       "../build/edge/edge-service.jar": "edge/edge-service.jar",
-      "../build/edge/jre/": "edge/jre/"
+      "../build/edge/jre/": "edge/jre/",
+      "../build/edge/VERSION": "edge/VERSION"
     },
     "linux": {
       "deb": {
         "files": {
-          "/lib/systemd/system/nguon-edge.service": "../installer/linux/nguon-edge.service"
+          "/lib/systemd/system/nguon-edge.service": "../installer/linux/nguon-edge.service",
+          "/lib/systemd/system/nguon-updater.path": "../installer/linux/updater/nguon-updater.path",
+          "/lib/systemd/system/nguon-updater.service": "../installer/linux/updater/nguon-updater.service",
+          "/usr/lib/nguon-pos-updater/nguon-updater": "../installer/linux/updater/nguon-updater",
+          "/usr/lib/nguon-pos-updater/release-signing.pub": "../installer/linux/updater/release-signing.pub"
         },
         "postInstallScript": "../installer/linux/postinst",
         "preRemoveScript": "../installer/linux/prerm",
-        "postRemoveScript": "../installer/linux/postrm"
+        "postRemoveScript": "../installer/linux/postrm",
+        "depends": [
+          "openssl"
+        ]
       }
     },
     "windows": {

@@ -37,7 +37,12 @@ fi
 chown nguon-edge:nguon-edge "$DATA/ui-token"
 chmod 0644 "$DATA/ui-token"
 
+# Automatic updates: a root-only work folder for nguon-updater, and the
+# watcher that starts it when the local server has a verified download.
+install -d -m 0700 -o root -g root /var/lib/nguon-updater
+
 systemctl daemon-reload
-systemctl enable nguon-edge.service >/dev/null 2>&1 || true
+systemctl enable nguon-edge.service nguon-updater.path >/dev/null 2>&1 || true
+systemctl start nguon-updater.path || true
 systemctl restart nguon-edge.service
 exit 0
