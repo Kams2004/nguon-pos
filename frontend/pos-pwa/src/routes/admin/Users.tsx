@@ -2,26 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { useLiveEvents, useSession } from "../../context/SessionContext";
 import { useConfirm } from "../../context/ConfirmContext";
-import { api, errorMessage } from "../../lib/api/client";
-import type { AdminGate, AdminUser, AuditEntry, Role } from "../../lib/api/types";
+import { api } from "../../lib/api/client";
+import type { AdminGate, AdminUser, AuditEntry } from "../../lib/api/types";
 import { ROLE_LABELS } from "../../lib/format";
 import { Pagination, usePaged } from "../../components/Pagination";
-import { Avatar, Loading, Modal, PageHeader, Pill, RefreshButton, SearchInput } from "../../components/ui";
+import { Avatar, Loading, PageHeader, Pill, RefreshButton, SearchInput } from "../../components/ui";
 import { GuideButton } from "../../components/SetupGuide";
+import { UserFormModal } from "../../components/UserFormModal";
 import { useI18n } from "../../i18n";
-
-const ROLES: Role[] = ["CASHIER", "COORDINATOR", "SUPER_ADMIN"];
-
-type FormState = {
-  fullName: string;
-  username: string;
-  password: string;
-  role: Role;
-  gateId: string;
-  active: boolean;
-};
-
-const EMPTY_FORM: FormState = { fullName: "", username: "", password: "", role: "CASHIER", gateId: "", active: true };
 
 export default function Users() {
   const { t } = useI18n();
@@ -32,9 +20,6 @@ export default function Users() {
   const [query, setQuery] = useState("");
   // null = closed; "new" = create; a user = edit that user
   const [editing, setEditing] = useState<AdminUser | "new" | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!session) return;
@@ -58,68 +43,8 @@ export default function Users() {
   if (!session) return null;
 
   const gateName = (id: string | null) => (id ? (gates.find((g) => g.id === id)?.name ?? "?") : "—");
-  const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setError(null);
-    setEditing("new");
-  };
-  const openEdit = (u: AdminUser) => {
-    setForm({ fullName: u.fullName, username: u.username, password: "", role: u.role, gateId: u.assignedGateId ?? "", active: u.active });
-    setError(null);
-    setEditing(u);
-  };
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editing) return;
-    const isNew = editing === "new";
-    // The bold name sits where its placeholder is in the translated sentence.
-    const [beforeName, afterName] = (
-      isNew
-        ? t("settings.users.confirmCreateMessage", { role: ROLE_LABELS[form.role] })
-        : t(form.password ? "settings.users.confirmEditPasswordMessage" : "settings.users.confirmEditMessage")
-    ).split(isNew ? "{username}" : "{name}");
-    const ok = await confirm({
-      title: isNew ? t("settings.users.confirmCreateTitle") : t("settings.confirmSaveChanges"),
-      message: (
-        <>
-          {beforeName}
-          <b>{isNew ? form.username : form.fullName}</b>
-          {afterName}
-        </>
-      ),
-      confirmLabel: isNew ? t("settings.create") : t("common.save"),
-    });
-    if (!ok) return;
-    setSaving(true);
-    setError(null);
-    const assignedGateId = form.role === "SUPER_ADMIN" ? null : form.gateId || null;
-    try {
-      if (isNew) {
-        await api.createUser(session.token, {
-          username: form.username,
-          password: form.password,
-          fullName: form.fullName,
-          role: form.role,
-          assignedGateId,
-        });
-      } else {
-        await api.updateUser(session.token, editing.id, {
-          fullName: form.fullName,
-          role: form.role,
-          assignedGateId,
-          active: form.active,
-          password: form.password || undefined,
-        });
-      }
-      setEditing(null);
-      await load();
-    } catch (err) {
-      setError(errorMessage(err, isNew ? t("settings.users.createError") : t("settings.saveError")));
-    } finally {
-      setSaving(false);
-    }
-  };
+  const openCreate = () => setEditing("new");
+  const openEdit = (u: AdminUser) => setEditing(u);
 
   const toggleActive = async (u: AdminUser) => {
     const ok = await confirm({
@@ -134,8 +59,6 @@ export default function Users() {
     await api.updateUser(session.token, u.id, { fullName: u.fullName, role: u.role, assignedGateId: u.assignedGateId, active: !u.active });
     await load();
   };
-
-  const isSelf = editing !== null && editing !== "new" && editing.id === session.userId;
 
   return (
     <>
@@ -221,93 +144,15 @@ export default function Users() {
       </div>
 
       {editing && (
-        <Modal
-          title={editing === "new" ? t("settings.users.newUser") : t("settings.users.editTitle", { name: editing.fullName })}
+        <UserFormModal
+          editing={editing}
+          gates={gates}
           onClose={() => setEditing(null)}
-        >
-          <form onSubmit={submit} className="space-y-3">
-            {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
-            <div>
-              <label className="field-label">{t("settings.users.fullName")}</label>
-              <input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="field" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="field-label">{t("settings.users.col.username")}</label>
-                <input
-                  required
-                  disabled={editing !== "new"}
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
-                  className="field disabled:bg-muted disabled:text-muted-foreground"
-                  title={editing !== "new" ? t("settings.users.usernameLocked") : undefined}
-                />
-              </div>
-              <div>
-                <label className="field-label">{editing === "new" ? t("settings.users.password") : t("settings.users.newPassword")}</label>
-                <input
-                  required={editing === "new"}
-                  type="password"
-                  autoComplete="new-password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder={editing === "new" ? "" : t("settings.users.passwordPlaceholder")}
-                  className="field"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="field-label">{t("settings.users.col.role")}</label>
-                <select
-                  value={form.role}
-                  disabled={isSelf}
-                  onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-                  className="field disabled:bg-muted"
-                >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {form.role !== "SUPER_ADMIN" && (
-                <div>
-                  <label className="field-label">{t("settings.users.assignedGate")}</label>
-                  <select value={form.gateId} onChange={(e) => setForm({ ...form, gateId: e.target.value })} className="field">
-                    <option value="">—</option>
-                    {gates.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-            {editing !== "new" && !isSelf && (
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
-                  className="h-4 w-4 accent-[hsl(var(--secondary))]"
-                />
-                {t("settings.users.activeAccount")}
-              </label>
-            )}
-            {isSelf && <p className="text-[11px] text-muted-foreground">{t("settings.users.selfNote")}</p>}
-            <div className="flex gap-3 pt-1">
-              <button type="button" onClick={() => setEditing(null)} className="btn-outline flex-1">
-                {t("common.cancel")}
-              </button>
-              <button type="submit" disabled={saving} className="btn-gold flex-1">
-                {editing === "new" ? t("settings.users.createUser") : t("common.save")}
-              </button>
-            </div>
-          </form>
-        </Modal>
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
       )}
     </>
   );

@@ -3,7 +3,6 @@ package com.nguonpos.sales.device;
 import com.nguonpos.sales.edgesync.EdgeSessions;
 import io.jsonwebtoken.Claims;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
@@ -37,7 +36,7 @@ public class DeviceAdminController {
     @PostMapping("/enrollment-codes")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public DeviceRegistry.EnrollmentCode createCode(@AuthenticationPrincipal Claims claims, @Valid @RequestBody CodeRequest req) {
-        return registry.createCode(establishmentOf(claims), req.gateId(), req.label().strip(), claims);
+        return registry.createCode(establishmentOf(claims), req.gateId(), req.label() == null ? "" : req.label().strip(), claims);
     }
 
     @PostMapping("/{id}/revoke")
@@ -52,6 +51,7 @@ public class DeviceAdminController {
         return UUID.fromString(claims.get("establishmentId", String.class));
     }
 
-    public record CodeRequest(@NotNull UUID gateId, @NotBlank @Size(max = 200) String label) {
+    /** label is optional: without one the till is named "Caisse n° N" when it enrolls. */
+    public record CodeRequest(@NotNull UUID gateId, @Size(max = 200) String label) {
     }
 }

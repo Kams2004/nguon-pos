@@ -205,7 +205,8 @@ class EdgeSyncIntegrationTest {
                 INSERT INTO sales.release (version, notes, files) VALUES ('0.9.0', 'Notes',
                   '[{"platform":"linux-deb","url":"/releases/0.9.0/nguon-pos_0.9.0_amd64.deb","sha256":"%s","signature":"s","size":1}]')
                 ON CONFLICT (version) DO NOTHING""".formatted("ab".repeat(32)));
-        Till till = enroll("Caisse V");
+        Till till = enroll(""); // no name given: numbered
+        assertThat(jdbc.queryForObject("SELECT label FROM sales.device WHERE id = ?", String.class, till.id)).isEqualTo("Caisse n° " + till.deviceNo);
         Channel ch = till.connect();
         assertThat(ch.next("RELEASE").get("frozen").asBoolean()).isTrue(); // nothing published yet
         assertThat(jdbc.queryForObject("SELECT app_version FROM sales.device WHERE id = ?", String.class, till.id)).isEqualTo("test");

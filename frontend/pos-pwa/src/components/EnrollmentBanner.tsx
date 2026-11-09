@@ -16,7 +16,6 @@ export function EnrollmentBanner() {
   const [status, setStatus] = useState<EdgeStatus | null>(null);
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
-  const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,7 +35,7 @@ export function EnrollmentBanner() {
     setError(null);
     setBusy(true);
     try {
-      const r = await edge.enroll(code.trim(), label.trim());
+      const r = await edge.enroll(code.trim(), "");
       setDone(r.deviceNo);
     } catch (err) {
       const c = err instanceof EdgeError ? err.code : "";
@@ -86,10 +85,6 @@ export function EnrollmentBanner() {
                 placeholder="XXXX-XXXX-XX"
                 className="field text-center font-mono text-xl tracking-widest"
               />
-            </div>
-            <div>
-              <label className="field-label">{t("gate.enroll.label")}</label>
-              <input value={label} maxLength={200} onChange={(e) => setLabel(e.target.value)} className="field" />
             </div>
             {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
             <button type="submit" disabled={busy} className="btn-gold w-full">

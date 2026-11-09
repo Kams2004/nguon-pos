@@ -5,6 +5,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
+use tauri::Manager;
 
 /// Where the installer puts the local server's data (and its UI token).
 fn edge_data_dir() -> PathBuf {
@@ -39,7 +40,33 @@ fn restart_app(app: tauri::AppHandle) {
 }
 
 fn main() {
+    // WebKitGTK's DMA-BUF renderer paints a black window on a number of
+    // Ubuntu machines (some GPUs, Wayland). The plain renderer is enough for
+    // the till's screens. An explicit setting on the machine still wins.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     tauri::Builder::default()
+        // The window starts hidden (tauri.conf.json) and appears once the
+        // screens are drawn: no black or blank frame at startup.
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                let _ = webview.window().show();
+            }
+        })
+        .setup(|app| {
+            // Whatever happens to the page, never leave the till without a window.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(4));
+                if let Some(window) = handle.get_webview_window("main") {
+                    let _ = window.show();
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![edge_ui_token, restart_app])
         .run(tauri::generate_context!())
         .expect("Nguon POS failed to start");

@@ -14,12 +14,12 @@ export default defineMessages({
     "guide.gates.title": "Créer les portes",
     "guide.gates.where": "Portes & caisses",
     "guide.gates.body":
-      "Chaque porte reçoit automatiquement sa propre clé secrète qui signe les QR codes de ses billets : un billet vendu à une porte n'est pas accepté à une autre.",
+      "Un nom suffit (le code est proposé). Chaque porte reçoit sa propre clé qui signe les QR codes de ses billets : un billet vendu à une porte n'est pas accepté à une autre. Ensuite, sur la carte de la porte : « Ajouter un caissier » et « Enrôler une caisse ».",
 
     "guide.ticketTypes.title": "Créer les types de billets",
     "guide.ticketTypes.where": "Billetterie",
     "guide.ticketTypes.body":
-      "Pour chaque type, choisissez une porte (vendu seulement là) ou toutes les portes. Dans les deux cas, le billet vendu n'est valable qu'à la porte qui l'a vendu.",
+      "Un type créé pour « toutes les portes » sert à chaque nouvelle porte, sans rien refaire. Choisissez une porte seulement pour un billet vendu là uniquement. Le billet vendu n'est valable qu'à la porte qui l'a vendu.",
 
     "guide.users.title": "Créer les utilisateurs et leur porte",
     "guide.users.where": "Utilisateurs",
@@ -31,7 +31,8 @@ export default defineMessages({
 
     "guide.devices.title": "Enrôler les caisses",
     "guide.devices.where": "Appareils",
-    "guide.devices.body1": "Choisissez la porte et un nom, puis « Générer un code » (valable 30 minutes, une seule fois).",
+    "guide.devices.body1":
+      "Sur la porte, « Enrôler une caisse » affiche un code (valable 30 minutes, une seule fois). Le nom est facultatif : « Caisse n° 1 », « n° 2 »…",
     "guide.devices.body2": "Sur la caisse : installer l'application, « Enrôler cette caisse », saisir le code.",
     "guide.devices.body3":
       "En deux secondes, la caisse reçoit d'elle-même les billets et prix de sa porte, le design du billet et du reçu, et les caissiers de sa porte — qui peuvent s'y connecter même sans internet.",
@@ -76,12 +77,12 @@ export default defineMessages({
     "guide.gates.title": "Create the gates",
     "guide.gates.where": "Gates & tills",
     "guide.gates.body":
-      "Each gate automatically gets its own secret key that signs its tickets' QR codes: a ticket sold at one gate is not accepted at another.",
+      'A name is enough (the code is suggested). Each gate gets its own key that signs its tickets\' QR codes: a ticket sold at one gate is not accepted at another. Then, on the gate\'s card: "Add a cashier" and "Enroll a till".',
 
     "guide.ticketTypes.title": "Create the ticket types",
     "guide.ticketTypes.where": "Tickets",
     "guide.ticketTypes.body":
-      "For each type, choose one gate (sold only there) or all gates. Either way, a ticket sold is only valid at the gate that sold it.",
+      'A type made for "all gates" serves every new gate with nothing to redo. Pick one gate only for a ticket sold there alone. A ticket sold is only valid at the gate that sold it.',
 
     "guide.users.title": "Create the users and their gate",
     "guide.users.where": "Users",
@@ -92,7 +93,8 @@ export default defineMessages({
 
     "guide.devices.title": "Enroll the tills",
     "guide.devices.where": "Devices",
-    "guide.devices.body1": 'Pick the gate and a name, then "Generate a code" (valid 30 minutes, once).',
+    "guide.devices.body1":
+      'On the gate, "Enroll a till" shows a code (valid 30 minutes, once). The name is optional: "Till no. 1", "no. 2"…',
     "guide.devices.body2": 'On the till: install the app, "Enroll this till", type the code.',
     "guide.devices.body3":
       "Within two seconds the till receives its gate's tickets and prices, the ticket and receipt design, and its gate's cashiers — who can sign in there even without internet.",

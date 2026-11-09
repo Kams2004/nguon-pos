@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { RefreshCw, Search, X, type LucideIcon } from "lucide-react";
+import { Eye, EyeOff, RefreshCw, Search, X, type LucideIcon } from "lucide-react";
 import { useBranding } from "../context/BrandingContext";
 import { useSession } from "../context/SessionContext";
 import { translate, useI18n } from "../i18n";
@@ -177,6 +177,10 @@ export function Modal({
       // mousedown, not click: a text selection dragged from inside the
       // dialog and released outside must not close it.
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      // React passes events up the component tree even through a portal: a
+      // form submitted in the dialog must not also submit a form around
+      // whatever opened it (the login form behind the enrollment dialog).
+      onSubmit={(e) => e.stopPropagation()}
     >
       {/* Own text colour: a dialog opened from a coloured header must not inherit its white text. */}
       <div className={`card my-auto w-full ${MODAL_WIDTHS[size]} overflow-hidden text-foreground animate-in fade-in zoom-in-95`}>
@@ -241,6 +245,48 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
     <div className="relative w-full max-w-sm">
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="field pl-9" />
+    </div>
+  );
+}
+
+/** A password field whose content can be shown, e.g. to read it out to the cashier it was made for. */
+export function PasswordInput({
+  value,
+  onChange,
+  required,
+  placeholder,
+  autoComplete = "new-password",
+  className = "",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  placeholder?: string;
+  autoComplete?: string;
+  className?: string;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={shown ? "text" : "password"}
+        required={required}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        spellCheck={false}
+        className={`field pr-11 ${className}`}
+      />
+      <button
+        type="button"
+        onClick={() => setShown((v) => !v)}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-secondary"
+        aria-label={translate(shown ? "shell.login.hidePassword" : "shell.login.showPassword")}
+        title={translate(shown ? "shell.login.hidePassword" : "shell.login.showPassword")}
+      >
+        {shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
     </div>
   );
 }

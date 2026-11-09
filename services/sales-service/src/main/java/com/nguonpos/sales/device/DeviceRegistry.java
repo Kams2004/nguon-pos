@@ -53,7 +53,7 @@ public class DeviceRegistry {
         jdbc.update("""
                 INSERT INTO sales.enrollment_code (code_hash, establishment_id, gate_id, label, created_by_user_id, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?)""", hash(code), establishmentId, gateId, label, AuditService.actorId(admin), Timestamp.from(expires));
-        audit.record(admin, "TERMINAL", "DEVICE_CODE_CREATED", "GATE", gateId, "Code d'enrôlement créé pour la caisse « " + label + " »");
+        audit.record(admin, "TERMINAL", "DEVICE_CODE_CREATED", "GATE", gateId, label.isBlank() ? "Code d'enrôlement créé" : "Code d'enrôlement créé pour la caisse « " + label + " »");
         return new EnrollmentCode(code, expires, gateId, label);
     }
 
@@ -71,7 +71,8 @@ public class DeviceRegistry {
         if (codes.isEmpty()) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "INVALID_CODE");
         UUID establishmentId = (UUID) codes.getFirst().get("establishment_id");
         UUID gateId = (UUID) codes.getFirst().get("gate_id");
-        String label = req.label() != null && !req.label().isBlank() ? req.label().strip() : (String) codes.getFirst().get("label");
+        String codeLabel = (String) codes.getFirst().get("label");
+        String requested = req.label() != null && !req.label().isBlank() ? req.label().strip() : codeLabel;
 
         PublicKey key;
         try {
@@ -89,6 +90,8 @@ public class DeviceRegistry {
         }
         int deviceNo = existing.map(e -> (Integer) e.get("device_no")).orElseGet(() ->
                 jdbc.queryForObject("SELECT COALESCE(MAX(device_no), 0) + 1 FROM sales.device WHERE gate_id = ?", Integer.class, gateId));
+
+        String label = requested != null && !requested.isBlank() ? requested : "Caisse n° " + deviceNo;
 
         X509Certificate cert = ca.issue(req.deviceId(), gateId, establishmentId, key);
         String fingerprint = DeviceCertificateAuthority.fingerprint(cert);

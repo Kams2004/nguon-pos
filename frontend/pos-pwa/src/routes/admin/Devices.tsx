@@ -107,7 +107,6 @@ export default function Devices() {
                 <div>
                   <label className="field-label">{t("settings.devices.label")}</label>
                   <input
-                    required
                     maxLength={200}
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
