@@ -1,0 +1,21 @@
+<!-- Nguon POS — the till's local server as a Windows service (WinSW).
+     Installed next to nguon-edge.exe (WinSW) by the installer hooks. -->
+<service>
+  <id>NguonEdge</id>
+  <name>Nguon POS - serveur local</name>
+  <description>Serveur local de la caisse Nguon POS : donnees chiffrees, ventes et scans hors-ligne, synchronisation avec le serveur central.</description>
+  <executable>%BASE%\jre\bin\java.exe</executable>
+  <arguments>-Xmx256m -XX:+UseSerialGC -jar "%BASE%\edge-service.jar"</arguments>
+  <env name="EDGE_DATA_DIR" value="%ProgramData%\NguonPOS\edge"/>
+  <env name="EDGE_KEY_PROVIDER" value="dpapi"/>
+  <startmode>Automatic</startmode>
+  <onfailure action="restart" delay="5 sec"/>
+  <onfailure action="restart" delay="15 sec"/>
+  <onfailure action="restart" delay="60 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <logpath>%ProgramData%\NguonPOS\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+</service>

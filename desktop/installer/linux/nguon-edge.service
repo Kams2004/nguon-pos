@@ -1,0 +1,30 @@
+# Nguon POS — the till's local server. Installed by the nguon-pos package.
+# The master key credential is added by a drop-in written at install
+# (nguon-edge.service.d/credential.conf): encrypted with systemd-creds
+# where available (TPM2 when the machine has one), a root-only file otherwise.
+[Unit]
+Description=Nguon POS local server (till)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nguon-edge
+Group=nguon-edge
+UMask=0077
+Environment=EDGE_DATA_DIR=/var/lib/nguon-edge
+Environment=EDGE_KEY_PROVIDER=systemd-creds
+ExecStart="/usr/lib/Nguon POS/edge/jre/bin/java" -Xmx256m -XX:+UseSerialGC -jar "/usr/lib/Nguon POS/edge/edge-service.jar"
+Restart=always
+RestartSec=3
+# Hardening: read-only system, private /tmp, no home access, only its data dir writable.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ReadWritePaths=/var/lib/nguon-edge
+
+[Install]
+WantedBy=multi-user.target

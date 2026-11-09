@@ -1,0 +1,13 @@
+#!/bin/sh
+# Before removing or upgrading: stop the local server (data stays).
+set -e
+case "$1" in
+  remove|deconfigure)
+    systemctl stop nguon-edge.service || true
+    systemctl disable nguon-edge.service >/dev/null 2>&1 || true
+    ;;
+  upgrade)
+    systemctl stop nguon-edge.service || true
+    ;;
+esac
+exit 0

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Nguon POS",
+  "mainBinaryName": "nguon-pos",
+  "version": "0.1.0",
+  "identifier": "com.nguonevents.pos",
+  "build": {
+    "frontendDist": "../../frontend/pos-pwa/dist-desktop",
+    "beforeBuildCommand": "npm --prefix ../frontend/pos-pwa run build:desktop"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Nguon POS",
+        "width": 1366,
+        "height": 820,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "maximized": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:47300; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "nsis"],
+    "publisher": "Nguon POS",
+    "category": "Business",
+    "shortDescription": "Billetterie et caisse du festival Nguon",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png", "icons/icon.ico"],
+    "resources": {
+      "../build/edge/edge-service.jar": "edge/edge-service.jar",
+      "../build/edge/jre/": "edge/jre/"
+    },
+    "linux": {
+      "deb": {
+        "files": {
+          "/lib/systemd/system/nguon-edge.service": "../installer/linux/nguon-edge.service"
+        },
+        "postInstallScript": "../installer/linux/postinst",
+        "preRemoveScript": "../installer/linux/prerm",
+        "postRemoveScript": "../installer/linux/postrm"
+      }
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "installerHooks": "../installer/windows/hooks.nsh"
+      }
+    }
+  }
+}

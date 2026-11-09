@@ -1,0 +1,43 @@
+#!/bin/sh
+# Runs after installing or upgrading the nguon-pos package (as root).
+# Idempotent: an upgrade keeps the till's data, key and enrollment.
+set -e
+DATA=/var/lib/nguon-edge
+CREDS=$DATA/creds
+DROPIN=/etc/systemd/system/nguon-edge.service.d
+
+if ! id nguon-edge >/dev/null 2>&1; then
+  adduser --system --group --home "$DATA" --no-create-home nguon-edge
+fi
+# Data dir: the service writes here (its files are 0600, UMask=0077); the
+# till app, running as the logged-in user, only needs to read ui-token.
+install -d -m 0755 -o nguon-edge -g nguon-edge "$DATA"
+# The master key: read by systemd (root) and handed to the service only.
+install -d -m 0700 -o root -g root "$CREDS"
+mkdir -p "$DROPIN"
+
+if [ -f "$CREDS/master.cred" ]; then
+  printf '[Service]\nLoadCredentialEncrypted=master:%s/master.cred\n' "$CREDS" > "$DROPIN/credential.conf"
+elif [ -f "$CREDS/master.key" ]; then
+  printf '[Service]\nLoadCredential=master:%s/master.key\n' "$CREDS" > "$DROPIN/credential.conf"
+elif command -v systemd-creds >/dev/null 2>&1; then
+  head -c 32 /dev/urandom | systemd-creds encrypt --name=master - "$CREDS/master.cred"
+  printf '[Service]\nLoadCredentialEncrypted=master:%s/master.cred\n' "$CREDS" > "$DROPIN/credential.conf"
+else
+  # systemd older than 250 (Ubuntu 22.04): root-only file; rely on full-disk encryption.
+  head -c 32 /dev/urandom > "$CREDS/master.key"
+  chmod 0400 "$CREDS/master.key"
+  printf '[Service]\nLoadCredential=master:%s/master.key\n' "$CREDS" > "$DROPIN/credential.conf"
+fi
+
+# UI token shared with the till app (readable by local users, not by web pages).
+if [ ! -f "$DATA/ui-token" ]; then
+  head -c 32 /dev/urandom | base64 | tr -d '=+/\n' > "$DATA/ui-token"
+fi
+chown nguon-edge:nguon-edge "$DATA/ui-token"
+chmod 0644 "$DATA/ui-token"
+
+systemctl daemon-reload
+systemctl enable nguon-edge.service >/dev/null 2>&1 || true
+systemctl restart nguon-edge.service
+exit 0

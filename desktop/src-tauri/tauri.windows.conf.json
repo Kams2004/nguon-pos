@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "resources": {
+      "../build/edge/nguon-edge.exe": "edge/nguon-edge.exe",
+      "../installer/windows/nguon-edge.xml": "edge/nguon-edge.xml"
+    }
+  }
+}
