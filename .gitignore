@@ -28,3 +28,6 @@ nginx/certs/
 
 # Desktop till build output
 frontend/pos-pwa/dist-desktop/
+
+# Device CA material and other secrets
+secrets/

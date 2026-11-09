@@ -1,6 +1,7 @@
 package com.nguonpos.sales.transaction;
 
 import com.nguonpos.sales.audit.AuditService;
+import com.nguonpos.sales.edgesync.EdgeFeed;
 import com.nguonpos.sales.live.EventHub;
 import com.nguonpos.sales.ticket.Ticket;
 import com.nguonpos.sales.ticket.TicketRepository;
@@ -43,6 +44,7 @@ public class TransactionController {
     private final TransactionRepository transactionRepository;
     private final TransactionLineRepository lineRepository;
     private final TicketRepository ticketRepository;
+    private final EdgeFeed edgeFeed;
     // Reports and the dashboard load a whole period in one page.
     static final int MAX_PAGE_SIZE = 5000;
 
@@ -51,8 +53,9 @@ public class TransactionController {
 
     public TransactionController(
             TransactionRepository transactionRepository, TransactionLineRepository lineRepository, TicketRepository ticketRepository,
-            AuditService audit, EventHub hub
+            AuditService audit, EventHub hub, EdgeFeed edgeFeed
     ) {
+        this.edgeFeed = edgeFeed;
         this.transactionRepository = transactionRepository;
         this.lineRepository = lineRepository;
         this.ticketRepository = ticketRepository;
@@ -128,13 +131,17 @@ public class TransactionController {
         // Unused tickets of a voided sale no longer admit anyone. Ones already
         // used keep their REDEEMED history.
         int voidedTickets = 0;
+        List<UUID> ticketIds = new ArrayList<>();
         for (Ticket ticket : ticketRepository.findByTransactionId(t.getId())) {
+            ticketIds.add(ticket.getId());
             if (ticket.getStatus() == TicketStatus.ISSUED) {
                 ticket.setStatus(TicketStatus.VOIDED);
                 ticketRepository.save(ticket);
                 voidedTickets++;
             }
         }
+        // Desktop tills of the gate refuse these tickets from now on, even offline later.
+        edgeFeed.append(establishmentId, t.getGateId(), EdgeFeed.SALE_VOIDED, null, Map.of("transactionId", t.getId(), "ticketIds", ticketIds));
         audit.record(claims, "VOID", "SALE_VOIDED", "TRANSACTION", t.getId(),
                 "Vente " + t.getReferenceNumber() + " annulée — motif : " + request.reason()
                         + (voidedTickets > 0 ? " — " + voidedTickets + " billet(s) invalidé(s)" : ""));

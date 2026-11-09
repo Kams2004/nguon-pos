@@ -1,4 +1,6 @@
 import type {
+  Device,
+  EnrollmentCode,
   DirectoryUser,
   SubscriptionOverview,
   SubscriptionPaymentMethod,
@@ -160,6 +162,24 @@ export const api = {
       headers: authHeader(token),
       body: JSON.stringify({ reason }),
     });
+  },
+
+  // ── Admin: desktop tills (enrollment, revocation) ───────────────────
+
+  listDevices(token: string): Promise<Device[]> {
+    return request(`${SALES_BASE}/sales/admin/devices`, { headers: authHeader(token) });
+  },
+
+  createEnrollmentCode(token: string, gateId: string, label: string): Promise<EnrollmentCode> {
+    return request(`${SALES_BASE}/sales/admin/devices/enrollment-codes`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify({ gateId, label }),
+    });
+  },
+
+  revokeDevice(token: string, id: string): Promise<void> {
+    return request(`${SALES_BASE}/sales/admin/devices/${encodeURIComponent(id)}/revoke`, { method: "POST", headers: authHeader(token) });
   },
 
   syncStatus(token: string): Promise<TerminalStatus[]> {

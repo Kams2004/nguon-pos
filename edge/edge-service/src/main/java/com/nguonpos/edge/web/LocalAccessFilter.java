@@ -28,7 +28,7 @@ public class LocalAccessFilter extends OncePerRequestFilter {
 
     public static final String USER = "edge.user";
     public static final String TOKEN = "edge.session";
-    private static final Set<String> NO_SESSION = Set.of("/local/v1/status", "/local/v1/auth/login");
+    private static final Set<String> NO_SESSION = Set.of("/local/v1/status", "/local/v1/auth/login", "/local/v1/enroll");
 
     private final EdgeProperties props;
     private final UiToken uiToken;

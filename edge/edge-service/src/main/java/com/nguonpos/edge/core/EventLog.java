@@ -53,6 +53,28 @@ public class EventLog {
                 type, limit);
     }
 
+    /** Pending records of any type in sequence order, with their signatures, for the live channel. */
+    public List<SignedRecord> pendingSigned(int limit) {
+        return jdbc.query("""
+                SELECT origin, seq, type, hlc, actor_user_id, payload, sig FROM event_log
+                WHERE uplink_status = 'PENDING' ORDER BY origin, seq LIMIT ?""",
+                (rs, i) -> new SignedRecord(rs.getString(1), rs.getLong(2), rs.getString(3), rs.getString(4), rs.getString(5),
+                        rs.getString(6), rs.getString(7)), limit);
+    }
+
+    /** Central already holds everything up to `seq` from this device (WELCOME after a lost ACK). */
+    public void markAckedUpTo(String origin, long seq) {
+        jdbc.update("UPDATE event_log SET uplink_status = 'ACKED' WHERE origin = ? AND seq <= ? AND uplink_status = 'PENDING'", origin, seq);
+    }
+
+    public void markAcked(String origin, long seq, String result) {
+        jdbc.update("UPDATE event_log SET uplink_status = 'ACKED', uplink_result = ? WHERE origin = ? AND seq = ?", result, origin, seq);
+    }
+
+    public void markRejected(String origin, long seq, String reason) {
+        jdbc.update("UPDATE event_log SET uplink_status = 'REJECTED', uplink_result = ? WHERE origin = ? AND seq = ?", reason, origin, seq);
+    }
+
     public int pendingCount(String type) {
         Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM event_log WHERE uplink_status = 'PENDING' AND type = ?", Integer.class, type);
         return n == null ? 0 : n;
@@ -72,5 +94,8 @@ public class EventLog {
     }
 
     public record Record(String origin, long seq, String type, String hlc, String actorUserId, String payload) {
+    }
+
+    public record SignedRecord(String origin, long seq, String type, String hlc, String actorUserId, String payload, String sig) {
     }
 }

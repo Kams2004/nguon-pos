@@ -6,8 +6,10 @@ import com.nguonpos.catalog.gate.Gate;
 import com.nguonpos.catalog.gate.GateRepository;
 import com.nguonpos.catalog.tickettype.TicketTypeRepository;
 import io.jsonwebtoken.Claims;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -44,8 +46,26 @@ public class BootstrapController {
         if (assignedGateIdRaw == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cet utilisateur n'est affecté à aucune porte.");
         }
-        UUID gateId = UUID.fromString(assignedGateIdRaw);
+        return build(establishmentId, UUID.fromString(assignedGateIdRaw));
+    }
 
+    /**
+     * The same document for a desktop till's local server, fetched by
+     * sales-service (service token) to push it over the till's live channel
+     * whenever the catalog changes. Never reachable from outside: nginx
+     * refuses every /internal/ path.
+     */
+    @GetMapping("/internal/gates/{gateId}/edge-config")
+    @PreAuthorize("hasRole('SERVICE')")
+    public BootstrapResponse edgeConfig(@AuthenticationPrincipal Claims claims, @PathVariable UUID gateId) {
+        UUID establishmentId = UUID.fromString(claims.get("establishmentId", String.class));
+        Gate gate = gateRepository.findById(gateId)
+                .filter(g -> establishmentId.equals(g.getEstablishmentId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Porte introuvable."));
+        return build(establishmentId, gate.getId());
+    }
+
+    private BootstrapResponse build(UUID establishmentId, UUID gateId) {
         Establishment establishment = establishmentRepository.findById(establishmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Établissement introuvable."));
         Gate gate = gateRepository.findById(gateId)

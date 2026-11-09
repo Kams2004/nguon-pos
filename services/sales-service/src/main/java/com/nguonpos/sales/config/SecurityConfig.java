@@ -35,6 +35,10 @@ public class SecurityConfig {
                         // hard way — this hid a real bug's actual error for a
                         // long time during testing.)
                         .requestMatchers("/actuator/health/**", "/error").permitAll()
+                        // Desktop tills: enrollment is authenticated by its one-time
+                        // code; /edge/** by the till's client certificate, checked in
+                        // device.EdgeDeviceAuth — neither carries a user JWT.
+                        .requestMatchers("/sales/enroll/v1", "/edge/**").permitAll()
                         // The live stream (/sales/events) completes on an async
                         // dispatch; the original request was already
                         // authenticated, and the async re-dispatch carries no

@@ -57,6 +57,16 @@ public class DeviceIdentity {
         return deviceId.toString().substring(0, 4).toUpperCase();
     }
 
+    /** The device key pair — also the TLS key of its certificate once enrolled. */
+    public KeyPair keyPair() {
+        try {
+            var pub = KeyFactory.getInstance("EC").generatePublic(new java.security.spec.X509EncodedKeySpec(Base64.getDecoder().decode(publicKey)));
+            return new KeyPair(pub, privateKey);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     public String sign(byte[] data) {
         try {
             Signature s = Signature.getInstance("SHA256withECDSA");

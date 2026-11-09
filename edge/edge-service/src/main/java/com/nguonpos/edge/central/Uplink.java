@@ -47,13 +47,15 @@ public class Uplink {
     private final LiveEvents live;
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
+    private final Enrollment enrollment;
 
     private volatile boolean reachable;
     private volatile String lastSyncAt;
     private volatile String activeUserId;
 
     public Uplink(CentralClient central, EventLog log, LocalAuth auth, Catalog catalog, DeviceIdentity device, LiveEvents live,
-                  JdbcTemplate jdbc, JsonMapper json) {
+                  JdbcTemplate jdbc, JsonMapper json, Enrollment enrollment) {
+        this.enrollment = enrollment;
         this.central = central;
         this.log = log;
         this.auth = auth;
@@ -71,7 +73,8 @@ public class Uplink {
 
     @Scheduled(fixedDelayString = "${edge.sync-interval-ms:5000}", initialDelay = 2_000)
     public synchronized void run() {
-        if (!central.configured()) return;
+        // Enrolled tills sync over the certificate channel (EdgeChannel) instead.
+        if (!central.configured() || enrollment.enrolled()) return;
         Optional<Catalog.GateInfo> gate = catalog.gate();
         if (gate.isEmpty()) return;
         boolean wasReachable = reachable;

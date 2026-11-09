@@ -66,6 +66,7 @@ public class UserAdminController {
                 .updatedAt(now)
                 .build();
         userRepository.save(user);
+        audit.usersChanged();
         audit.record(claims, "USER", "USER_CREATED", "USER", user.getId(),
                 "Utilisateur « " + user.getFullName() + " » (" + user.getUsername() + ", " + user.getRole() + ") créé");
         return UserSummary.from(user);
@@ -94,6 +95,7 @@ public class UserAdminController {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
         }
         userRepository.save(user);
+        audit.usersChanged();
         audit.record(claims, "USER", "USER_UPDATED", "USER", user.getId(),
                 "Utilisateur « " + user.getFullName() + " » modifié" + (changes.isEmpty() ? "" : " : " + String.join(", ", changes)));
         return UserSummary.from(user);

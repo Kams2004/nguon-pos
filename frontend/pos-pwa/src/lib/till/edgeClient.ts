@@ -59,6 +59,10 @@ export type EdgeStatus = {
   centralReachable: boolean;
   lastSyncAt: string | null;
   pending: number;
+  enrolled: boolean;
+  revoked: boolean;
+  deviceNo: number | null;
+  channelConnected: boolean;
 };
 
 export type EdgeUser = { id: string; username: string; fullName: string; role: Role; assignedGateId: string };
@@ -110,6 +114,8 @@ export type PrinterSettings = {
 
 export const edge = {
   status: () => call<EdgeStatus>("/status"),
+  enroll: (code: string, label: string) =>
+    call<{ deviceNo: number; label: string; gateId: string }>("/enroll", { method: "POST", body: JSON.stringify({ code, label }) }),
   login: (username: string, password: string) =>
     call<{ token: string; user: EdgeUser; verifiedOnline: boolean }>("/auth/login", {
       method: "POST",

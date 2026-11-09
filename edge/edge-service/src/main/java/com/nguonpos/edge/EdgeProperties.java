@@ -11,6 +11,8 @@ import java.util.List;
  * @param keyProvider    auto | dpapi | systemd-creds | file
  * @param allowedOrigins browser origins allowed to call the local API (the Tauri webview; Vite dev server)
  * @param syncIntervalMs pause between two sync rounds with central
+ * @param channelUrl     wss URL of the tills' live channel (default: wss://edge.<central host>/edge/v1/ws)
+ * @param channelCaFile  extra CA (PEM) to trust for the channel's server certificate — local tests only
  */
 @ConfigurationProperties(prefix = "edge")
 public record EdgeProperties(
@@ -18,13 +20,23 @@ public record EdgeProperties(
         String centralUrl,
         String keyProvider,
         List<String> allowedOrigins,
-        long syncIntervalMs
+        long syncIntervalMs,
+        String channelUrl,
+        Path channelCaFile
 ) {
     public EdgeProperties {
         if (dataDir == null) dataDir = Path.of("data");
         if (keyProvider == null || keyProvider.isBlank()) keyProvider = "auto";
         if (allowedOrigins == null) allowedOrigins = List.of();
         if (syncIntervalMs <= 0) syncIntervalMs = 5_000;
+    }
+
+    /** The certificate-guarded live channel; derived from the central URL unless set. */
+    public String channelWebSocketUrl() {
+        if (channelUrl != null && !channelUrl.isBlank()) return channelUrl;
+        if (!hasCentral()) return null;
+        String host = java.net.URI.create(centralUrl).getHost();
+        return "wss://edge." + host + "/edge/v1/ws";
     }
 
     public boolean hasCentral() {

@@ -1,5 +1,8 @@
 package com.nguonpos.sales.sync;
 
+import java.util.Map;
+import java.util.LinkedHashMap;
+import com.nguonpos.sales.edgesync.EdgeFeed;
 import com.nguonpos.sales.transaction.Transaction;
 import com.nguonpos.sales.transaction.TransactionLine;
 import com.nguonpos.sales.transaction.TransactionLineRepository;
@@ -37,6 +40,7 @@ public class SyncEntryProcessor {
     private final EntryScanRepository entryScanRepository;
     private final EntityManager entityManager;
     private final AuditService audit;
+    private final EdgeFeed edgeFeed;
 
     public SyncEntryProcessor(
             TransactionRepository transactionRepository,
@@ -44,8 +48,10 @@ public class SyncEntryProcessor {
             TicketRepository ticketRepository,
             EntryScanRepository entryScanRepository,
             EntityManager entityManager,
-            AuditService audit
+            AuditService audit,
+            EdgeFeed edgeFeed
     ) {
+        this.edgeFeed = edgeFeed;
         this.transactionRepository = transactionRepository;
         this.transactionLineRepository = transactionLineRepository;
         this.ticketRepository = ticketRepository;
@@ -126,6 +132,17 @@ public class SyncEntryProcessor {
                 ticketRepository.save(ticket);
                 resolvePendingScans(ticket);
             }
+
+            // The gate's other desktop tills learn these tickets (to admit them, or refuse a second entry).
+            Map<String, Object> feedSale = new LinkedHashMap<>();
+            feedSale.put("transactionId", transaction.getId());
+            feedSale.put("referenceNumber", transaction.getReferenceNumber());
+            feedSale.put("createdAtClient", entry.createdAtClient());
+            feedSale.put("paymentMethod", entry.paymentMethod());
+            feedSale.put("cashierUserId", cashierUserId);
+            feedSale.put("lines", entry.lines());
+            feedSale.put("tickets", entry.tickets());
+            edgeFeed.append(establishmentId, gateId, EdgeFeed.SALE, terminalId, feedSale);
 
             audit.record(claims, "SALE", "SALE_SYNCED", "TRANSACTION", transaction.getId(),
                     "Vente " + transaction.getReferenceNumber() + " synchronisée — "
@@ -217,6 +234,8 @@ public class SyncEntryProcessor {
                 .scannedAt(entry.scannedAt()).result(result)
                 .build();
         entryScanRepository.save(scan);
+        edgeFeed.append(establishmentId, gateId, EdgeFeed.SCAN, terminalId, Map.of("clientScanId", scan.getId(), "ticketId", ticket.getId(),
+                "scannedAt", scan.getScannedAt(), "result", result.name()));
         audit.record(claims, "SCAN", "SCAN_" + result.name(), "TICKET", ticket.getId(),
                 (result == ScanResult.ACCEPTED ? "Entrée validée — billet "
                         : result == ScanResult.REJECTED_VOIDED ? "Entrée refusée (vente annulée) — billet "
@@ -246,6 +265,8 @@ public class SyncEntryProcessor {
                 scan.setResult(ScanResult.REJECTED_ALREADY_REDEEMED);
             }
             entryScanRepository.save(scan);
+            edgeFeed.append(ticket.getEstablishmentId(), ticket.getGateId(), EdgeFeed.SCAN, scan.getTerminalId(),
+                    Map.of("clientScanId", scan.getId(), "ticketId", ticket.getId(), "scannedAt", scan.getScannedAt(), "result", scan.getResult().name()));
             audit.recordAs(scan.getScannedByUserId(), "Système", "SCAN", "SCAN_" + scan.getResult().name(), "TICKET", ticket.getId(),
                     "Scan en attente réglé à l'arrivée de la vente : "
                             + (scan.getResult() == ScanResult.ACCEPTED ? "entrée validée" : "entrée refusée (déjà utilisé)")

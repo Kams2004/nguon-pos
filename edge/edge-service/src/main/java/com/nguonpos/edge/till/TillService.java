@@ -188,6 +188,52 @@ public class TillService {
         });
     }
 
+    // ── What the other tills of the gate did (from central's feed) ───────
+
+    /** Another till's sale: its tickets become known here, so they can be admitted (or refused a second time). */
+    public void applyForeignSale(tools.jackson.databind.JsonNode p) {
+        String saleId = p.get("transactionId").asString();
+        tx.executeWithoutResult(s -> {
+            if (!jdbc.queryForList("SELECT id FROM sale WHERE id = ?", String.class, saleId).isEmpty()) return;
+            String ref = p.path("referenceNumber").asString("EXT-" + saleId.substring(0, 8));
+            BigDecimal total = BigDecimal.ZERO;
+            for (tools.jackson.databind.JsonNode l : p.get("lines")) {
+                total = total.add(l.get("unitPrice").decimalValue().multiply(BigDecimal.valueOf(l.get("quantity").asInt())));
+            }
+            jdbc.update("""
+                    INSERT INTO sale (id, client_request_id, local_reference, central_reference, cashier_user_id, payment_method, total, currency, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'XAF', ?)""", saleId, saleId, ref, ref, p.path("cashierUserId").asString(""),
+                    p.get("paymentMethod").asString(), total.toPlainString(), p.get("createdAtClient").asString());
+            int li = 0;
+            for (tools.jackson.databind.JsonNode l : p.get("lines")) {
+                String typeId = l.get("ticketTypeId").asString();
+                String name = catalog.ticketType(typeId).map(Catalog.TicketType::name).orElse("—");
+                jdbc.update("INSERT INTO sale_line (sale_id, line_no, ticket_type_id, name, quantity, unit_price) VALUES (?, ?, ?, ?, ?, ?)",
+                        saleId, li++, typeId, name, l.get("quantity").asInt(), l.get("unitPrice").decimalValue().toPlainString());
+            }
+            for (tools.jackson.databind.JsonNode t : p.get("tickets")) {
+                jdbc.update("""
+                        INSERT INTO ticket (id, sale_id, ticket_type_id, ticket_number, qr, status) VALUES (?, ?, ?, ?, ?, 'ISSUED')
+                        ON CONFLICT (id) DO NOTHING""", t.get("id").asString(), saleId, t.get("ticketTypeId").asString(),
+                        t.get("ticketNumber").asString(), t.get("qrSignature").asString());
+            }
+        });
+    }
+
+    /** Another till let this ticket in: it is used here too. */
+    public void applyForeignScan(tools.jackson.databind.JsonNode p) {
+        if (!"ACCEPTED".equals(p.path("result").asString(""))) return;
+        jdbc.update("UPDATE ticket SET status = 'REDEEMED', redeemed_at = ? WHERE id = ? AND status = 'ISSUED'",
+                p.get("scannedAt").asString(), p.get("ticketId").asString());
+    }
+
+    /** A sale voided at central: its unused tickets admit no one, even if this till goes offline. */
+    public void applyVoid(tools.jackson.databind.JsonNode p) {
+        for (tools.jackson.databind.JsonNode id : p.get("ticketIds")) {
+            jdbc.update("UPDATE ticket SET status = 'VOIDED' WHERE id = ? AND status = 'ISSUED'", id.asString());
+        }
+    }
+
     // ── Shapes ───────────────────────────────────────────────────────────
 
     public record SaleRequest(

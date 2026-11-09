@@ -124,6 +124,36 @@ public class LocalAuth {
         return true;
     }
 
+    /**
+     * The gate's accounts as central sent them over the live channel: who may
+     * log in here, offline included — new cashiers too, without a first online
+     * login. Central's bcrypt hash is the verifier. Accounts removed, disabled
+     * or moved to another gate disappear, with their open sessions.
+     */
+    public void replaceUsers(JsonNode users, String gateId) {
+        tx.executeWithoutResult(s -> {
+            List<String> keep = new java.util.ArrayList<>();
+            for (JsonNode u : users) {
+                if (!u.path("active").asBoolean(false)) continue;
+                String id = u.get("id").asString();
+                keep.add(id);
+                jdbc.update("""
+                        INSERT INTO user_credential (user_id, username, full_name, role, gate_id, verifier, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT (user_id) DO UPDATE SET username = excluded.username, full_name = excluded.full_name,
+                            role = excluded.role, gate_id = excluded.gate_id, verifier = excluded.verifier, updated_at = excluded.updated_at""",
+                        id, u.get("username").asString(), u.get("fullName").asString(), u.get("role").asString(), gateId,
+                        u.get("passwordHash").asString(), Instant.now().toString());
+            }
+            for (String id : jdbc.queryForList("SELECT user_id FROM user_credential", String.class)) {
+                if (!keep.contains(id)) {
+                    jdbc.update("DELETE FROM local_session WHERE user_id = ?", id);
+                    jdbc.update("DELETE FROM user_credential WHERE user_id = ?", id);
+                }
+            }
+        });
+    }
+
     public Optional<LocalUser> userForSession(String token) {
         if (token == null || token.isBlank()) return Optional.empty();
         List<LocalUser> users = jdbc.query("""

@@ -151,6 +151,24 @@ export type AdminUser = {
   active: boolean;
 };
 
+/** A desktop till enrolled with a certificate ("Appareils"). */
+export type Device = {
+  id: string;
+  gateId: string;
+  deviceNo: number;
+  label: string;
+  status: "ACTIVE" | "REVOKED";
+  certNotAfter: string;
+  enrolledAt: string;
+  os: string | null;
+  appVersion: string | null;
+  revokedAt: string | null;
+  online: boolean;
+  lastSeenAt: string | null;
+};
+
+export type EnrollmentCode = { code: string; expiresAt: string; gateId: string; label: string };
+
 export type TerminalStatus = {
   terminalId: string;
   gateId: string;

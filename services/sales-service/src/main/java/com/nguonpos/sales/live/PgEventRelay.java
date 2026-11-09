@@ -1,5 +1,7 @@
 package com.nguonpos.sales.live;
 
+import java.util.UUID;
+import com.nguonpos.sales.edgesync.EdgeSessions;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.postgresql.PGConnection;
@@ -28,11 +30,33 @@ public class PgEventRelay {
 
     private final DataSource dataSource;
     private final EventHub hub;
+    private final EdgeSessions edgeSessions;
     private volatile boolean running = true;
 
-    public PgEventRelay(DataSource dataSource, EventHub hub) {
+    public PgEventRelay(DataSource dataSource, EventHub hub, EdgeSessions edgeSessions) {
         this.dataSource = dataSource;
         this.hub = hub;
+        this.edgeSessions = edgeSessions;
+    }
+
+    /**
+     * nguon_edge carries a gate id: wake that gate's desktop tills. Catalog and
+     * account changes on nguon_all also refresh the desktop tills' copies.
+     */
+    private void relay(PGNotification n) {
+        try {
+            if ("nguon_edge".equals(n.getName())) {
+                edgeSessions.wakeGate(UUID.fromString(n.getParameter()));
+                return;
+            }
+            hub.publishRaw(n.getParameter(), "nguon_admin".equals(n.getName()));
+            if ("nguon_all".equals(n.getName())) {
+                if (n.getParameter().contains("\"CATALOG_CHANGED\"")) edgeSessions.catalogChanged();
+                if (n.getParameter().contains("\"USERS_CHANGED\"")) edgeSessions.usersChanged();
+            }
+        } catch (RuntimeException e) {
+            log.warn("Live event not relayed: {}", e.getMessage());
+        }
     }
 
     @PostConstruct
@@ -53,13 +77,14 @@ public class PgEventRelay {
                 try (Statement st = connection.createStatement()) {
                     st.execute("LISTEN nguon_admin");
                     st.execute("LISTEN nguon_all");
+                    st.execute("LISTEN nguon_edge");
                 }
                 PGConnection pg = connection.unwrap(PGConnection.class);
                 while (running) {
                     PGNotification[] notifications = pg.getNotifications(5_000);
                     if (notifications == null) continue;
                     for (PGNotification n : notifications) {
-                        hub.publishRaw(n.getParameter(), "nguon_admin".equals(n.getName()));
+                        relay(n);
                     }
                 }
             } catch (Exception e) {

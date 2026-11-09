@@ -39,6 +39,11 @@ public class CentralClient {
         return post("/api/auth/auth/login", null, Map.of("username", username, "password", password));
     }
 
+    /** Trades a one-time code + certificate request for this till's certificate (server TLS only). */
+    public Response enroll(Object body) {
+        return post("/api/sales/sales/enroll/v1", null, body);
+    }
+
     public Response bootstrap(String token) {
         return send(request("/api/catalog/catalog/bootstrap", token).GET().build());
     }

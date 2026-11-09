@@ -18,6 +18,7 @@ import SyncStatus from "./routes/admin/SyncStatus";
 import TerminalDetail from "./routes/admin/TerminalDetail";
 import Logs from "./routes/admin/Logs";
 import Scans from "./routes/admin/Scans";
+import Devices from "./routes/admin/Devices";
 import Subscription from "./routes/admin/Subscription";
 import Media from "./routes/admin/Media";
 import TicketDesign from "./routes/admin/TicketDesign";
@@ -64,6 +65,7 @@ function AppRoutes() {
         <Route path="sync-status/:terminalId" element={<TerminalDetail />} />
         <Route path="logs" element={<Logs />} />
         <Route path="scans" element={<Scans />} />
+        <Route path="devices" element={<Devices />} />
         <Route path="subscription" element={<Subscription />} />
         <Route path="media" element={<Media />} />
         <Route path="design" element={<TicketDesign />} />

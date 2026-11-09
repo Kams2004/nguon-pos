@@ -79,6 +79,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    volumes:
+      # Device CA (issuing certificate + key) that signs the desktop tills'
+      # certificates. Not in git: created with deploy/device-ca/create-ca.sh.
+      - ./secrets/device-ca:/run/secrets/device-ca:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +106,8 @@ services:
     # nginx (TLS for pos.nguonevents.com). Locally it defaults to :8081.
     ports:
       - "${POS_HTTP_BIND:-8081}:80"
+      # The tills' channel: reached only by the host's edge.pos site (mutual TLS).
+      - "${POS_EDGE_BIND:-127.0.0.1:8097}:81"
     depends_on:
       - auth-service
       - catalog-service

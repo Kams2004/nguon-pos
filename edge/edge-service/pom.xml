@@ -47,6 +47,12 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.53.4.0</version>
         </dependency>
+        <!-- Certificate request at enrollment (milestone 2). -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.86</version>
+        </dependency>
         <!-- Windows DPAPI for the database master key. -->
         <dependency>
             <groupId>net.java.dev.jna</groupId>

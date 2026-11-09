@@ -1,6 +1,8 @@
 package com.nguonpos.edge.web;
 
 import com.nguonpos.edge.EdgeProperties;
+import com.nguonpos.edge.central.EdgeChannel;
+import com.nguonpos.edge.central.Enrollment;
 import com.nguonpos.edge.central.Uplink;
 import com.nguonpos.edge.core.Catalog;
 import com.nguonpos.edge.core.DeviceIdentity;
@@ -41,9 +43,13 @@ public class LocalApiController {
     private final EdgeProperties props;
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
+    private final EdgeChannel channel;
+    private final Enrollment enrollment;
 
     public LocalApiController(LocalAuth auth, TillService till, Catalog catalog, Uplink uplink, DeviceIdentity device, LiveEvents live,
-                              EdgeProperties props, JdbcTemplate jdbc, JsonMapper json) {
+                              EdgeProperties props, JdbcTemplate jdbc, JsonMapper json, EdgeChannel channel, Enrollment enrollment) {
+        this.channel = channel;
+        this.enrollment = enrollment;
         this.auth = auth;
         this.till = till;
         this.catalog = catalog;
@@ -62,10 +68,25 @@ public class LocalApiController {
         s.put("deviceCode", device.shortCode());
         s.put("gate", catalog.gate().orElse(null));
         s.put("centralUrl", props.centralUrl());
-        s.put("centralReachable", uplink.reachable());
+        s.put("centralReachable", channel.connected() || uplink.reachable());
+        s.put("enrolled", enrollment.enrolled());
+        s.put("revoked", enrollment.revoked());
+        s.put("deviceNo", enrollment.deviceNo().orElse(null));
+        s.put("channelConnected", channel.connected());
         s.put("lastSyncAt", uplink.lastSyncAt());
         s.put("pending", uplink.pendingCount());
         return s;
+    }
+
+    // ── Enrollment (first run) ───────────────────────────────────────────
+
+    /** One-time code from the back office ("Appareils") → this till's certificate. */
+    @PostMapping("/enroll")
+    public Map<String, Object> enroll(@Valid @RequestBody EnrollRequest req) {
+        return enrollment.enroll(req.code(), req.label());
+    }
+
+    public record EnrollRequest(@NotBlank @Size(max = 20) String code, @Size(max = 200) String label) {
     }
 
     // ── Session ──────────────────────────────────────────────────────────
@@ -74,6 +95,7 @@ public class LocalApiController {
     public Map<String, Object> login(@Valid @RequestBody LoginRequest req) {
         LocalAuth.LoginResult r = auth.login(req.username().strip(), req.password());
         uplink.setActiveUser(r.user().id());
+        channel.setActiveUser(r.user().id());
         return Map.of("token", r.token(), "user", publicUser(r.user()), "verifiedOnline", r.online());
     }
 
@@ -81,6 +103,7 @@ public class LocalApiController {
     public ResponseEntity<Void> logout(@RequestAttribute(LocalAccessFilter.TOKEN) String token) {
         auth.logout(token);
         uplink.setActiveUser(null);
+        channel.setActiveUser(null);
         return ResponseEntity.noContent().build();
     }
 
@@ -99,7 +122,9 @@ public class LocalApiController {
 
     @PostMapping("/sales")
     public TillService.Sale sell(@RequestAttribute(LocalAccessFilter.USER) LocalUser user, @Valid @RequestBody TillService.SaleRequest req) {
-        return till.sell(user, req);
+        TillService.Sale sale = till.sell(user, req);
+        channel.nudge();
+        return sale;
     }
 
     @GetMapping("/sales")
@@ -114,7 +139,9 @@ public class LocalApiController {
 
     @PostMapping("/scans")
     public TillService.ScanResult scan(@RequestAttribute(LocalAccessFilter.USER) LocalUser user, @Valid @RequestBody ScanRequest req) {
-        return till.scan(user, req.qrContent());
+        TillService.ScanResult result = till.scan(user, req.qrContent());
+        channel.nudge();
+        return result;
     }
 
     @GetMapping("/events")

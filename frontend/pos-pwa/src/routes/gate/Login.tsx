@@ -5,6 +5,7 @@ import { useSession } from "../../context/SessionContext";
 import { useBranding } from "../../context/BrandingContext";
 import { useI18n } from "../../i18n";
 import { EdgeError } from "../../lib/till/edgeClient";
+import { EnrollmentBanner } from "../../components/EnrollmentBanner";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 const REMEMBER_KEY = "nguon-pos.rememberedUsername";
@@ -86,6 +87,7 @@ export default function Login() {
             <p className="mt-1 text-sm text-muted-foreground">{t("shell.login.intro")}</p>
           </div>
 
+          <EnrollmentBanner />
           {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-destructive">{error}</div>}
 
           <div>

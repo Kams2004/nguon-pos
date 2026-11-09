@@ -5,6 +5,9 @@ services:
   nginx:
     ports:
       - "8443:443"
+      # Desktop tills' channel with client certificates (local stand-in for edge.pos.nguonevents.com).
+      - "8444:8444"
     volumes:
       - ./nginx/lan-https.conf:/etc/nginx/conf.d/lan-https.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+      - ./secrets/device-ca/ca-chain.pem:/etc/nginx/device-ca/ca-chain.pem:ro

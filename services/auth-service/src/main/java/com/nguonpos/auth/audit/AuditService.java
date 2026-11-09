@@ -62,4 +62,10 @@ public class AuditService {
                 SERVICE, category, action, actorId, actorName, entityType,
                 entityId != null ? entityId.toString() : null, summary);
     }
+
+    /** Tells sales-service (LISTEN nguon_all) that accounts changed, so desktop tills get the new list at once. */
+    public void usersChanged() {
+        jdbc.query("SELECT pg_notify('nguon_all', '{\"type\":\"USERS_CHANGED\"}')", rs -> {
+        });
+    }
 }
