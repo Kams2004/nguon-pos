@@ -33,5 +33,5 @@ sudo certbot --nginx -d pos.nguonevents.com
 
 ```bash
 cd ~/nguon-pos && git pull
-docker compose build <service> && docker compose up -d <service>
+sh deploy/vps/update.sh <service>   # e.g. sales-service pos-pwa; restarts nginx at the end
 ```
