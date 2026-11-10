@@ -14,6 +14,10 @@ export default defineMessages({
     "gate.enroll.title": "Enrôler cette caisse",
     "gate.enroll.code": "Code d'enrôlement",
     "gate.enroll.submit": "Enrôler",
+    "gate.lan.peers_one": "{count} caisse voisine",
+    "gate.lan.peers_other": "{count} caisses voisines",
+    "gate.lan.hint":
+      "Caisses de cette porte joignables en réseau local : {connected} sur {known}. Ventes et entrées s'échangent entre elles même sans internet.",
     "gate.enroll.codeHint": "Le code fourni par l'administration désigne déjà cette caisse et sa porte.",
     "gate.enroll.tillNo": "Caisse n° {n}",
     "gate.enroll.thisTill": "Cette caisse",
@@ -202,6 +206,10 @@ export default defineMessages({
     "gate.enroll.title": "Enroll this till",
     "gate.enroll.code": "Enrollment code",
     "gate.enroll.submit": "Enroll",
+    "gate.lan.peers_one": "{count} nearby till",
+    "gate.lan.peers_other": "{count} nearby tills",
+    "gate.lan.hint":
+      "Tills of this gate reachable on the local network: {connected} of {known}. They share sales and entries even without internet.",
     "gate.enroll.codeHint": "The code from the administration already names this till and its gate.",
     "gate.enroll.tillNo": "Till no. {n}",
     "gate.enroll.thisTill": "This till",

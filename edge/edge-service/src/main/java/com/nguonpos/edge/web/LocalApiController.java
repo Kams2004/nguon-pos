@@ -47,7 +47,9 @@ public class LocalApiController {
     private final Enrollment enrollment;
 
     public LocalApiController(LocalAuth auth, TillService till, Catalog catalog, Uplink uplink, DeviceIdentity device, LiveEvents live,
-                              EdgeProperties props, JdbcTemplate jdbc, JsonMapper json, EdgeChannel channel, Enrollment enrollment, com.nguonpos.edge.update.Updater updater) {
+                              EdgeProperties props, JdbcTemplate jdbc, JsonMapper json, EdgeChannel channel, Enrollment enrollment, com.nguonpos.edge.update.Updater updater, com.nguonpos.edge.peer.PeerSync peers, com.nguonpos.edge.peer.PeerServer peerServer) {
+        this.peers = peers;
+        this.peerServer = peerServer;
         this.updater = updater;
         this.channel = channel;
         this.enrollment = enrollment;
@@ -63,6 +65,9 @@ public class LocalApiController {
     }
 
     private final com.nguonpos.edge.update.Updater updater;
+
+    private final com.nguonpos.edge.peer.PeerSync peers;
+    private final com.nguonpos.edge.peer.PeerServer peerServer;
 
     @GetMapping("/status")
     public Map<String, Object> status() {
@@ -81,6 +86,18 @@ public class LocalApiController {
         s.put("pending", uplink.pendingCount());
         s.put("appVersion", updater.currentVersion());
         s.put("update", updater.status());
+        // The other tills of the gate on the LAN: who answered lately.
+        s.put("peerServer", peerServer.running());
+        s.put("peers", peers.peers().stream().filter(p -> !p.placeholder()).map(p -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("deviceId", p.deviceId());
+            m.put("label", p.label());
+            m.put("address", p.address());
+            m.put("connected", p.connected());
+            m.put("lastSeenAt", p.lastSeenAt());
+            return m;
+        }).toList());
+        s.put("duplicateEntries", till.duplicateEntries());
         return s;
     }
 
@@ -130,6 +147,7 @@ public class LocalApiController {
     public TillService.Sale sell(@RequestAttribute(LocalAccessFilter.USER) LocalUser user, @Valid @RequestBody TillService.SaleRequest req) {
         TillService.Sale sale = till.sell(user, req);
         channel.nudge();
+        peers.announce();
         return sale;
     }
 
@@ -147,6 +165,7 @@ public class LocalApiController {
     public TillService.ScanResult scan(@RequestAttribute(LocalAccessFilter.USER) LocalUser user, @Valid @RequestBody ScanRequest req) {
         TillService.ScanResult result = till.scan(user, req.qrContent());
         channel.nudge();
+        peers.announce();
         return result;
     }
 

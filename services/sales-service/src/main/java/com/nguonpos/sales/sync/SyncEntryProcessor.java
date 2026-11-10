@@ -167,6 +167,16 @@ public class SyncEntryProcessor {
     public ScanSyncResponse.EntryResult processScanEntry(
             ScanSyncRequest.ScanEntry entry, UUID terminalId, UUID gateId, UUID establishmentId, UUID scannedByUserId, Claims claims
     ) {
+        return processScanEntry(entry, null, terminalId, gateId, establishmentId, scannedByUserId, claims);
+    }
+
+    /**
+     * @param hlc the till's hybrid-clock stamp of the scan (desktop tills, over the live channel); null from browser tills
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ScanSyncResponse.EntryResult processScanEntry(
+            ScanSyncRequest.ScanEntry entry, String hlc, UUID terminalId, UUID gateId, UUID establishmentId, UUID scannedByUserId, Claims claims
+    ) {
         var existingScan = entryScanRepository.findById(entry.clientScanId());
         if (existingScan.isPresent()) {
             return new ScanSyncResponse.EntryResult(
@@ -184,7 +194,7 @@ public class SyncEntryProcessor {
             EntryScan scan = EntryScan.builder()
                     .id(entry.clientScanId()).ticketId(entry.ticketId()).establishmentId(establishmentId).gateId(gateId)
                     .terminalId(terminalId).scannedByUserId(scannedByUserId)
-                    .scannedAt(entry.scannedAt()).result(ScanResult.PENDING_TICKET)
+                    .scannedAt(entry.scannedAt()).result(ScanResult.PENDING_TICKET).localDecision(entry.localDecision()).hlc(hlc)
                     .build();
             entryScanRepository.save(scan);
             audit.record(claims, "SCAN", "SCAN_PENDING_TICKET", "TICKET", entry.ticketId(),
@@ -214,30 +224,46 @@ public class SyncEntryProcessor {
         // the server-side tie-breaker for the same-gate multi-till race
         // described in docs/QR_TICKET_SPEC.md. Any later-arriving scan for
         // an already-REDEEMED ticket is recorded, not silently dropped.
+        // What the till decided at the gate. A till that REFUSED knew of an entry
+        // central may not have yet (another till's, relayed later): its scan is
+        // never the entry. Browser tills don't say (null): first to arrive wins.
+        String local = entry.localDecision();
+        boolean tillAdmitted = local == null || "ACCEPTED".equals(local);
         ScanResult result;
-        if (ticket.getStatus() == TicketStatus.ISSUED) {
-            ticket.setStatus(TicketStatus.REDEEMED);
-            ticket.setRedeemedAt(entry.scannedAt());
-            ticket.setRedeemedByUserId(scannedByUserId);
-            ticket.setRedeemedByTerminalId(terminalId);
-            ticketRepository.save(ticket);
-            result = ScanResult.ACCEPTED;
-        } else if (ticket.getStatus() == TicketStatus.VOIDED) {
+        if (ticket.getStatus() == TicketStatus.VOIDED) {
             result = ScanResult.REJECTED_VOIDED;
-        } else {
+        } else if (!tillAdmitted) {
             result = ScanResult.REJECTED_ALREADY_REDEEMED;
+        } else if (ticket.getStatus() == TicketStatus.ISSUED) {
+            redeem(ticket, entry.scannedAt(), scannedByUserId, terminalId);
+            result = ScanResult.ACCEPTED;
+        } else if (local == null) {
+            result = ScanResult.REJECTED_ALREADY_REDEEMED;
+        } else {
+            // Admitted at a till while the ticket was already used: two people went in. The tills keep
+            // the earliest scan (hybrid clock, then till, then scan id) as the entry; so does central.
+            EntryScan entryScan = entryScanRepository.findFirstByTicketIdAndResult(ticket.getId(), ScanResult.ACCEPTED).orElse(null);
+            if (entryScan != null && comesFirst(hlc, terminalId, entry.clientScanId(), entryScan)) {
+                entryScan.setResult(ScanResult.DUPLICATE_ENTRY);
+                entryScanRepository.save(entryScan);
+                redeem(ticket, entry.scannedAt(), scannedByUserId, terminalId);
+                result = ScanResult.ACCEPTED;
+            } else {
+                result = ScanResult.DUPLICATE_ENTRY;
+            }
         }
 
         EntryScan scan = EntryScan.builder()
                 .id(entry.clientScanId()).ticketId(entry.ticketId()).establishmentId(establishmentId).gateId(gateId)
                 .terminalId(terminalId).scannedByUserId(scannedByUserId)
-                .scannedAt(entry.scannedAt()).result(result)
+                .scannedAt(entry.scannedAt()).result(result).localDecision(entry.localDecision()).hlc(hlc)
                 .build();
         entryScanRepository.save(scan);
         edgeFeed.append(establishmentId, gateId, EdgeFeed.SCAN, terminalId, Map.of("clientScanId", scan.getId(), "ticketId", ticket.getId(),
                 "scannedAt", scan.getScannedAt(), "result", result.name()));
         audit.record(claims, "SCAN", "SCAN_" + result.name(), "TICKET", ticket.getId(),
                 (result == ScanResult.ACCEPTED ? "Entrée validée — billet "
+                        : result == ScanResult.DUPLICATE_ENTRY ? "Double entrée (deux caisses hors ligne ont admis le même billet) — billet "
                         : result == ScanResult.REJECTED_VOIDED ? "Entrée refusée (vente annulée) — billet "
                         : "Entrée refusée (déjà utilisé) — billet ")
                         + ticket.getTicketNumber());
@@ -251,27 +277,47 @@ public class SyncEntryProcessor {
      * the same ticket presented again.
      */
     private void resolvePendingScans(Ticket ticket) {
-        var pending = entryScanRepository.findByTicketIdAndEstablishmentIdAndResultOrderByScannedAtAscIdAsc(
-                ticket.getId(), ticket.getEstablishmentId(), ScanResult.PENDING_TICKET);
+        var pending = new java.util.ArrayList<>(entryScanRepository.findByTicketIdAndEstablishmentIdAndResultOrderByScannedAtAscIdAsc(
+                ticket.getId(), ticket.getEstablishmentId(), ScanResult.PENDING_TICKET));
+        // Same order as the tills: hybrid clock (or scan time), then till, then scan id.
+        pending.sort(java.util.Comparator.comparing((EntryScan e) -> e.getHlc() != null ? e.getHlc() : e.getScannedAt().toString())
+                .thenComparing(e -> e.getTerminalId().toString()).thenComparing(e -> e.getId().toString()));
         for (EntryScan scan : pending) {
-            if (ticket.getStatus() == TicketStatus.ISSUED) {
-                ticket.setStatus(TicketStatus.REDEEMED);
-                ticket.setRedeemedAt(scan.getScannedAt());
-                ticket.setRedeemedByUserId(scan.getScannedByUserId());
-                ticket.setRedeemedByTerminalId(scan.getTerminalId());
-                ticketRepository.save(ticket);
+            boolean tillAdmitted = scan.getLocalDecision() == null || "ACCEPTED".equals(scan.getLocalDecision());
+            if (!tillAdmitted) {
+                scan.setResult(ScanResult.REJECTED_ALREADY_REDEEMED);
+            } else if (ticket.getStatus() == TicketStatus.ISSUED) {
+                redeem(ticket, scan.getScannedAt(), scan.getScannedByUserId(), scan.getTerminalId());
                 scan.setResult(ScanResult.ACCEPTED);
             } else {
-                scan.setResult(ScanResult.REJECTED_ALREADY_REDEEMED);
+                scan.setResult(scan.getLocalDecision() != null ? ScanResult.DUPLICATE_ENTRY : ScanResult.REJECTED_ALREADY_REDEEMED);
             }
             entryScanRepository.save(scan);
             edgeFeed.append(ticket.getEstablishmentId(), ticket.getGateId(), EdgeFeed.SCAN, scan.getTerminalId(),
                     Map.of("clientScanId", scan.getId(), "ticketId", ticket.getId(), "scannedAt", scan.getScannedAt(), "result", scan.getResult().name()));
             audit.recordAs(scan.getScannedByUserId(), "Système", "SCAN", "SCAN_" + scan.getResult().name(), "TICKET", ticket.getId(),
                     "Scan en attente réglé à l'arrivée de la vente : "
-                            + (scan.getResult() == ScanResult.ACCEPTED ? "entrée validée" : "entrée refusée (déjà utilisé)")
+                            + (scan.getResult() == ScanResult.ACCEPTED ? "entrée validée"
+                                : scan.getResult() == ScanResult.DUPLICATE_ENTRY ? "double entrée" : "entrée refusée (déjà utilisé)")
                             + " — billet " + ticket.getTicketNumber());
         }
+    }
+
+    private void redeem(Ticket ticket, Instant at, UUID userId, UUID terminalId) {
+        ticket.setStatus(TicketStatus.REDEEMED);
+        ticket.setRedeemedAt(at);
+        ticket.setRedeemedByUserId(userId);
+        ticket.setRedeemedByTerminalId(terminalId);
+        ticketRepository.save(ticket);
+    }
+
+    /** Does a scan (hlc, till, id) come before the current entry, in the order the tills use? Unknown stamps never do. */
+    private static boolean comesFirst(String hlc, UUID terminalId, UUID scanId, EntryScan current) {
+        if (hlc == null || current.getHlc() == null) return false;
+        int c = hlc.compareTo(current.getHlc());
+        if (c == 0) c = terminalId.toString().compareTo(current.getTerminalId().toString());
+        if (c == 0) c = scanId.toString().compareTo(current.getId().toString());
+        return c < 0;
     }
 
     private String nextReferenceNumber() {

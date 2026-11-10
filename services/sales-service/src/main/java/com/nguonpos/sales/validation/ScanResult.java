@@ -18,5 +18,8 @@ public enum ScanResult {
     // The scan reached central before the sale that issued the ticket
     // (another till's sale not synced yet). Settled to ACCEPTED or
     // REJECTED_ALREADY_REDEEMED as soon as that sale arrives.
-    PENDING_TICKET
+    PENDING_TICKET,
+    // A till let someone in on a ticket another till had already admitted
+    // while they could not reach each other or central: two entries.
+    DUPLICATE_ENTRY
 }

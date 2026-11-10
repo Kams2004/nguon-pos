@@ -1,5 +1,6 @@
 package com.nguonpos.sales.edgesync;
 
+import com.nguonpos.sales.device.DeviceRegistry;
 import com.nguonpos.sales.device.DeviceRegistry.Device;
 import com.nguonpos.sales.release.Releases;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,9 +46,14 @@ public class EdgeSessions {
     private final InternalClients internal;
     private final JsonMapper json;
     private final Releases releases;
+    private final DeviceRegistry registry;
+    /** Each till's last reported LAN addresses (host:port of its peer server), kept after it disconnects. */
+    private final Map<UUID, List<String>> lanByDevice = new ConcurrentHashMap<>();
+    private static final java.util.regex.Pattern LAN_ADDRESS = java.util.regex.Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}:\\d{1,5}");
 
-    public EdgeSessions(EdgeFeed feed, InternalClients internal, JsonMapper json, Releases releases) {
+    public EdgeSessions(EdgeFeed feed, InternalClients internal, JsonMapper json, Releases releases, DeviceRegistry registry) {
         this.releases = releases;
+        this.registry = registry;
         this.feed = feed;
         this.internal = internal;
         this.json = json;
@@ -85,6 +92,7 @@ public class EdgeSessions {
         sendCatalog(live, internal.gateConfig(live.device().establishmentId(), live.device().gateId()), catalogVersion);
         sendUsers(live, internal.gateUsers(live.device().establishmentId(), live.device().gateId()), usersVersion);
         sendRelease(live);
+        sendPeers(live);
         pump(live);
     }
 
@@ -111,6 +119,42 @@ public class EdgeSessions {
             JsonNode users = internal.gateUsers(lives.getFirst().device().establishmentId(), gate);
             lives.forEach(l -> sendUsers(l, users, null));
         });
+    }
+
+    /** A till reported where the other tills of its gate can reach it on the LAN. */
+    public void lanAddresses(Live live, List<String> reported) {
+        List<String> clean = reported.stream().filter(a -> a != null && LAN_ADDRESS.matcher(a).matches()).limit(5).toList();
+        // An address is the last reporter's: a reinstalled till or swapped IPs leave no stale owner behind.
+        lanByDevice.replaceAll((id, addrs) -> id.equals(live.device().id()) ? addrs : addrs.stream().filter(x -> !clean.contains(x)).toList());
+        List<String> previous = lanByDevice.put(live.device().id(), clean);
+        if (!clean.equals(previous)) peersChanged(live.device().gateId());
+    }
+
+    /** The gate's tills changed (an address, an enrollment, a revocation): tell its connected tills. */
+    public void peersChanged(UUID gateId) {
+        byDevice.values().stream().filter(l -> l.device().gateId().equals(gateId)).forEach(this::sendPeers);
+    }
+
+    public void peersChangedFor(UUID deviceId) {
+        registry.byId(deviceId).ifPresent(d -> peersChanged(d.gateId()));
+    }
+
+    /** PEERS: the other tills of this till's gate — label and LAN addresses — and the revoked ones, to refuse. */
+    private void sendPeers(Live live) {
+        UUID gate = live.device().gateId();
+        List<Map<String, Object>> peers = new ArrayList<>();
+        List<String> revoked = new ArrayList<>();
+        for (Map<String, Object> d : registry.list(live.device().establishmentId())) {
+            if (!gate.equals(d.get("gateId"))) continue;
+            UUID id = (UUID) d.get("id");
+            if ("REVOKED".equals(d.get("status"))) {
+                revoked.add(id.toString());
+            } else if (!id.equals(live.device().id())) {
+                peers.add(Map.of("deviceId", id.toString(), "label", String.valueOf(d.get("label")),
+                        "addresses", lanByDevice.getOrDefault(id, List.of())));
+            }
+        }
+        send(live, Map.of("t", "PEERS", "peers", peers, "revoked", revoked));
     }
 
     /** The version the establishment deploys changed (or was frozen): tell its connected tills. */

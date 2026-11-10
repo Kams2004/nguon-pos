@@ -57,6 +57,7 @@ public class DeviceAdminController {
     public ResponseEntity<Void> revoke(@AuthenticationPrincipal Claims claims, @PathVariable UUID id) {
         registry.revoke(establishmentOf(claims), id, claims);
         sessions.disconnect(id);
+        sessions.peersChangedFor(id); // the gate's other tills refuse it on the LAN too
         return ResponseEntity.noContent().build();
     }
 

@@ -239,6 +239,105 @@ class EdgeSyncIntegrationTest {
         assertThat(enrollRequest(UUID.randomUUID(), code, ecKeys()).statusCode()).isEqualTo(403);
     }
 
+    @Test
+    void tillsOfAGateLearnWhereTheirNeighboursAreAndWhichToRefuse() throws Exception {
+        Till a = enroll("Caisse LAN A");
+        Till b = enroll("Caisse LAN B");
+        Channel chA = a.connect();
+        Channel chB = b.connect();
+        chB.next("PEERS");
+        chA.send("{\"t\":\"STATUS\",\"pending\":0,\"lan\":[\"192.168.1.23:47310\",\"not an address\"]}");
+        JsonNode peers = null;
+        for (int i = 0; i < 5 && peers == null; i++) {
+            for (JsonNode p : chB.next("PEERS").get("peers")) {
+                if (p.get("deviceId").asString().equals(a.id.toString()) && !p.get("addresses").isEmpty()) peers = p;
+            }
+        }
+        assertThat(peers).isNotNull();
+        assertThat(peers.get("label").asString()).isEqualTo("Caisse LAN A");
+        assertThat(peers.get("addresses").size()).isEqualTo(1); // the junk entry is dropped
+        assertThat(peers.get("addresses").get(0).asString()).isEqualTo("192.168.1.23:47310");
+
+        HttpResponse<String> revoked = http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/devices/" + a.id + "/revoke"))
+                .header("Authorization", "Bearer " + adminToken()).POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(revoked.statusCode()).isEqualTo(204);
+        boolean refused = false;
+        for (int i = 0; i < 5 && !refused; i++) {
+            for (JsonNode r : chB.next("PEERS").get("revoked")) refused |= r.asString().equals(a.id.toString());
+        }
+        assertThat(refused).isTrue();
+    }
+
+    @Test
+    void tillsOfAGateLearnWhereTheOthersAreOnTheLanAndWhichWereRevoked() throws Exception {
+        Till a = enroll("Caisse LAN A");
+        Till b = enroll("Caisse LAN B");
+        Channel chA = a.connect();
+        Channel chB = b.connect();
+        chB.next("PEERS");
+        chA.send("{\"t\":\"STATUS\",\"pending\":0,\"lan\":[\"192.168.1.20:47310\",\"not-an-address\"]}");
+        JsonNode peers = null;
+        for (int i = 0; i < 5 && peers == null; i++) {
+            for (JsonNode p : chB.next("PEERS").get("peers")) {
+                if (p.get("deviceId").asString().equals(a.id.toString()) && !p.get("addresses").isEmpty()) peers = p;
+            }
+        }
+        assertThat(peers).isNotNull();
+        assertThat(peers.get("addresses").toString()).isEqualTo("[\"192.168.1.20:47310\"]"); // garbage dropped
+        assertThat(peers.get("label").asString()).isEqualTo("Caisse LAN A");
+
+        http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/devices/" + a.id + "/revoke"))
+                .header("Authorization", "Bearer " + adminToken()).POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+        boolean told = false;
+        for (int i = 0; i < 5 && !told; i++) told = chB.next("PEERS").get("revoked").toString().contains(a.id.toString());
+        assertThat(told).isTrue();
+    }
+
+    @Test
+    void aTicketLetInByTwoTillsThatCouldNotTalkIsASecondEntryNotARefusal() throws Exception {
+        Till a = enroll("Caisse D1");
+        Till b = enroll("Caisse D2");
+        Channel chA = a.connect();
+        Channel chB = b.connect();
+        chA.next("WELCOME");
+        chB.next("WELCOME");
+        UUID sale = UUID.randomUUID(), ticket = UUID.randomUUID();
+        chA.send(push(a, 1, "SALE", saleEntry(sale, ticket)));
+        chA.next("ACK");
+        String scan = "{\"clientScanId\":\"%s\",\"ticketId\":\"" + ticket + "\",\"scannedAt\":\"" + Instant.now() + "\",\"localDecision\":\"%s\"}";
+
+        chA.send(push(a, 2, "SCAN", scan.formatted(UUID.randomUUID(), "ACCEPTED")));
+        assertThat(chA.next("ACK").get("results").get(0).get("scanResult").asString()).isEqualTo("ACCEPTED");
+        chB.send(push(b, 1, "SCAN", scan.formatted(UUID.randomUUID(), "ACCEPTED")));   // B let someone in too
+        assertThat(chB.next("ACK").get("results").get(0).get("scanResult").asString()).isEqualTo("DUPLICATE_ENTRY");
+        chB.send(push(b, 2, "SCAN", scan.formatted(UUID.randomUUID(), "ALREADY_REDEEMED"))); // B refused this one
+        assertThat(chB.next("ACK").get("results").get(0).get("scanResult").asString()).isEqualTo("REJECTED_ALREADY_REDEEMED");
+
+        // A refusal that reaches central before the entry it was refused for (relayed later) is never the entry.
+        UUID sale2 = UUID.randomUUID(), ticket2 = UUID.randomUUID();
+        chA.send(push(a, 3, "SALE", saleEntry(sale2, ticket2)));
+        chA.next("ACK");
+        String scan2 = scan.replace(ticket.toString(), ticket2.toString());
+        chB.send(push(b, 3, "SCAN", scan2.formatted(UUID.randomUUID(), "ALREADY_REDEEMED")));
+        assertThat(chB.next("ACK").get("results").get(0).get("scanResult").asString()).isEqualTo("REJECTED_ALREADY_REDEEMED");
+        assertThat(jdbc.queryForObject("SELECT status FROM sales.ticket WHERE id = ?", String.class, ticket2)).isEqualTo("ISSUED");
+        chA.send(push(a, 4, "SCAN", scan2.formatted(UUID.randomUUID(), "ACCEPTED")));
+        assertThat(chA.next("ACK").get("results").get(0).get("scanResult").asString()).isEqualTo("ACCEPTED");
+
+        // Two real entries: the earlier by the tills' clock is the entry, even when it arrives second — as on the tills.
+        UUID sale3 = UUID.randomUUID(), ticket3 = UUID.randomUUID();
+        chA.send(push(a, 5, "SALE", saleEntry(sale3, ticket3)));
+        chA.next("ACK");
+        String scan3 = scan.replace(ticket.toString(), ticket3.toString());
+        UUID late = UUID.randomUUID(), early = UUID.randomUUID();
+        chA.send(push(a, 6, "SCAN", scan3.formatted(late, "ACCEPTED"), "9999999999000-0000"));
+        assertThat(chA.next("ACK").get("results").get(0).get("scanResult").asString()).isEqualTo("ACCEPTED");
+        chB.send(push(b, 4, "SCAN", scan3.formatted(early, "ACCEPTED"), "0000000001000-0000"));
+        assertThat(chB.next("ACK").get("results").get(0).get("scanResult").asString()).isEqualTo("ACCEPTED");
+        assertThat(jdbc.queryForObject("SELECT result FROM sales.entry_scan WHERE id = ?", String.class, late)).isEqualTo("DUPLICATE_ENTRY");
+        assertThat(jdbc.queryForObject("SELECT redeemed_by_terminal_id FROM sales.ticket WHERE id = ?", UUID.class, ticket3)).isEqualTo(b.id);
+    }
+
     HttpResponse<String> setTarget(String versionJson) throws Exception {
         return http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/releases/target"))
                 .header("Authorization", "Bearer " + adminToken()).header("Content-Type", "application/json")
@@ -322,7 +421,10 @@ class EdgeSyncIntegrationTest {
     }
 
     String push(Till till, long seq, String type, String payload) throws Exception {
-        String hlc = String.format("%013d-0000", System.currentTimeMillis());
+        return push(till, seq, type, payload, String.format("%013d-0000", System.currentTimeMillis()));
+    }
+
+    String push(Till till, long seq, String type, String payload, String hlc) throws Exception {
         String signed = String.join("\u001f", till.id.toString(), Long.toString(seq), type, hlc, cashier.toString(), payload);
         return JSON.writeValueAsString(Map.of("t", "PUSH", "batchId", "b" + seq, "records", List.of(Map.of(
                 "origin", till.id.toString(), "seq", seq, "type", type, "hlc", hlc, "actorUserId", cashier.toString(),
@@ -351,7 +453,9 @@ class EdgeSyncIntegrationTest {
                 .build(new JcaContentSignerBuilder("SHA256withECDSA").build(keys.getPrivate()));
         String body = JSON.writeValueAsString(Map.of("deviceId", deviceId.toString(), "code", code,
                 "csrPem", pem("CERTIFICATE REQUEST", csr.getEncoded()), "os", "test", "appVersion", "0.0.1"));
+        // Each test till from its own address: the per-address enrollment limit is not what these tests are about.
         return http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/enroll/v1")).header("Content-Type", "application/json")
+                .header("X-Real-IP", "10.9." + (deviceId.hashCode() & 0xff) + "." + ((deviceId.hashCode() >> 8) & 0xff))
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
     }
 

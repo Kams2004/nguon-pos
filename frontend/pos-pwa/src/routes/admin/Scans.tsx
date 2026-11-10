@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Clock, FilterX, ScanLine, ShieldAlert } from "lucide-react";
+import { CheckCircle2, Clock, Copy, FilterX, ScanLine, ShieldAlert } from "lucide-react";
 import { useLiveRefresh, useSession } from "../../context/SessionContext";
 import { api } from "../../lib/api/client";
 import type { ScanEntry, ScanFilter, ScanResultValue, TerminalStatus } from "../../lib/api/types";
@@ -20,6 +20,7 @@ const RESULT_FILTERS: { value: ScanFilter | ""; labelKey: MessageKey }[] = [
   { value: "REJECTED_ALREADY_REDEEMED", labelKey: "reports.scans.filter.alreadyUsed" },
   { value: "REJECTED_UNKNOWN_TICKET", labelKey: "reports.scans.filter.unknown" },
   { value: "PENDING_TICKET", labelKey: "reports.scans.filter.pending" },
+  { value: "DUPLICATE_ENTRY", labelKey: "reports.scans.filter.duplicate" },
 ];
 
 type Filters = { result: ScanFilter | ""; gateId: string; from: string; to: string };
@@ -40,7 +41,7 @@ export default function Scans() {
   const { t } = useI18n();
   const { gates, gateName, ticketType, userName } = useCatalog();
   const [scans, setScans] = useState<ScanEntry[] | null>(null);
-  const [counts, setCounts] = useState({ accepted: 0, rejected: 0, pending: 0 });
+  const [counts, setCounts] = useState({ accepted: 0, rejected: 0, pending: 0, duplicate: 0 });
   const [terminals, setTerminals] = useState<TerminalStatus[]>([]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -65,7 +66,7 @@ export default function Scans() {
     setScans(res.content);
     setTotalPages(Math.max(1, res.totalPages));
     setTotalElements(res.totalElements);
-    setCounts({ accepted: res.acceptedCount, rejected: res.rejectedCount, pending: res.pendingCount });
+    setCounts({ accepted: res.acceptedCount, rejected: res.rejectedCount, pending: res.pendingCount, duplicate: res.duplicateCount ?? 0 });
   }, [session, page, pageSize, filters]);
 
   useEffect(() => {
@@ -105,6 +106,15 @@ export default function Scans() {
           value={counts.rejected.toLocaleString(locale())}
           hint={total > 0 ? t("reports.scans.rejectedShare", { n: Math.round((counts.rejected / total) * 100) }) : undefined}
         />
+        {counts.duplicate > 0 && (
+          <StatCard
+            icon={Copy}
+            tone="gold"
+            label={t("reports.scans.result.DUPLICATE_ENTRY")}
+            value={counts.duplicate.toLocaleString(locale())}
+            hint={t("reports.scans.duplicateHint")}
+          />
+        )}
         {counts.pending > 0 && (
           <StatCard
             icon={Clock}
@@ -207,7 +217,7 @@ export default function Scans() {
                 return (
                   <tr
                     key={s.id}
-                    className={`border-b border-border/60 last:border-0 ${s.result === "ACCEPTED" ? "" : s.result === "PENDING_TICKET" ? "bg-amber-50/40" : "bg-red-50/40"}`}
+                    className={`border-b border-border/60 last:border-0 ${s.result === "ACCEPTED" ? "" : s.result === "PENDING_TICKET" || s.result === "DUPLICATE_ENTRY" ? "bg-amber-50/40" : "bg-red-50/40"}`}
                   >
                     <td className="td text-muted-foreground">{formatDateTime(s.scannedAt)}</td>
                     <td className="td">
@@ -225,7 +235,15 @@ export default function Scans() {
                     <td className="td">{terminalLabel(s.terminalId)}</td>
                     <td className="td">{userName(s.scannedByUserId)}</td>
                     <td className="td">
-                      <Pill tone={s.result === "ACCEPTED" ? "success" : s.result === "PENDING_TICKET" ? "warning" : "danger"}>
+                      <Pill
+                        tone={
+                          s.result === "ACCEPTED"
+                            ? "success"
+                            : s.result === "PENDING_TICKET" || s.result === "DUPLICATE_ENTRY"
+                              ? "warning"
+                              : "danger"
+                        }
+                      >
                         {resultLabel(s.result)}
                       </Pill>
                     </td>
@@ -238,7 +256,9 @@ export default function Scans() {
                             ? t("reports.scans.sellerNotSynced")
                             : s.result === "REJECTED_VOIDED"
                               ? t("reports.scans.saleVoided")
-                              : ""}
+                              : s.result === "DUPLICATE_ENTRY"
+                                ? t("reports.scans.duplicateDetail")
+                                : ""}
                     </td>
                   </tr>
                 );

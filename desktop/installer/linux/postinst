@@ -41,6 +41,14 @@ chmod 0644 "$DATA/ui-token"
 # watcher that starts it when the local server has a verified download.
 install -d -m 0700 -o root -g root /var/lib/nguon-updater
 
+# Peer sync between the tills of a gate (TLS with device certificates on
+# TCP 47310, LAN announcements on UDP 47311): only matters when Ubuntu's
+# firewall is switched on, which it is not by default.
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+  ufw allow 47310/tcp comment "Nguon POS peers" >/dev/null || true
+  ufw allow 47311/udp comment "Nguon POS peers" >/dev/null || true
+fi
+
 systemctl daemon-reload
 systemctl enable nguon-edge.service nguon-updater.path >/dev/null 2>&1 || true
 systemctl start nguon-updater.path || true

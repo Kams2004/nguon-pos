@@ -75,6 +75,8 @@ public class EdgeChannel {
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
     private final Updater updater;
+    private final com.nguonpos.edge.peer.PeerStore peerStore;
+    private final com.nguonpos.edge.peer.PeerDiscovery discovery;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> new Thread(r, "edge-channel"));
 
     private volatile WebSocket ws;
@@ -87,7 +89,10 @@ public class EdgeChannel {
     private final StringBuilder partial = new StringBuilder();
 
     public EdgeChannel(EdgeProperties props, Enrollment enrollment, DeviceIdentity device, EventLog eventLog, Catalog catalog,
-                       LocalAuth auth, TillService till, LiveEvents live, Meta meta, JdbcTemplate jdbc, JsonMapper json, Updater updater) {
+                       LocalAuth auth, TillService till, LiveEvents live, Meta meta, JdbcTemplate jdbc, JsonMapper json, Updater updater,
+                       com.nguonpos.edge.peer.PeerStore peerStore, com.nguonpos.edge.peer.PeerDiscovery discovery) {
+        this.peerStore = peerStore;
+        this.discovery = discovery;
         this.updater = updater;
         this.props = props;
         this.enrollment = enrollment;
@@ -126,6 +131,7 @@ public class EdgeChannel {
             status.put("pending", eventLog.pendingCount(EventLog.SALE) + eventLog.pendingCount(EventLog.SCAN));
             if (activeUserId != null) status.put("userId", activeUserId);
             status.put("update", updater.status().get("state"));
+            status.put("lan", discovery.lanAddresses());
             worker.execute(() -> send(status));
         }
     }
@@ -228,6 +234,17 @@ public class EdgeChannel {
                 }
             }
             case "RELEASE" -> updater.onRelease(f);
+            case "PEERS" -> {
+                // The gate's tills as central knows them: where to reach each one, and which were revoked.
+                List<com.nguonpos.edge.peer.PeerStore.Info> active = new ArrayList<>();
+                for (JsonNode p : f.path("peers")) {
+                    String address = p.path("addresses").isArray() && !p.path("addresses").isEmpty() ? p.path("addresses").get(0).asString() : null;
+                    active.add(new com.nguonpos.edge.peer.PeerStore.Info(p.path("deviceId").asString(), p.path("label").asString(null), address));
+                }
+                List<String> revoked = new ArrayList<>();
+                for (JsonNode r : f.path("revoked")) revoked.add(r.asString());
+                peerStore.replaceFromCentral(active, revoked, device.deviceId().toString());
+            }
             case "UPGRADE_REQUIRED" -> log.warn("Central needs a newer till version (protocol {}): working offline until updated", f.path("p"));
             default -> log.debug("Ignored frame {}", f.path("t"));
         }

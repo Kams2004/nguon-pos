@@ -79,6 +79,11 @@ public class EdgeSyncHandler extends TextWebSocketHandler {
             case "FEED_ACK" -> sessions.feedAcked(live, frame.path("cursor").asLong());
             case "STATUS" -> {
                 String user = frame.path("userId").asString(null);
+                if (frame.path("lan").isArray()) {
+                    java.util.List<String> lan = new java.util.ArrayList<>();
+                    frame.path("lan").forEach(a -> lan.add(a.asString("")));
+                    sessions.lanAddresses(live, lan);
+                }
                 presence.heartbeat(new HeartbeatRequest(device.id(), device.gateId(), frame.path("pending").asInt(0), device.label()),
                         ingest.actorClaims(device, user != null ? UUID.fromString(user) : new UUID(0, 0)));
             }

@@ -84,7 +84,9 @@ export type ScanResultValue =
   | "REJECTED_UNKNOWN_TICKET"
   | "REJECTED_VOIDED"
   /** Reached central before the sale of its ticket; settled when that sale arrives. */
-  | "PENDING_TICKET";
+  | "PENDING_TICKET"
+  /** Two tills cut off from each other both let this ticket in: a second person entered. */
+  | "DUPLICATE_ENTRY";
 
 export type ScanSyncResult = {
   clientScanId: string;
@@ -212,6 +214,7 @@ export type ScanPage = {
   acceptedCount: number;
   rejectedCount: number;
   pendingCount: number;
+  duplicateCount: number;
 };
 
 export type AuditCategory = "AUTH" | "USER" | "CATALOG" | "SETTINGS" | "MEDIA" | "SALE" | "VOID" | "SCAN" | "TERMINAL" | "SUBSCRIPTION";

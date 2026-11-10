@@ -72,7 +72,7 @@ class UpdaterTest {
     }
 
     private Updater updater(String installed, long quietMinutes) throws Exception {
-        var props = new EdgeProperties(dir.resolve("data"), "http://127.0.0.1:" + server.getAddress().getPort(), "file", List.of(), 0, null, null);
+        var props = new EdgeProperties(dir.resolve("data"), "http://127.0.0.1:" + server.getAddress().getPort(), "file", List.of(), 0, null, null, 0, 0, List.of());
         Installer fake = new Installer() {
             @Override
             public String fileName(String version) {

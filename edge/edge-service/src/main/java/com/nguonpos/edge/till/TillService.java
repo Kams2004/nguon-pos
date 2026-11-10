@@ -180,10 +180,10 @@ public class TillService {
             if (decision.equals("ACCEPTED")) {
                 jdbc.update("UPDATE ticket SET status = 'REDEEMED', redeemed_at = ? WHERE id = ?", now, ticketId);
             }
-            jdbc.update("INSERT INTO scan (id, ticket_id, scanned_by, scanned_at, decision) VALUES (?, ?, ?, ?, ?)",
-                    scanId, ticketId, controller.id(), now, decision);
             Map<String, Object> entry = Map.of("clientScanId", scanId, "ticketId", ticketId, "scannedAt", now, "localDecision", decision);
-            log.append(EventLog.SCAN, controller.id(), json.writeValueAsString(entry));
+            EventLog.Record rec = log.append(EventLog.SCAN, controller.id(), json.writeValueAsString(entry));
+            jdbc.update("INSERT INTO scan (id, ticket_id, scanned_by, scanned_at, decision, origin, hlc) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    scanId, ticketId, controller.id(), now, decision, rec.origin(), rec.hlc());
             return new ScanResult(decision, number, decision.equals("ACCEPTED") ? now : rows.getFirst()[1]);
         });
     }
@@ -217,7 +217,79 @@ public class TillService {
                         ON CONFLICT (id) DO NOTHING""", t.get("id").asString(), saleId, t.get("ticketTypeId").asString(),
                         t.get("ticketNumber").asString(), t.get("qrSignature").asString());
             }
+            // A scan of these tickets may have arrived first (from another till): they are used already.
+            jdbc.update("""
+                    UPDATE ticket SET status = 'REDEEMED',
+                        redeemed_at = (SELECT MIN(scanned_at) FROM scan WHERE scan.ticket_id = ticket.id AND decision = 'ACCEPTED')
+                    WHERE sale_id = ? AND status = 'ISSUED'
+                      AND EXISTS (SELECT 1 FROM scan WHERE scan.ticket_id = ticket.id AND decision = 'ACCEPTED')""", saleId);
         });
+    }
+
+    // ── What the other tills of the gate did (over the local network) ────
+
+    /** A sale signed by another till of this gate (record payload as that till logged it). */
+    public void applyPeerSale(String cashierUserId, tools.jackson.databind.JsonNode entry) {
+        var p = json.createObjectNode();
+        String saleId = entry.get("idempotencyKey").asString();
+        p.put("transactionId", saleId);
+        p.put("referenceNumber", "LAN-" + saleId.substring(0, 8).toUpperCase());
+        p.put("cashierUserId", cashierUserId);
+        p.put("paymentMethod", entry.path("paymentMethod").asString("CASH"));
+        p.put("createdAtClient", entry.path("createdAtClient").asString(Instant.now().toString()));
+        p.set("lines", entry.get("lines"));
+        p.set("tickets", entry.get("tickets"));
+        applyForeignSale(p);
+    }
+
+    /**
+     * A scan made at another till of this gate. When two tills let the same
+     * ticket in while cut off from each other, every till keeps the same one
+     * as the entry — the earliest by hybrid clock, then till, then scan id —
+     * and flags the other as a second entry.
+     */
+    public void applyPeerScan(String origin, String hlc, String actor, tools.jackson.databind.JsonNode entry) {
+        String scanId = entry.get("clientScanId").asString();
+        String ticketId = entry.get("ticketId").asString();
+        String at = entry.get("scannedAt").asString();
+        String decision = entry.path("localDecision").asString("ACCEPTED");
+        tx.executeWithoutResult(s -> {
+            int inserted = jdbc.update("""
+                    INSERT INTO scan (id, ticket_id, scanned_by, scanned_at, decision, origin, hlc) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (id) DO NOTHING""", scanId, ticketId, actor, at, decision, origin, hlc);
+            if (inserted == 0 || !decision.equals("ACCEPTED")) return;
+            jdbc.update("UPDATE ticket SET status = 'REDEEMED', redeemed_at = ? WHERE id = ? AND status = 'ISSUED'", at, ticketId);
+            resolveDoubleEntry(ticketId);
+        });
+    }
+
+    /** Several accepted scans of one ticket: the earliest stays the entry, the others become second entries. */
+    private void resolveDoubleEntry(String ticketId) {
+        List<String[]> accepted = jdbc.query("""
+                SELECT id, scanned_at, duplicate FROM scan WHERE ticket_id = ? AND decision = 'ACCEPTED'
+                ORDER BY COALESCE(hlc, scanned_at), COALESCE(origin, ''), id""",
+                (rs, i) -> new String[]{rs.getString(1), rs.getString(2), rs.getString(3)}, ticketId);
+        if (accepted.size() < 2) return;
+        boolean newlyFound = false;
+        for (int i = 0; i < accepted.size(); i++) {
+            int dup = i == 0 ? 0 : 1;
+            if (!String.valueOf(dup).equals(accepted.get(i)[2])) {
+                jdbc.update("UPDATE scan SET duplicate = ? WHERE id = ?", dup, accepted.get(i)[0]);
+                if (dup == 1) newlyFound = true;
+            }
+        }
+        jdbc.update("UPDATE ticket SET redeemed_at = ? WHERE id = ?", accepted.getFirst()[1], ticketId);
+        if (newlyFound) {
+            String number = jdbc.queryForList("SELECT ticket_number FROM ticket WHERE id = ?", String.class, ticketId).stream().findFirst()
+                    .orElse(ticketId);
+            live.publish("DUPLICATE_ENTRY", Map.of("ticketId", ticketId, "ticketNumber", number, "entries", accepted.size()));
+        }
+    }
+
+    /** Second entries found here (the same ticket admitted by two tills while they were cut off). */
+    public int duplicateEntries() {
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM scan WHERE duplicate = 1", Integer.class);
+        return n == null ? 0 : n;
     }
 
     /** Another till let this ticket in: it is used here too. */

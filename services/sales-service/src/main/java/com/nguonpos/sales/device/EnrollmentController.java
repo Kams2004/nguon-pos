@@ -31,16 +31,21 @@ public class EnrollmentController {
     static final Duration WINDOW = Duration.ofMinutes(10);
 
     private final DeviceRegistry registry;
+    private final com.nguonpos.sales.edgesync.EdgeSessions sessions;
     private final Map<String, Deque<Instant>> attempts = new ConcurrentHashMap<>();
 
-    public EnrollmentController(DeviceRegistry registry) {
+    public EnrollmentController(DeviceRegistry registry, com.nguonpos.sales.edgesync.EdgeSessions sessions) {
         this.registry = registry;
+        this.sessions = sessions;
     }
 
     @PostMapping("/sales/enroll/v1")
     public DeviceRegistry.Enrolled enroll(@Valid @RequestBody Request req, HttpServletRequest http) {
         throttle(clientAddress(http));
-        return registry.enroll(new DeviceRegistry.EnrollRequest(req.deviceId(), req.code(), req.csrPem(), req.label(), req.os(), req.appVersion()));
+        DeviceRegistry.Enrolled enrolled = registry.enroll(
+                new DeviceRegistry.EnrollRequest(req.deviceId(), req.code(), req.csrPem(), req.label(), req.os(), req.appVersion()));
+        sessions.peersChanged(enrolled.gateId()); // the gate's other tills learn about the new one at once
+        return enrolled;
     }
 
     private void throttle(String address) {

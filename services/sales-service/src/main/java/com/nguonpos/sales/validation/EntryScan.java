@@ -40,4 +40,12 @@ public class EntryScan {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ScanResult result;
+
+    /** What the till decided at the gate (ACCEPTED: the person went in), when it says. */
+    @Column(name = "local_decision")
+    private String localDecision;
+
+    /** The till's hybrid-clock stamp (desktop tills), to order entries made while tills were cut off. */
+    @Column(name = "hlc")
+    private String hlc;
 }

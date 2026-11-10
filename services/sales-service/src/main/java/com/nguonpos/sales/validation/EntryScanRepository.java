@@ -10,4 +10,7 @@ public interface EntryScanRepository extends JpaRepository<EntryScan, UUID>, Jpa
 
     /** Scans of a ticket still waiting for its sale, oldest first. */
     List<EntryScan> findByTicketIdAndEstablishmentIdAndResultOrderByScannedAtAscIdAsc(UUID ticketId, UUID establishmentId, ScanResult result);
+
+    /** The scan counted as a ticket's entry. */
+    java.util.Optional<EntryScan> findFirstByTicketIdAndResult(UUID ticketId, ScanResult result);
 }

@@ -104,7 +104,8 @@ public class EdgeIngest {
                 sales |= res.status() == SaleSyncResponse.Status.ACCEPTED;
             } else if (type.equals("SCAN")) {
                 ScanSyncRequest.ScanEntry entry = json.readValue(r.get("payload").asString(), ScanSyncRequest.ScanEntry.class);
-                ScanSyncResponse.EntryResult res = processor.processScanEntry(entry, origin, pusher.gateId(), pusher.establishmentId(), actor, claims);
+                ScanSyncResponse.EntryResult res = processor.processScanEntry(entry, r.path("hlc").asString(null), origin, pusher.gateId(),
+                        pusher.establishmentId(), actor, claims);
                 result.put("status", "ACCEPTED");
                 result.put("scanResult", res.scanResult().name());
                 scans = true;

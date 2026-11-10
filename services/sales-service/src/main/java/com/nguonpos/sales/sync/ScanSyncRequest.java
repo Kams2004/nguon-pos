@@ -14,6 +14,7 @@ public record ScanSyncRequest(
         @NotNull UUID gateId,
         @NotEmpty @Size(max = 500) @Valid List<ScanEntry> entries
 ) {
-    public record ScanEntry(@NotNull UUID clientScanId, @NotNull UUID ticketId, @NotNull Instant scannedAt) {
+    /** localDecision: what the till decided at the gate (desktop tills send it; null from browser tills). */
+    public record ScanEntry(@NotNull UUID clientScanId, @NotNull UUID ticketId, @NotNull Instant scannedAt, String localDecision) {
     }
 }

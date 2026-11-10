@@ -65,6 +65,11 @@ export type EdgeStatus = {
   /** The till's name, given in the back office when its code was made. */
   deviceLabel: string | null;
   channelConnected: boolean;
+  /** The other tills of the gate on the local network, and whether this till's own peer server runs. */
+  peers: { deviceId: string; label: string | null; address: string; connected: boolean; lastSeenAt: string | null }[];
+  peerServer: boolean;
+  /** Tickets this till knows were let in twice (two tills cut off from each other). */
+  duplicateEntries: number;
   /** The installed version ("dev" from source) and the automatic update's progress. */
   appVersion: string;
   update: {

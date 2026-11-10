@@ -182,6 +182,10 @@ export default defineMessages({
     "reports.scans.otherVenue": "Billet d'un autre établissement",
     "reports.scans.sellerNotSynced": "La caisse qui a vendu ce billet ne s'est pas encore synchronisée",
     "reports.scans.saleVoided": "La vente de ce billet a été annulée",
+    "reports.scans.result.DUPLICATE_ENTRY": "Double entrée",
+    "reports.scans.filter.duplicate": "Doubles entrées",
+    "reports.scans.duplicateHint": "Même billet admis par deux caisses coupées l'une de l'autre",
+    "reports.scans.duplicateDetail": "Deux caisses sans réseau entre elles ont laissé entrer ce billet : une personne de trop.",
 
     // Live tills
     "reports.tills.title": "Caisses en direct",
@@ -409,6 +413,10 @@ export default defineMessages({
     "reports.scans.otherVenue": "Ticket from another venue",
     "reports.scans.sellerNotSynced": "The till that sold this ticket hasn't synced yet",
     "reports.scans.saleVoided": "The sale of this ticket was voided",
+    "reports.scans.result.DUPLICATE_ENTRY": "Double entry",
+    "reports.scans.filter.duplicate": "Double entries",
+    "reports.scans.duplicateHint": "Same ticket let in by two tills cut off from each other",
+    "reports.scans.duplicateDetail": "Two tills with no network between them both let this ticket in: one person too many.",
 
     // Live tills
     "reports.tills.title": "Live tills",

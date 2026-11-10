@@ -69,8 +69,10 @@ public class ScanController {
             return cb.and(where.toArray(Predicate[]::new));
         };
         Specification<EntryScan> accepted = (root, query, cb) -> cb.equal(root.get("result"), ScanResult.ACCEPTED);
-        Specification<EntryScan> refused = (root, query, cb) -> cb.not(root.get("result").in(ScanResult.ACCEPTED, ScanResult.PENDING_TICKET));
+        Specification<EntryScan> refused = (root, query, cb) -> cb.not(root.get("result").in(ScanResult.ACCEPTED, ScanResult.PENDING_TICKET,
+                ScanResult.DUPLICATE_ENTRY));
         Specification<EntryScan> pending = (root, query, cb) -> cb.equal(root.get("result"), ScanResult.PENDING_TICKET);
+        Specification<EntryScan> duplicate = (root, query, cb) -> cb.equal(root.get("result"), ScanResult.DUPLICATE_ENTRY);
 
         Specification<EntryScan> spec = base;
         if (result != null) {
@@ -94,18 +96,20 @@ public class ScanController {
                 scans.getTotalPages(),
                 scanRepository.count(base.and(accepted)),
                 scanRepository.count(base.and(refused)),
-                scanRepository.count(base.and(pending))
+                scanRepository.count(base.and(pending)),
+                scanRepository.count(base.and(duplicate))
         );
     }
 
-    // REJECTED = any refusal (every outcome except ACCEPTED and PENDING_TICKET).
+    // REJECTED = any refusal (every outcome except ACCEPTED, PENDING_TICKET and DUPLICATE_ENTRY — someone got in).
     public enum ResultFilter {
         ACCEPTED, REJECTED, REJECTED_ALREADY_REDEEMED, REJECTED_INVALID_SIGNATURE, REJECTED_WRONG_GATE, REJECTED_UNKNOWN_TICKET,
-        REJECTED_VOIDED, PENDING_TICKET
+        REJECTED_VOIDED, PENDING_TICKET, DUPLICATE_ENTRY
     }
 
     public record ScanPage(
-            List<ScanSummary> content, long totalElements, int totalPages, long acceptedCount, long rejectedCount, long pendingCount
+            List<ScanSummary> content, long totalElements, int totalPages, long acceptedCount, long rejectedCount, long pendingCount,
+            long duplicateCount
     ) {
     }
 

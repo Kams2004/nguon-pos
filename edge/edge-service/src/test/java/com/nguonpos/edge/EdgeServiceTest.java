@@ -61,6 +61,12 @@ class EdgeServiceTest {
     @Autowired
     Uplink uplink;
 
+    @Autowired
+    com.nguonpos.edge.till.TillService till;
+
+    @Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     final HttpClient http = HttpClient.newHttpClient();
 
     @BeforeAll
@@ -83,6 +89,8 @@ class EdgeServiceTest {
         r.add("edge.key-provider", () -> "file");
         r.add("edge.sync-interval-ms", () -> "3600000"); // tests run the uplink themselves
         r.add("server.port", () -> "0");
+        r.add("edge.peer-port", () -> "0"); // no LAN ports in tests
+        r.add("edge.beacon-port", () -> "0");
     }
 
     @BeforeEach
@@ -165,6 +173,46 @@ class EdgeServiceTest {
                 .isEqualTo("INVALID_SIGNATURE");
         assertThat(scan(session, TicketSignatures.sign(payload(UUID.randomUUID().toString(), "GATE-OTHER"), SECRET))).isEqualTo("WRONG_GATE");
         assertThat(scan(session, TicketSignatures.sign(payload(UUID.randomUUID().toString(), GATE_CODE), SECRET))).isEqualTo("NOT_RECOGNIZED");
+    }
+
+    // ── Tills of the gate over the LAN (milestone 5) ─────────────────────
+
+    @Test
+    void twoTillsThatLetTheSameTicketInWhileCutOffAgreeOnWhichEntryCounts() throws Exception {
+        String session = login("cashier1", "secret");
+        JsonNode ticket = sell(session, 1).get("tickets").get(0);
+        String ticketId = ticket.get("id").asString();
+        assertThat(scan(session, ticket.get("qrContent").asString())).isEqualTo("ACCEPTED");
+
+        // Another till let the same ticket in a little earlier (smaller hybrid clock), unaware of this one.
+        String peerScan = """
+                {"clientScanId":"%s","ticketId":"%s","scannedAt":"2026-01-01T00:00:00Z","localDecision":"ACCEPTED"}"""
+                .formatted(UUID.randomUUID(), ticketId);
+        till.applyPeerScan("peer-till", "0000000001000-0000", "u2", JSON.readTree(peerScan));
+        till.applyPeerScan("peer-till", "0000000001000-0000", "u2", JSON.readTree(peerScan)); // received twice: no change
+
+        // Both tills agree: the peer's scan is the entry, this till's is the second entry.
+        assertThat(jdbc.queryForList("SELECT origin FROM scan WHERE ticket_id = ? AND decision = 'ACCEPTED' AND duplicate = 0", String.class, ticketId))
+                .containsExactly("peer-till");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM scan WHERE ticket_id = ? AND duplicate = 1", Integer.class, ticketId)).isEqualTo(1);
+    }
+
+    @Test
+    void aTicketScannedElsewhereBeforeItsSaleArrivesIsAlreadyUsedWhenItDoes() throws Exception {
+        String session = login("cashier1", "secret");
+        String ticketId = UUID.randomUUID().toString();
+        String qr = TicketSignatures.sign(payload(ticketId, GATE_CODE), SECRET);
+        // The other till's records travel separately: its scan comes in first…
+        till.applyPeerScan("peer-till", "0000000002000-0000", "u2", JSON.readTree("""
+                {"clientScanId":"%s","ticketId":"%s","scannedAt":"2026-01-01T00:00:05Z","localDecision":"ACCEPTED"}"""
+                .formatted(UUID.randomUUID(), ticketId)));
+        // …then its sale.
+        till.applyPeerSale("u2", JSON.readTree("""
+                {"idempotencyKey":"%s","paymentMethod":"CASH","createdAtClient":"2026-01-01T00:00:00Z",
+                 "lines":[{"ticketTypeId":"%s","quantity":1,"unitPrice":2000}],
+                 "tickets":[{"id":"%s","ticketTypeId":"%s","ticketNumber":"GATE-T-lan-0-0","qrSignature":"%s"}]}"""
+                .formatted(UUID.randomUUID(), TICKET_TYPE, ticketId, TICKET_TYPE, qr)));
+        assertThat(scan(session, qr)).isEqualTo("ALREADY_REDEEMED");
     }
 
     @Test

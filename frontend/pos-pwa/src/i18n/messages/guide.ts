@@ -61,7 +61,7 @@ export default defineMessages({
     "guide.rules.moveTill":
       "Pour changer une caisse de porte : la révoquer, puis l'enrôler à nouveau avec un code de la nouvelle porte. Une caisse ne change jamais de porte en silence.",
     "guide.rules.severalTills":
-      "Plusieurs caisses par porte : en ligne, elles apprennent en direct les ventes et scans des autres — un billet déjà utilisé est refusé à l'autre caisse.",
+      "Plusieurs caisses par porte : elles s'échangent en direct ventes et scans — par le serveur, et aussi directement sur le réseau local quand internet est coupé. Branchez les caisses d'une même porte sur le même routeur / Wi-Fi. Si deux caisses sans aucun réseau entre elles laissent entrer le même billet, c'est signalé en « Double entrée » dans Contrôle des entrées.",
     "guide.rules.browserTills":
       "Les caisses navigateur (sans enrôlement) restent utilisables pour tout caissier affecté à une porte, mais sans la synchronisation en direct entre caisses.",
   },
@@ -123,7 +123,7 @@ export default defineMessages({
     "guide.rules.moveTill":
       "To move a till to another gate: revoke it, then enroll it again with a code for the new gate. A till never changes gate silently.",
     "guide.rules.severalTills":
-      "Several tills per gate: when online, they learn each other's sales and scans live — a ticket already used is refused at the other till.",
+      'Several tills per gate: they share sales and scans live \u2014 through the server, and directly over the local network when internet is down. Connect the tills of a gate to the same router / Wi-Fi. If two tills with no network at all between them let the same ticket in, it shows as a "Double entry" in Entry control.',
     "guide.rules.browserTills":
       "Browser tills (no enrollment) still work for any cashier assigned to a gate, but without the live sync between tills.",
   },

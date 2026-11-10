@@ -26,6 +26,12 @@
     IntCmp $0 60 nguon_token_ready nguon_wait_token nguon_token_ready
   nguon_token_ready:
   nsExec::Exec 'icacls "$COMMONAPPDATA\NguonPOS\edge\ui-token" /grant "*S-1-5-32-545:R"'
+  ; Tills of the same gate sync with each other on the LAN (TLS with device
+  ; certificates on TCP 47310, announcements on UDP 47311): open them for the
+  ; service's Java, on private and domain networks only — never public Wi-Fi.
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="Nguon POS peers"'
+  nsExec::Exec 'netsh advfirewall firewall add rule name="Nguon POS peers" dir=in action=allow protocol=TCP localport=47310 profile=private,domain program="$INSTDIR\edge\jre\bin\java.exe"'
+  nsExec::Exec 'netsh advfirewall firewall add rule name="Nguon POS peers" dir=in action=allow protocol=UDP localport=47311 profile=private,domain program="$INSTDIR\edge\jre\bin\java.exe"'
   ; A "Nguon POS" icon on the desktop of every account (perMachine: the
   ; public desktop), also restored by updates if someone deleted it.
   SetShellVarContext all
@@ -42,6 +48,7 @@
 !macro NSIS_HOOK_PREUNINSTALL
   nsExec::Exec '"$INSTDIR\edge\nguon-edge.exe" stop'
   nsExec::Exec '"$INSTDIR\edge\nguon-edge.exe" uninstall'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="Nguon POS peers"'
   nsExec::Exec 'schtasks /Delete /TN "NguonPOS\Launch" /F'
   nsExec::Exec 'schtasks /Delete /TN "NguonPOS\Update" /F'
   SetShellVarContext all

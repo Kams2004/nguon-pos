@@ -7,6 +7,7 @@ import { useI18n } from "../../i18n";
 import { isEdgeMode } from "../../lib/platform";
 import { PrinterSettingsDialog } from "../../components/PrinterSettingsDialog";
 import { UpdateNotice } from "../../components/UpdateNotice";
+import { LanPeersBadge } from "../../components/LanPeersBadge";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 /**
@@ -65,6 +66,7 @@ export default function GateHeader() {
 
         <div className="ml-auto flex items-center gap-2">
           <UpdateNotice />
+          <LanPeersBadge />
           <LanguageSwitcher tone="light" />
           <span className="hidden max-w-[220px] items-center gap-1.5 truncate rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground md:flex">
             <UserRound className="h-3.5 w-3.5 flex-shrink-0 text-secondary" />
