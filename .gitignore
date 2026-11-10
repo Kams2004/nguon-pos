@@ -34,3 +34,6 @@ secrets/
 
 # Till installers published to the VPS (deploy/release/publish-release.sh)
 /releases/
+
+# Database / media backups (deploy/vps/backup.sh)
+/backups/

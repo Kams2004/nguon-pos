@@ -35,3 +35,29 @@ sudo certbot --nginx -d pos.nguonevents.com
 cd ~/nguon-pos && git pull
 sh deploy/vps/update.sh <service>   # e.g. sales-service pos-pwa; restarts nginx at the end
 ```
+
+## Backups
+
+`deploy/vps/backup.sh` saves:
+- the whole database, every run (14 kept);
+- the media library, weekly (4 kept);
+- once, the MinIO image (MinIO no longer publishes images, so this copy is the only way to reinstall it).
+
+Install it nightly at 03:15 (user crontab, nothing system-wide):
+
+```bash
+(crontab -l 2>/dev/null; echo '15 3 * * * cd $HOME/nguon-pos && sh deploy/vps/backup.sh >> backups/backup.log 2>&1') | crontab -
+sh deploy/vps/backup.sh            # a first one now
+```
+
+Copy them off the server from your computer: `sh deploy/vps/pull-backups.sh` (into `~/nguon-pos-backups/`).
+
+Check now and then that a backup really restores. This is harmless: it restores into a separate database, compares row counts, then deletes it.
+
+```bash
+sh deploy/vps/restore.sh backups/db/<latest>.dump --test
+```
+
+In a disaster, `--replace` instead of `--test` puts a dump back as the live data (it asks you to type the database name first). Tills resend whatever they hold that the dump lacks.
+
+To reinstall MinIO on a new server: `docker load < backups/images/minio-image.tar.gz`.
