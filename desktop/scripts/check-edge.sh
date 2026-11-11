@@ -8,6 +8,14 @@ set -eu
 OUT=$(cd "${1:?build/edge folder}" && pwd)
 JRE="$OUT/jre/bin/java"
 WORK=$(mktemp -d)
+# Failures also go to GitHub as an annotation (readable without the job log).
+fail() {
+  printf '%s\n' "$1" >&2
+  if [ "${GITHUB_ACTIONS:-}" = true ]; then
+    printf '::error title=check-edge::%s\n' "$(printf '%s' "$1" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+  fi
+  exit 1
+}
 trap 'kill "$PID" 2>/dev/null || true; rm -rf "$WORK"' EXIT
 PID=
 
@@ -27,8 +35,7 @@ for m in $need; do
   echo "$have" | grep -qx "$m" || missing="$missing $m"
 done
 if [ -n "$missing" ]; then
-  echo "check-edge: the runtime lacks module(s):$missing — add them to MODULES in build-edge.sh" >&2
-  exit 1
+  fail "check-edge: the runtime lacks module(s):$missing — add them to MODULES in build-edge.sh (jdeps said: $need; runtime has: $(echo $have))"
 fi
 echo "check-edge: modules OK ($need)"
 
@@ -53,7 +60,7 @@ for i in $(seq 1 90); do
   if ! kill -0 "$PID" 2>/dev/null; then break; fi
   sleep 1
 done
-echo "check-edge: the service did not start on the trimmed runtime:" >&2
-grep -E "ERROR|Caused by|NoClassDefFound|Exception" "$WORK/run.log" | head -15 >&2
-tail -n 30 "$WORK/run.log" >&2
-exit 1
+fail "check-edge: the service did not start on the trimmed runtime (last HTTP code: ${code:-none}):
+$(grep -E "ERROR|Caused by|NoClassDefFound|Exception|Error" "$WORK/run.log" | head -12)
+--- last lines:
+$(tail -n 15 "$WORK/run.log")"
