@@ -13,6 +13,7 @@ PID=
 
 # 1. Modules our classes need.
 (cd "$WORK" && unzip -q "$OUT/edge-service.jar" 'BOOT-INF/classes/*' 'BOOT-INF/lib/sync-core-*')
+echo "check-edge: runtime $("$JRE" -version 2>&1 | head -1)"
 need=$(jdeps --ignore-missing-deps --multi-release 21 --print-module-deps \
   "$WORK/BOOT-INF/classes" $(ls "$WORK"/BOOT-INF/lib/sync-core-*.jar) 2>/dev/null | tr ',' ' ')
 have=$("$JRE" --list-modules | sed 's/@.*//')
@@ -27,9 +28,16 @@ fi
 echo "check-edge: modules OK ($need)"
 
 # 2. Start it for real (no central, no LAN ports, a throwaway data folder).
-port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
-EDGE_DATA_DIR="$WORK/data" EDGE_PORT=$port EDGE_KEY_PROVIDER=file EDGE_CENTRAL_URL= \
-  "$JRE" -Xmx256m -jar "$OUT/edge-service.jar" --edge.peer-port=0 --edge.beacon-port=0 > "$WORK/run.log" 2>&1 &
+# Works in Git Bash on Windows too: no python, and Windows paths for the Windows JVM.
+port=$((20000 + $$ % 20000))
+data="$WORK/data"
+jar="$OUT/edge-service.jar"
+if command -v cygpath >/dev/null 2>&1; then
+  data=$(cygpath -w "$data")
+  jar=$(cygpath -w "$jar")
+fi
+EDGE_DATA_DIR="$data" EDGE_PORT=$port EDGE_KEY_PROVIDER=file EDGE_CENTRAL_URL= \
+  "$JRE" -Xmx256m -jar "$jar" --edge.peer-port=0 --edge.beacon-port=0 > "$WORK/run.log" 2>&1 &
 PID=$!
 for i in $(seq 1 90); do
   code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/local/v1/status" || true)
@@ -42,4 +50,5 @@ for i in $(seq 1 90); do
 done
 echo "check-edge: the service did not start on the trimmed runtime:" >&2
 grep -E "ERROR|Caused by|NoClassDefFound|Exception" "$WORK/run.log" | head -15 >&2
+tail -n 30 "$WORK/run.log" >&2
 exit 1
