@@ -56,8 +56,26 @@ add windows-nsis "$EXE" "nguon-pos_${VERSION}_x64-setup.exe"
 [ -n "$FILES" ] || { echo "Nothing to publish" >&2; exit 1; }
 
 echo "Uploading to $VPS:$DIR/releases/$VERSION/…"
-ssh "$VPS" "mkdir -p '$DIR/releases/$VERSION'"
-scp -q "$TMP"/nguon-pos_* "$VPS:$DIR/releases/$VERSION/"
+ssh "$VPS" "mkdir -p '$DIR/releases/$VERSION/.upload'"
+# Into a hidden folder first, resuming after a dropped connection (up to 5
+# tries); the files are moved into place only once their SHA-256 matches on
+# the server, so a cut upload never sits under the published name.
+for f in "$TMP"/nguon-pos_*; do
+  name=$(basename "$f")
+  tries=0
+  until rsync -q --partial --timeout=60 "$f" "$VPS:$DIR/releases/$VERSION/.upload/$name"; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 5 ] || { echo "Upload of $name kept failing; run the script again to resume." >&2; exit 1; }
+    echo "  connection lost, resuming $name ($tries/5)…"
+    sleep 5
+  done
+  want=$(sha256sum "$f" | cut -d ' ' -f 1)
+  got=$(ssh "$VPS" "sha256sum '$DIR/releases/$VERSION/.upload/$name' | cut -d ' ' -f 1")
+  [ "$want" = "$got" ] || { echo "$name arrived damaged on the server (SHA-256 differs); run the script again." >&2; exit 1; }
+  ssh "$VPS" "mv -f '$DIR/releases/$VERSION/.upload/$name' '$DIR/releases/$VERSION/$name'"
+  echo "  $name: uploaded and checked on the server"
+done
+ssh "$VPS" "rmdir '$DIR/releases/$VERSION/.upload' 2>/dev/null || true"
 
 # Values travel base64-encoded (shell- and SQL-safe), decoded by Postgres; psql
 # binds them as literals (:'var'), never pasted into the SQL text.
