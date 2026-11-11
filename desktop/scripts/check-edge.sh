@@ -12,11 +12,16 @@ trap 'kill "$PID" 2>/dev/null || true; rm -rf "$WORK"' EXIT
 PID=
 
 # 1. Modules our classes need.
-(cd "$WORK" && unzip -q "$OUT/edge-service.jar" 'BOOT-INF/classes/*' 'BOOT-INF/lib/sync-core-*')
+if command -v unzip >/dev/null 2>&1; then
+  (cd "$WORK" && unzip -q "$OUT/edge-service.jar" 'BOOT-INF/classes/*' 'BOOT-INF/lib/sync-core-*')
+else
+  (cd "$WORK" && jar xf "$OUT/edge-service.jar" BOOT-INF/classes BOOT-INF/lib)
+fi
 echo "check-edge: runtime $("$JRE" -version 2>&1 | head -1)"
 need=$(jdeps --ignore-missing-deps --multi-release 21 --print-module-deps \
-  "$WORK/BOOT-INF/classes" $(ls "$WORK"/BOOT-INF/lib/sync-core-*.jar) 2>/dev/null | tr ',' ' ')
-have=$("$JRE" --list-modules | sed 's/@.*//')
+  "$WORK/BOOT-INF/classes" $(ls "$WORK"/BOOT-INF/lib/sync-core-*.jar) 2>/dev/null | tr -d '\r' | tr ',' ' ')
+# Windows tools end lines with CR: strip it, or "jdk.httpserver\r" never matches.
+have=$("$JRE" --list-modules | tr -d '\r' | sed 's/@.*//')
 missing=""
 for m in $need; do
   echo "$have" | grep -qx "$m" || missing="$missing $m"
