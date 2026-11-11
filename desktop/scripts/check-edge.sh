@@ -35,15 +35,13 @@ trap 'if [ -n "$PID" ]; then kill "$PID" 2>/dev/null; fi; rm -rf "$WORK"' EXIT
 version=$("$JRE" -version 2>&1 | tr -d '\r' | head -n 1) || fail "the runtime does not run: $JRE"
 step "runtime: $version"
 
-# 1. Modules our classes need.
-if command -v unzip >/dev/null 2>&1; then
-  (cd "$WORK" && unzip -q "$OUT/edge-service.jar" 'BOOT-INF/classes/*' 'BOOT-INF/lib/*') || fail "unzip of the service jar failed"
-else
-  (cd "$WORK" && jar xf "$OUT/edge-service.jar" BOOT-INF) || fail "jar extraction of the service jar failed"
-fi
-core=$(ls "$WORK"/BOOT-INF/lib/sync-core-*.jar 2>/dev/null | head -n 1)
-[ -n "$core" ] || fail "sync-core jar not found inside the service jar"
-classes="$WORK/BOOT-INF/classes"
+# 1. Modules our classes need: read from the classes Maven just compiled
+#    (the repo's target/ folders), not from inside the Spring Boot jar.
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+classes="$ROOT/edge/edge-service/target/classes"
+core="$ROOT/shared/sync-core/target/classes"
+n=$(find "$classes" -name '*.class' 2>/dev/null | wc -l | tr -d ' ')
+[ "$n" -gt 0 ] || fail "no compiled classes in $classes (build the service first)"
 if command -v cygpath >/dev/null 2>&1; then # Windows JDK tools want Windows paths
   classes=$(cygpath -w "$classes")
   core=$(cygpath -w "$core")
@@ -52,7 +50,7 @@ need=$(jdeps --ignore-missing-deps --multi-release 21 --print-module-deps "$clas
 [ -n "$need" ] || fail "jdeps found nothing: $(head -c 600 "$WORK/jdeps.err")"
 # Our code certainly uses these: if jdeps does not see them, it did not read our classes.
 for m in java.sql jdk.httpserver; do
-  echo " $need " | grep -q " $m " || fail "jdeps did not analyse the service classes (found only: $need; $(head -c 300 "$WORK/jdeps.err"))"
+  echo " $need " | grep -q " $m " || fail "jdeps did not analyse the service classes ($n class files; found only: $need; $(head -c 300 "$WORK/jdeps.err"))"
 done
 have=$("$JRE" --list-modules 2>&1 | tr -d '\r' | sed 's/@.*//')
 missing=""
