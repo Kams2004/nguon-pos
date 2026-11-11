@@ -43,8 +43,17 @@ else
 fi
 core=$(ls "$WORK"/BOOT-INF/lib/sync-core-*.jar 2>/dev/null | head -n 1)
 [ -n "$core" ] || fail "sync-core jar not found inside the service jar"
-need=$(jdeps --ignore-missing-deps --multi-release 21 --print-module-deps "$WORK/BOOT-INF/classes" "$core" 2>"$WORK/jdeps.err" | tr -d '\r' | tr ',' ' ')
+classes="$WORK/BOOT-INF/classes"
+if command -v cygpath >/dev/null 2>&1; then # Windows JDK tools want Windows paths
+  classes=$(cygpath -w "$classes")
+  core=$(cygpath -w "$core")
+fi
+need=$(jdeps --ignore-missing-deps --multi-release 21 --print-module-deps "$classes" "$core" 2>"$WORK/jdeps.err" | tr -d '\r' | tr ',' ' ')
 [ -n "$need" ] || fail "jdeps found nothing: $(head -c 600 "$WORK/jdeps.err")"
+# Our code certainly uses these: if jdeps does not see them, it did not read our classes.
+for m in java.sql jdk.httpserver; do
+  echo " $need " | grep -q " $m " || fail "jdeps did not analyse the service classes (found only: $need; $(head -c 300 "$WORK/jdeps.err"))"
+done
 have=$("$JRE" --list-modules 2>&1 | tr -d '\r' | sed 's/@.*//')
 missing=""
 for m in $need; do
