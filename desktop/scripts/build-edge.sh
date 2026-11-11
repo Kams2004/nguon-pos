@@ -23,4 +23,5 @@ chmod -R u+w "$OUT/jre"
 du -sh "$OUT/jre" "$OUT/edge-service.jar"
 
 # Refuse to hand the installer a runtime that cannot run the service.
+if [ "${GITHUB_ACTIONS:-}" = true ]; then echo "::notice title=build-edge::jar and runtime built; checking them"; fi
 sh "$ROOT/desktop/scripts/check-edge.sh" "$OUT"
