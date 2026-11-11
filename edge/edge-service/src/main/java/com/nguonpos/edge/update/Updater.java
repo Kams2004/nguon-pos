@@ -161,6 +161,11 @@ public class Updater {
             set(State.INSTALLING, version, null);
             return;
         }
+        // The root updater put the previous version back because this one did not start: never again.
+        if (lastInstallerResult().contains("ROLLED_BACK " + version + " ")) {
+            set(State.FAILED, version, "Version " + version + " did not start on this till; the previous version was put back");
+            return;
+        }
         if (attempts >= MAX_ATTEMPTS) {
             set(State.FAILED, version, "Installation did not complete after " + MAX_ATTEMPTS + " attempts" + lastInstallerResult());
             return;

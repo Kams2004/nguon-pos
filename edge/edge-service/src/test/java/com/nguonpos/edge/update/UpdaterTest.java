@@ -153,6 +153,17 @@ class UpdaterTest {
     }
 
     @Test
+    void aVersionThatWasRolledBackIsNotInstalledAgain() throws Exception {
+        Updater u = updater("0.1.0", 0);
+        Files.createDirectories(dir.resolve("data/updates"));
+        Files.writeString(dir.resolve("data/updates/last-result"), "2026-11-11T10:00:00Z ROLLED_BACK 0.2.0 did not start; back to 0.1.0\n");
+        String sha = sha(served);
+        receive(u, releaseFrame("0.2.0", sha, sign("0.2.0", AppVersion.LINUX_DEB, sha)));
+        assertTrue(installs.isEmpty());
+        assertEquals("FAILED", u.status().get("state"));
+    }
+
+    @Test
     void itWaitsUntilTheTillIsQuietAndNothingHappensWhenFrozen() throws Exception {
         Updater u = updater("0.1.0", 15);
         String sha = sha(served);

@@ -5,7 +5,9 @@
 # (nguon-updater.path). Nothing from that folder is trusted: the package is
 # copied to a root-only folder and checked again — SHA-256, the Nguon POS
 # release signature, package name and version, newer than installed —
-# before dpkg installs it. Data in /var/lib/nguon-edge is not touched.
+# before dpkg installs it, then checks the new version starts — and puts
+# the previous one back if it does not. Data in /var/lib/nguon-edge is
+# not touched.
 set -eu
 SRC=/var/lib/nguon-edge/updates
 WORK=/var/lib/nguon-updater
@@ -53,6 +55,30 @@ if ! dpkg --compare-versions "$VERSION" gt "$INSTALLED"; then
 fi
 
 result "INSTALLING $VERSION (was $INSTALLED)"
+since=$(date +%s)
 DEBIAN_FRONTEND=noninteractive dpkg -i "$WORK/update.deb" > "$WORK/dpkg.log" 2>&1 || fail "dpkg: $(tail -n 3 "$WORK/dpkg.log" | tr '\n' ' ')"
-rm -f "$WORK/update.deb" "$SRC/$NAME"
+
+# The new version must actually run: the local server logs "Started" within
+# two minutes and stays up. Otherwise the last version that did run
+# (kept below as current.deb) goes back in — a till is never left unable to sell.
+healthy=no
+for i in $(seq 1 24); do
+  sleep 5
+  if journalctl -u nguon-edge --since "@$since" --no-pager 2>/dev/null | grep -q "Started EdgeApplication"; then
+    sleep 10
+    systemctl is-active --quiet nguon-edge.service && healthy=yes
+    break
+  fi
+done
+if [ "$healthy" != yes ]; then
+  if [ -f "$WORK/current.deb" ]; then
+    DEBIAN_FRONTEND=noninteractive dpkg -i "$WORK/current.deb" > "$WORK/dpkg.log" 2>&1 || true
+    rm -f "$WORK/update.deb" "$SRC/$NAME"
+    result "ROLLED_BACK $VERSION did not start; back to $(dpkg-deb -f "$WORK/current.deb" Version)"
+    exit 1
+  fi
+  fail "$VERSION did not start, and no earlier package is kept to go back to"
+fi
+mv -f "$WORK/update.deb" "$WORK/current.deb"
+rm -f "$SRC/$NAME"
 result "INSTALLED $VERSION"

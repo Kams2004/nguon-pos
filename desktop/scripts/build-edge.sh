@@ -16,8 +16,11 @@ cp "$ROOT"/edge/edge-service/target/edge-service-*.jar "$OUT/edge-service.jar"
 
 # Spring Boot's nested jars defeat jdeps, so the list is explicit — and
 # checked: scripts/check-edge.sh starts the service on this runtime.
-MODULES=java.base,java.compiler,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.security.sasl,java.sql,java.transaction.xa,java.xml,jdk.charsets,jdk.crypto.ec,jdk.localedata,jdk.management,jdk.net,jdk.unsupported,jdk.zipfs
+MODULES=java.base,java.compiler,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.security.sasl,java.sql,java.transaction.xa,java.xml,jdk.charsets,jdk.crypto.ec,jdk.localedata,jdk.management,jdk.httpserver,jdk.net,jdk.unsupported,jdk.zipfs
 jlink --add-modules "$MODULES" --strip-debug --no-man-pages --no-header-files --compress zip-6 --output "$OUT/jre"
 # jlink marks the licence files read-only: the next build couldn't overwrite their copies.
 chmod -R u+w "$OUT/jre"
 du -sh "$OUT/jre" "$OUT/edge-service.jar"
+
+# Refuse to hand the installer a runtime that cannot run the service.
+sh "$ROOT/desktop/scripts/check-edge.sh" "$OUT"
