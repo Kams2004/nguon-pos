@@ -73,6 +73,7 @@ export async function createSale(session: GateSession, cart: CartLine[], payment
     lastAttemptAt: null,
     lastError: null,
     syncStatus: "PENDING",
+    cashierUserId: session.userId,
   });
 
   for (const t of ticketPayloadEntries) {

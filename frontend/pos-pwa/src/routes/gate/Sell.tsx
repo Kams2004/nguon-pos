@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { printPage } from "../../lib/platform";
 import QRCode from "qrcode";
 import {
+  ArrowLeft,
   ArrowRight,
   Banknote,
   Check,
@@ -28,7 +29,7 @@ import { till, type TodaySale } from "../../lib/till/backend";
 import { usePrinterSettings } from "../../lib/till/printerSettings";
 import type { GateSession } from "../../lib/offline/session";
 import type { PaymentMethod } from "../../lib/api/types";
-import { PAYMENT_LABELS, formatMoney, formatTime } from "../../lib/format";
+import { PAYMENT_LABELS, formatDateTime, formatMoney, formatTime } from "../../lib/format";
 import { resolveTicketDesign } from "../../lib/ticketDesign";
 import { TicketTypeBadge, ticketColor, ticketIcon } from "../../lib/ticketIcons";
 import GateHeader from "./GateHeader";
@@ -46,8 +47,10 @@ const PAYMENT_METHODS: { value: PaymentMethod; icon: LucideIcon }[] = [
 
 type CartItem = { ticketTypeId: string; quantity: number };
 
-type CompletedSale = {
+export type CompletedSale = {
   transactionId: string;
+  /** Known when shown again from "Mes ventes"; right after a sale it comes from the till's list. */
+  reference?: string | null;
   tickets: IssuedTicket[];
   lines: (ReceiptLine & { ticketTypeId: string })[];
   currency: string;
@@ -469,13 +472,19 @@ function useTodaySales(session: GateSession, refreshKey: unknown): TodaySale[] {
   return sales;
 }
 
-function SaleComplete({
+/**
+ * A sale's receipt and tickets, ready to print: right after selling
+ * (mode "sale"), or again later from "Mes ventes" (mode "reprint": no change
+ * to hand back, no automatic printing, back to the list instead of a new sale).
+ */
+export function SaleComplete({
   sale,
   session,
   qrImages,
   logoUrl,
   design,
   onNewSale,
+  mode = "sale",
 }: {
   sale: CompletedSale;
   session: GateSession;
@@ -483,7 +492,9 @@ function SaleComplete({
   logoUrl: string;
   design: ReturnType<typeof resolveTicketDesign>;
   onNewSale: () => void;
+  mode?: "sale" | "reprint";
 }) {
+  const reprint = mode === "reprint";
   const { t } = useI18n();
   const { pendingCount } = useSession();
   const [printTarget, setPrintTarget] = useState<PrintTarget>("all");
@@ -493,7 +504,7 @@ function SaleComplete({
   const today = useTodaySales(session, `${sale.transactionId}-${pendingCount}`);
   const saleTotal = sale.lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
   const n = sale.tickets.length;
-  const change = sale.received !== null ? sale.received - saleTotal : null;
+  const change = !reprint && sale.received !== null ? sale.received - saleTotal : null;
   const thisSale = today.find((s) => s.id === sale.transactionId);
   const newSaleRef = useRef<HTMLButtonElement>(null);
   const paperClass = design.receipt.paperWidth === 58 ? "paper-58" : "";
@@ -511,6 +522,10 @@ function SaleComplete({
     }));
   const separateTickets = sale.tickets.filter((t) => modeOf(t.ticketTypeId) === "INDIVIDUAL");
   const ns = separateTickets.length;
+  // The receipt is worth its own button when the sale has several tickets, or when
+  // it carries entries itself (the "standard" print mode puts their QR codes on it).
+  const receiptButton = ns > 0 && (n > 1 || ns < n);
+  const reference = sale.reference ?? thisSale?.reference ?? `LOC-${sale.transactionId.slice(0, 8)}`;
 
   // Enter = next customer, the most common action after a sale.
   useEffect(() => {
@@ -531,9 +546,9 @@ function SaleComplete({
     setTimeout(() => printPage(printer?.printerName, printer?.paperWidth ?? design.receipt.paperWidth), 50);
   };
 
-  // Automatic printing, as set for this till — once every QR code is drawn.
+  // Automatic printing, as set for this till — once every QR code is drawn. Never when printing again.
   useEffect(() => {
-    if (!printer || printer.autoPrint === "NONE" || autoPrinted.current) return;
+    if (reprint || !printer || printer.autoPrint === "NONE" || autoPrinted.current) return;
     if (sale.tickets.some((tk) => !qrImages[tk.id])) return;
     autoPrinted.current = true;
     const target: PrintTarget =
@@ -549,7 +564,7 @@ function SaleComplete({
       establishmentName={session.bootstrap.establishment.name}
       gateName={session.bootstrap.gate.name}
       cashierName={session.fullName}
-      reference={thisSale?.reference ?? `LOC-${sale.transactionId.slice(0, 8)}`}
+      reference={reference}
       createdAtClient={sale.createdAtClient}
       lines={sale.lines}
       currency={sale.currency}
@@ -578,14 +593,20 @@ function SaleComplete({
       <div className="mx-auto max-w-[1920px] space-y-5 p-4 sm:p-6">
         {/* Outcome + actions */}
         <section className="no-print card relative overflow-hidden">
-          <div className="absolute inset-y-0 left-0 w-1.5 bg-success" />
+          <div className={`absolute inset-y-0 left-0 w-1.5 ${reprint ? "bg-secondary" : "bg-success"}`} />
           <div className="grid gap-5 p-5 sm:p-6 xl:grid-cols-[1fr_auto] xl:items-center">
             <div className="flex flex-wrap items-center gap-5">
-              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-success text-white shadow-lg shadow-success/30">
-                <Check className="h-9 w-9" strokeWidth={3} />
+              <div
+                className={`flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full text-white shadow-lg ${
+                  reprint ? "bg-secondary shadow-secondary/30" : "bg-success shadow-success/30"
+                }`}
+              >
+                {reprint ? <Printer className="h-8 w-8" /> : <Check className="h-9 w-9" strokeWidth={3} />}
               </div>
               <div>
-                <h2 className="font-display text-2xl font-bold text-royal">{t("gate.done.title")}</h2>
+                <h2 className="font-display text-2xl font-bold text-royal">
+                  {reprint ? t("gate.mySales.reprintTitle", { date: formatDateTime(sale.createdAtClient) }) : t("gate.done.title")}
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   {ns === 0
                     ? t("gate.done.summaryReceipt", { count: n })
@@ -610,9 +631,7 @@ function SaleComplete({
                 )}
                 <div className="rounded-2xl bg-muted/60 px-4 py-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("gate.done.reference")}</p>
-                  <p className="font-mono text-sm font-bold text-foreground">
-                    {thisSale?.reference ?? `LOC-${sale.transactionId.slice(0, 8)}`}
-                  </p>
+                  <p className="font-mono text-sm font-bold text-foreground">{reference}</p>
                   <p
                     className={`flex items-center gap-1 text-[11px] font-semibold ${thisSale?.synced ? "text-success" : "text-amber-700"}`}
                   >
@@ -624,22 +643,19 @@ function SaleComplete({
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2 xl:w-[420px]">
-              <button onClick={() => print("all")} className="btn-blue py-3 sm:col-span-2">
+              {/* Main: the tickets (or the receipt, when it is what carries the entries). */}
+              <button onClick={() => print(ns === 0 ? "receipt" : "tickets")} className="btn-blue py-3 sm:col-span-2">
                 <Printer className="h-4 w-4" />
-                {ns === 0 ? t("gate.done.printReceipt") : t("gate.done.printAll", { count: ns })}
+                {ns === 0 ? t("gate.done.printReceipt") : t("gate.done.printTickets", { count: ns })}
               </button>
-              {ns > 0 && (
-                <>
-                  <button onClick={() => print("receipt")} className="btn-outline py-2.5">
-                    <ReceiptIcon className="h-4 w-4" /> {t("gate.done.receiptOnly")}
-                  </button>
-                  <button onClick={() => print("tickets")} className="btn-outline py-2.5">
-                    <Ticket className="h-4 w-4" /> {t("gate.done.ticketsOnly", { count: ns })}
-                  </button>
-                </>
+              {receiptButton && (
+                <button onClick={() => print("receipt")} className="btn-outline py-2.5 sm:col-span-2">
+                  <ReceiptIcon className="h-4 w-4" /> {t("gate.done.printReceipt")}
+                </button>
               )}
               <button ref={newSaleRef} onClick={onNewSale} className="btn-gold py-3.5 text-base sm:col-span-2">
-                <ShoppingCart className="h-5 w-5" /> {t("gate.done.newSale")}
+                {reprint ? <ArrowLeft className="h-5 w-5" /> : <ShoppingCart className="h-5 w-5" />}
+                {reprint ? t("gate.mySales.back") : t("gate.done.newSale")}
                 <kbd className="ml-1 rounded border border-primary-foreground/30 px-1.5 text-[10px] font-semibold">
                   {t("gate.done.enterKey")}
                 </kbd>

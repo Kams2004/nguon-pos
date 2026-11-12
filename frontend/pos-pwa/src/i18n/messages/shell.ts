@@ -45,6 +45,7 @@ export default defineMessages({
 
     "shell.till.sell": "Vendre",
     "shell.till.scan": "Scanner",
+    "shell.till.mySales": "Mes ventes",
     "shell.till.admin": "Admin",
     "shell.till.syncPending": "Synchroniser ({count} en attente)",
     "shell.till.syncNow": "Synchroniser maintenant",
@@ -97,6 +98,7 @@ export default defineMessages({
 
     "shell.till.sell": "Sell",
     "shell.till.scan": "Scan",
+    "shell.till.mySales": "My sales",
     "shell.till.admin": "Admin",
     "shell.till.syncPending": "Sync ({count} pending)",
     "shell.till.syncNow": "Sync now",

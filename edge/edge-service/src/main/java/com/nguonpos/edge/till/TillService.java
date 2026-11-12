@@ -123,14 +123,19 @@ public class TillService {
     }
 
     public List<SaleSummary> recentSales(int limit) {
+        return recentSales(limit, null);
+    }
+
+    /** Latest sales on this till; with a cashier id, only that cashier's. */
+    public List<SaleSummary> recentSales(int limit, String cashierUserId) {
         return jdbc.query("""
                 SELECT s.id, s.local_reference, s.central_reference, s.payment_method, s.total, s.currency, s.created_at,
                        (SELECT COUNT(*) FROM ticket t WHERE t.sale_id = s.id),
                        (SELECT e.uplink_status FROM event_log e WHERE e.type = 'SALE' AND json_extract(e.payload, '$.idempotencyKey') = s.id)
-                FROM sale s ORDER BY s.created_at DESC LIMIT ?""",
+                FROM sale s WHERE (? IS NULL OR s.cashier_user_id = ?) ORDER BY s.created_at DESC LIMIT ?""",
                 (rs, i) -> new SaleSummary(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
                         new BigDecimal(rs.getString(5)), rs.getString(6), rs.getString(7), rs.getInt(8), "ACKED".equals(rs.getString(9))),
-                Math.min(Math.max(limit, 1), 500));
+                cashierUserId, cashierUserId, Math.min(Math.max(limit, 1), 500));
     }
 
     public Optional<Sale> sale(String id) {

@@ -6,6 +6,7 @@ import { I18nProvider } from "./i18n";
 import Login from "./routes/gate/Login";
 import Sell from "./routes/gate/Sell";
 import Scan from "./routes/gate/Scan";
+import MySales from "./routes/gate/MySales";
 import AdminLayout from "./routes/admin/AdminLayout";
 import Gates from "./routes/admin/Gates";
 import TicketTypes from "./routes/admin/TicketTypes";
@@ -44,6 +45,14 @@ function AppRoutes() {
         element={
           <RequireGateSession>
             <Sell />
+          </RequireGateSession>
+        }
+      />
+      <Route
+        path="/gate/sales"
+        element={
+          <RequireGateSession>
+            <MySales />
           </RequireGateSession>
         }
       />

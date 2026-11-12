@@ -6,7 +6,7 @@ import { useLiveEvents } from "./SessionContext";
 // Logo and login background as set in Paramètres. Cached locally so the
 // login screen and offline tills show the right logo without the network.
 const CACHE_KEY = "nguon-pos.branding";
-const DEFAULTS = { logoUrl: "/logo.png", loginBackgroundUrl: "/img/banners/hero.jpg", name: "Nguon Festival" };
+const DEFAULTS = { logoUrl: "/logo.png", loginBackgroundUrl: "/img/banners/palais-sultan-foumban.jpg", name: "Nguon Festival" };
 
 type BrandingValue = { logoUrl: string; loginBackgroundUrl: string; name: string; reload: () => void };
 

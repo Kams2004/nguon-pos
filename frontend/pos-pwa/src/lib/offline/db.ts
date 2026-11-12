@@ -23,6 +23,7 @@ export type OutboxEntry = {
   lastError: string | null;
   syncStatus: "PENDING" | "SYNCING" | "SYNCED" | "FAILED_PERMANENT";
   referenceNumber?: string | null; // SALE only, filled in once synced
+  cashierUserId?: string; // SALE only: who sold it ("Mes ventes"); absent on sales made before it was recorded
 };
 
 export type CachedTicket = {

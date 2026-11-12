@@ -216,6 +216,31 @@ class EdgeServiceTest {
     }
 
     @Test
+    void aCashierSeesOnlyTheirOwnSalesToPrintThemAgain() throws Exception {
+        String session = login("cashier1", "secret");
+        String mine = sell(session, 1).get("id").asString();
+        // A sale another cashier made on another till of the gate, learnt over the LAN.
+        String theirs = UUID.randomUUID().toString();
+        till.applyPeerSale("someone-else", JSON.readTree("""
+                {"idempotencyKey":"%s","paymentMethod":"CASH","createdAtClient":"2026-01-01T00:00:00Z",
+                 "lines":[{"ticketTypeId":"%s","quantity":1,"unitPrice":2000}],
+                 "tickets":[{"id":"%s","ticketTypeId":"%s","ticketNumber":"GATE-T-other-0-0","qrSignature":"q"}]}"""
+                .formatted(theirs, TICKET_TYPE, UUID.randomUUID(), TICKET_TYPE)));
+
+        HttpResponse<String> res = http.send(withUi("/local/v1/sales?mine=true&limit=500").header("Authorization", "Bearer " + session).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(res.statusCode()).isEqualTo(200);
+        List<String> ids = new java.util.ArrayList<>();
+        JSON.readTree(res.body()).forEach(s -> ids.add(s.get("id").asString()));
+        assertThat(ids).contains(mine).doesNotContain(theirs);
+        // Everything needed to print it again: lines and each ticket's QR content.
+        JsonNode sale = JSON.readTree(http.send(withUi("/local/v1/sales/" + mine).header("Authorization", "Bearer " + session).GET().build(),
+                HttpResponse.BodyHandlers.ofString()).body());
+        assertThat(sale.get("lines")).hasSize(1);
+        assertThat(sale.get("tickets").get(0).get("qrContent").asString()).isNotBlank();
+    }
+
+    @Test
     void theSameSaleRequestSentTwiceIsOneSale() throws Exception {
         String session = login("cashier1", "secret");
         String body = saleBody(UUID.randomUUID(), 1);

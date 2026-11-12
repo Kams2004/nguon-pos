@@ -152,8 +152,11 @@ public class LocalApiController {
     }
 
     @GetMapping("/sales")
-    public List<TillService.SaleSummary> recentSales(@RequestParam(defaultValue = "50") int limit) {
-        return till.recentSales(limit);
+    public List<TillService.SaleSummary> recentSales(@RequestParam(defaultValue = "50") int limit,
+                                                     @RequestParam(defaultValue = "false") boolean mine,
+                                                     @RequestAttribute(LocalAccessFilter.USER) LocalUser user) {
+        // mine=true: only the sales of the cashier signed in ("Mes ventes", to print them again).
+        return till.recentSales(limit, mine ? user.id() : null);
     }
 
     @GetMapping("/sales/{id}")

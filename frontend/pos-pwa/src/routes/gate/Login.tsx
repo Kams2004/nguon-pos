@@ -57,8 +57,8 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-royal-deep">
-      {/* Full-bleed festival artwork: palace + royal dancer, blue sky fading into the brand blue */}
-      <img src={loginBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-[70%_center] opacity-90" />
+      {/* Full-bleed: the Sultan's palace in Foumban (from the Nguon website), fading into the brand blue */}
+      <img src={loginBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-[60%_center] opacity-90" />
       <div className="absolute inset-0 bg-gradient-to-r from-royal-deep/95 via-royal/70 to-transparent" />
       <div
         className="pointer-events-none absolute -bottom-10 -left-10 h-72 w-72 bg-cover opacity-70"

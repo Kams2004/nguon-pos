@@ -98,6 +98,8 @@ export type EdgeSale = {
   total: number;
   currency: string;
   createdAt: string;
+  cashierUserId: string;
+  lines: { ticketTypeId: string; name: string; quantity: number; unitPrice: number }[];
   tickets: EdgeTicket[];
 };
 
@@ -141,7 +143,9 @@ export const edge = {
     session: string,
     req: { clientRequestId: string; paymentMethod: PaymentMethod; lines: { ticketTypeId: string; quantity: number }[] },
   ) => call<EdgeSale>("/sales", { method: "POST", session, body: JSON.stringify(req) }),
-  recentSales: (session: string, limit = 200) => call<EdgeSaleSummary[]>(`/sales?limit=${limit}`, { session }),
+  recentSales: (session: string, limit = 200, mine = false) =>
+    call<EdgeSaleSummary[]>(`/sales?limit=${limit}${mine ? "&mine=true" : ""}`, { session }),
+  sale: (session: string, id: string) => call<EdgeSale>(`/sales/${encodeURIComponent(id)}`, { session }),
   scan: (session: string, qrContent: string) =>
     call<EdgeScanResult>("/scans", { method: "POST", session, body: JSON.stringify({ qrContent }) }),
   printer: (session: string) => call<PrinterSettings>("/settings/printer", { session }),

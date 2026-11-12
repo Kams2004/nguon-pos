@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, LogOut, RefreshCw, ScanLine, ShoppingCart, UserRound, Printer } from "lucide-react";
+import { History, LayoutDashboard, LogOut, Printer, RefreshCw, ScanLine, ShoppingCart, UserRound } from "lucide-react";
 import { useSession } from "../../context/SessionContext";
 import { BrandLockup } from "../../components/ui";
 import { useI18n } from "../../i18n";
@@ -55,6 +55,9 @@ export default function GateHeader() {
             </Link>
             <Link to="/gate/scan" className={navLinkClass(location.pathname === "/gate/scan")}>
               <ScanLine className="h-3.5 w-3.5" /> {t("shell.till.scan")}
+            </Link>
+            <Link to="/gate/sales" className={navLinkClass(location.pathname === "/gate/sales")}>
+              <History className="h-3.5 w-3.5" /> {t("shell.till.mySales")}
             </Link>
             {!isEdgeMode() && (session?.role === "SUPER_ADMIN" || session?.role === "COORDINATOR") && (
               <Link to="/admin/dashboard" className={navLinkClass(false)}>
