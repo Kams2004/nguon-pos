@@ -1,7 +1,7 @@
 {
   "name": "nguon-pos-desktop",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Nguon POS desktop till: the till screens (frontend/pos-pwa, desktop build) in a Tauri window, installed with the local server (edge/edge-service) as an OS service.",
   "scripts": {
     "tauri": "tauri",
