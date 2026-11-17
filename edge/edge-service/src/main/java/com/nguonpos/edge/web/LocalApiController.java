@@ -47,7 +47,8 @@ public class LocalApiController {
     private final Enrollment enrollment;
 
     public LocalApiController(LocalAuth auth, TillService till, Catalog catalog, Uplink uplink, DeviceIdentity device, LiveEvents live,
-                              EdgeProperties props, JdbcTemplate jdbc, JsonMapper json, EdgeChannel channel, Enrollment enrollment, com.nguonpos.edge.update.Updater updater, com.nguonpos.edge.peer.PeerSync peers, com.nguonpos.edge.peer.PeerServer peerServer) {
+                              EdgeProperties props, JdbcTemplate jdbc, JsonMapper json, EdgeChannel channel, Enrollment enrollment, com.nguonpos.edge.update.Updater updater, com.nguonpos.edge.peer.PeerSync peers, com.nguonpos.edge.peer.PeerServer peerServer, Diagnostics diagnostics) {
+        this.diagnostics = diagnostics;
         this.peers = peers;
         this.peerServer = peerServer;
         this.updater = updater;
@@ -68,6 +69,25 @@ public class LocalApiController {
 
     private final com.nguonpos.edge.peer.PeerSync peers;
     private final com.nguonpos.edge.peer.PeerServer peerServer;
+
+    private final Diagnostics diagnostics;
+
+    /** Support: the till's state, shown in its Support dialog. */
+    @GetMapping("/diagnostics")
+    public Map<String, Object> diagnostics() {
+        return diagnostics.summary();
+    }
+
+    /** Support: the state and recent logs as a zip, for the cashier to save and send. */
+    @GetMapping("/diagnostics.zip")
+    public org.springframework.http.ResponseEntity<byte[]> diagnosticsZip() throws java.io.IOException {
+        String name = "nguon-diagnostic-" + device.shortCode() + "-"
+                + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")) + ".zip";
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/zip"))
+                .body(diagnostics.zip());
+    }
 
     @GetMapping("/status")
     public Map<String, Object> status() {

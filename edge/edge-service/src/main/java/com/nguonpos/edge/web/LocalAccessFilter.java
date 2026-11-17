@@ -29,7 +29,9 @@ public class LocalAccessFilter extends OncePerRequestFilter {
     public static final String USER = "edge.user";
     private final com.nguonpos.edge.core.Activity activity;
     public static final String TOKEN = "edge.session";
-    private static final Set<String> NO_SESSION = Set.of("/local/v1/status", "/local/v1/auth/login", "/local/v1/enroll");
+    private static final Set<String> NO_SESSION = Set.of("/local/v1/status", "/local/v1/auth/login", "/local/v1/enroll",
+            // Support export: needed precisely when nobody can log in. Still needs the app's UI token.
+            "/local/v1/diagnostics", "/local/v1/diagnostics.zip");
 
     private final EdgeProperties props;
     private final UiToken uiToken;
@@ -63,6 +65,7 @@ public class LocalAccessFilter extends OncePerRequestFilter {
             }
             res.setHeader("Access-Control-Allow-Origin", origin);
             res.setHeader("Vary", "Origin");
+            res.setHeader("Access-Control-Expose-Headers", "Content-Disposition"); // the support export's file name
             if ("OPTIONS".equals(req.getMethod())) {
                 res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
                 res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Edge-Ui-Token");

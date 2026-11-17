@@ -241,6 +241,36 @@ class EdgeServiceTest {
     }
 
     @Test
+    void aSupportExportWorksWithoutLoginAndHoldsNoSecret() throws Exception {
+        // First with nothing waiting to be sent (the usual case).
+        uplink.run();
+        assertThat(http.send(withUi("/local/v1/diagnostics").GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(200);
+        String session = login("cashier1", "secret");
+        sell(session, 1);
+        // Summary: no session needed (support is needed precisely when login fails), but the app's token is.
+        HttpResponse<String> summary = http.send(withUi("/local/v1/diagnostics").GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(summary.statusCode()).isEqualTo(200);
+        assertThat(JSON.readTree(summary.body()).get("pendingSales").asInt()).isGreaterThanOrEqualTo(1);
+        assertThat(http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/local/v1/diagnostics.zip")).GET().build(),
+                HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(401);
+
+        HttpResponse<byte[]> zip = http.send(withUi("/local/v1/diagnostics.zip").GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        assertThat(zip.statusCode()).isEqualTo(200);
+        assertThat(zip.headers().firstValue("Content-Disposition").orElse("")).contains("nguon-diagnostic-");
+        StringBuilder all = new StringBuilder();
+        List<String> names = new java.util.ArrayList<>();
+        try (var in = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(zip.body()))) {
+            for (var e = in.getNextEntry(); e != null; e = in.getNextEntry()) {
+                names.add(e.getName());
+                all.append(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            }
+        }
+        assertThat(names).contains("summary.json", "LISEZ-MOI.txt");
+        String uiToken = Files.readString(dataDir.resolve("ui-token")).strip();
+        assertThat(all.toString()).doesNotContain(SECRET).doesNotContain(uiToken).doesNotContain(session).doesNotContain("\"secret\"");
+    }
+
+    @Test
     void theSameSaleRequestSentTwiceIsOneSale() throws Exception {
         String session = login("cashier1", "secret");
         String body = saleBody(UUID.randomUUID(), 1);

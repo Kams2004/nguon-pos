@@ -79,6 +79,26 @@ export type EdgeStatus = {
   };
 };
 
+export type EdgeDiagnostics = {
+  appVersion: string;
+  os: string;
+  deviceCode: string;
+  deviceNo: number | null;
+  deviceLabel: string | null;
+  gate: string | null;
+  enrolled: boolean;
+  revoked: boolean;
+  connectedToCentral: boolean;
+  pendingSales: number;
+  pendingScans: number;
+  oldestPending: string | null;
+  rejected: { type: string; reason: string | null; createdAt: string }[];
+  peerServer: boolean;
+  peers: { label: string | null; address: string; connected: boolean }[];
+  update: { state: string; targetVersion: string | null; error: string | null };
+  disk: { freeMb: number; totalMb: number } | null;
+};
+
 export type EdgeUser = { id: string; username: string; fullName: string; role: Role; assignedGateId: string };
 
 export type EdgeTicket = {
@@ -149,6 +169,20 @@ export const edge = {
   scan: (session: string, qrContent: string) =>
     call<EdgeScanResult>("/scans", { method: "POST", session, body: JSON.stringify({ qrContent }) }),
   printer: (session: string) => call<PrinterSettings>("/settings/printer", { session }),
+  /** Support: the till's state (no login needed — support matters most when login fails). */
+  diagnostics: () => call<EdgeDiagnostics>("/diagnostics"),
+  /** Support: state + recent logs as a zip, with the file name to save it under. */
+  async diagnosticsZip(): Promise<{ name: string; bytes: ArrayBuffer }> {
+    let res: Response;
+    try {
+      res = await fetch(`${EDGE_URL}/local/v1/diagnostics.zip`, { headers: { "X-Edge-Ui-Token": await uiToken() } });
+    } catch {
+      throw new EdgeError(0, "EDGE_UNREACHABLE");
+    }
+    if (!res.ok) throw new EdgeError(res.status, `HTTP_${res.status}`);
+    const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "nguon-diagnostic.zip";
+    return { name, bytes: await res.arrayBuffer() };
+  },
   savePrinter: (session: string, s: PrinterSettings) =>
     call<PrinterSettings>("/settings/printer", { method: "PUT", session, body: JSON.stringify(s) }),
 

@@ -26,6 +26,16 @@ export const desktopApp = {
   restart: async (): Promise<void> => {
     await tauri()?.invoke("restart_app");
   },
+  /** Saves bytes into the user's Downloads folder; returns the full path. */
+  saveDownload: async (fileName: string, bytes: ArrayBuffer): Promise<string> => {
+    const t = tauri();
+    if (!t) throw new Error("NOT_DESKTOP");
+    // base64 in chunks: a multi-megabyte export would overflow String.fromCharCode(...all).
+    const view = new Uint8Array(bytes);
+    let binary = "";
+    for (let i = 0; i < view.length; i += 0x8000) binary += String.fromCharCode(...view.subarray(i, i + 0x8000));
+    return t.invoke<string>("save_download", { fileName, dataBase64: btoa(binary) });
+  },
   /** The printers installed on this computer. */
   printers: async (): Promise<string[]> => (await tauri()?.invoke<string[]>("list_printers")) ?? [],
   /** Prints the page as it is now, straight to `printer`, with no dialog. */

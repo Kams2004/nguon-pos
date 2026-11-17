@@ -34,6 +34,34 @@ fn edge_ui_token() -> Result<String, String> {
         .map_err(|e| format!("EDGE_TOKEN_UNREADABLE: {e}"))
 }
 
+/// Saves a file the screens produced (the support export) into the user's
+/// Downloads folder — a web view cannot save files by itself. Returns the
+/// full path, to show where it went.
+#[tauri::command]
+fn save_download(app: tauri::AppHandle, file_name: String, data_base64: String) -> Result<String, String> {
+    use base64::Engine;
+    // A plain file name only: no path, nothing that climbs out of Downloads.
+    let safe: String = file_name
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        .collect();
+    if safe.is_empty() || safe.starts_with('.') {
+        return Err("BAD_NAME".into());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_base64.as_bytes())
+        .map_err(|e| format!("BAD_DATA: {e}"))?;
+    let dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().home_dir())
+        .map_err(|e| format!("NO_FOLDER: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(&safe);
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
 /// After an automatic update (Ubuntu), the window still runs the old
 /// screens: the till restarts itself into the new version.
 #[tauri::command]
@@ -69,7 +97,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![edge_ui_token, restart_app, print::list_printers, print::print_silent])
+        .invoke_handler(tauri::generate_handler![edge_ui_token, restart_app, save_download, print::list_printers, print::print_silent])
         .run(tauri::generate_context!())
         .expect("Nguon POS failed to start");
 }

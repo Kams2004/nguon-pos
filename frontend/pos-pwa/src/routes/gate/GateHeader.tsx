@@ -8,6 +8,7 @@ import { isEdgeMode } from "../../lib/platform";
 import { PrinterSettingsDialog } from "../../components/PrinterSettingsDialog";
 import { UpdateNotice } from "../../components/UpdateNotice";
 import { LanPeersBadge } from "../../components/LanPeersBadge";
+import { SupportButton } from "../../components/SupportDialog";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 /**
@@ -105,6 +106,7 @@ export default function GateHeader() {
           >
             <Printer className="h-4 w-4" />
           </button>
+          <SupportButton />
           <button
             onClick={logout}
             className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20"

@@ -7,6 +7,7 @@ import { useI18n } from "../../i18n";
 import { EdgeError } from "../../lib/till/edgeClient";
 import { EnrollmentBanner } from "../../components/EnrollmentBanner";
 import { UpdateNotice } from "../../components/UpdateNotice";
+import { SupportButton } from "../../components/SupportDialog";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 
 const REMEMBER_KEY = "nguon-pos.rememberedUsername";
@@ -148,6 +149,7 @@ export default function Login() {
               </>
             )}
           </button>
+          <SupportButton tone="link" />
         </form>
       </div>
     </div>
