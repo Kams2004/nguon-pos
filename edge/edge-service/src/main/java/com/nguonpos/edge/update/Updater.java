@@ -16,12 +16,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.HttpURLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -61,10 +60,9 @@ public class Updater {
     private final Duration quietPeriod;
     private final String currentVersion;
     private final String platform;
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(15))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .build();
+
+    /** A read that waits longer than this fails (and the download resumes later). Tests shorten it. */
+    int readTimeoutMs = 60_000;
 
     private volatile State state = State.UP_TO_DATE;
     private volatile String targetVersion;
@@ -147,7 +145,7 @@ public class Updater {
                     verifiedKey = sha + "|" + local;
                 }
             } catch (IOException e) {
-                nextDownload = Instant.now().plus(Duration.ofMinutes(5));
+                nextDownload = Instant.now().plus(Duration.ofMinutes(1)); // resumes where it stopped
                 set(State.FAILED, version, "Download failed: " + e.getMessage());
                 log.warn("Update {} download failed: {}", version, e.getMessage());
                 return;
@@ -185,6 +183,12 @@ public class Updater {
         }
     }
 
+    /**
+     * Fetches the installer into `<name>.part`, then checks its SHA-256 and moves it into place.
+     * Venue networks drop or stall large transfers: every read times out (a stalled connection
+     * fails within readTimeoutMs instead of hanging the updater for good), and the next attempt
+     * resumes the partial file (HTTP Range) rather than starting again.
+     */
     private void download(String url, long size, String sha, Path dir, Path target) throws IOException {
         // Only from central, only under /releases/: the signature is what makes the file trusted, this keeps the till off other hosts.
         if (!url.startsWith("/releases/") || url.contains("..") || url.contains("//") || url.contains("\\")) {
@@ -192,34 +196,50 @@ public class Updater {
         }
         URI uri = URI.create(props.centralUrl().replaceAll("/+$", "") + url);
         Files.createDirectories(dir);
-        try (var old = Files.newDirectoryStream(dir, "*.{deb,exe,part}")) {
-            for (Path p : old) Files.deleteIfExists(p); // one installer kept at a time
-        }
         Path part = dir.resolve(target.getFileName() + ".part");
-        HttpResponse<InputStream> res;
+        try (var old = Files.newDirectoryStream(dir, "*.{deb,exe,part}")) {
+            for (Path p : old) if (!p.equals(part)) Files.deleteIfExists(p); // one installer at a time; keep this one's partial download
+        }
+        long have = Files.exists(part) ? Files.size(part) : 0;
+        if (size > 0 && have > size) {
+            Files.delete(part);
+            have = 0;
+        }
+        if (size > 0 && have == size) {
+            finish(part, target, sha); // complete already, only the check was missing
+            return;
+        }
+        HttpURLConnection c = (HttpURLConnection) uri.toURL().openConnection();
         try {
-            res = http.send(HttpRequest.newBuilder(uri).timeout(Duration.ofMinutes(30)).GET().build(), HttpResponse.BodyHandlers.ofInputStream());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
-        if (res.statusCode() != 200) {
-            res.body().close();
-            throw new IOException("HTTP " + res.statusCode());
-        }
-        MessageDigest md = digest();
-        long written = 0;
-        try (InputStream in = new DigestInputStream(res.body(), md); OutputStream out = Files.newOutputStream(part)) {
-            byte[] buf = new byte[64 * 1024];
-            for (int n; (n = in.read(buf)) > 0; ) {
-                written += n;
-                if (size > 0 && written > size) throw new IOException("Larger than announced");
-                out.write(buf, 0, n);
+            c.setInstanceFollowRedirects(false);
+            c.setConnectTimeout(15_000);
+            c.setReadTimeout(readTimeoutMs);
+            if (have > 0) c.setRequestProperty("Range", "bytes=" + have + "-");
+            int code = c.getResponseCode();
+            boolean resume = code == 206 && have > 0;
+            if (code != 200 && !resume) throw new IOException("HTTP " + code);
+            long written = resume ? have : 0;
+            try (InputStream in = c.getInputStream();
+                 OutputStream out = resume
+                         ? Files.newOutputStream(part, StandardOpenOption.APPEND)
+                         : Files.newOutputStream(part, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                byte[] buf = new byte[64 * 1024];
+                for (int n; (n = in.read(buf)) > 0; ) {
+                    written += n;
+                    if (size > 0 && written > size) throw new IOException("Larger than announced");
+                    out.write(buf, 0, n);
+                }
             }
+            if (size > 0 && written < size) throw new IOException("Incomplete (" + written + " of " + size + " bytes); will resume");
+        } finally {
+            c.disconnect();
         }
-        String actual = HexFormat.of().formatHex(md.digest());
-        if (!actual.equals(sha)) {
-            Files.deleteIfExists(part);
+        finish(part, target, sha);
+    }
+
+    private static void finish(Path part, Path target, String sha) throws IOException {
+        if (!sha256(part).equals(sha)) {
+            Files.deleteIfExists(part); // damaged: start again from scratch
             throw new IOException("SHA-256 mismatch");
         }
         Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

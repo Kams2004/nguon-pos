@@ -40,6 +40,8 @@ class UpdaterTest {
 
     private HttpServer server;
     private byte[] served = "the 0.2.0 installer".getBytes(StandardCharsets.UTF_8);
+    private volatile int stallAfter = -1;
+    private volatile int rangeRequests;
     private PrivateKey releaseKey;
     private Path publicKeyFile;
     private final List<String> installs = new ArrayList<>();
@@ -50,10 +52,27 @@ class UpdaterTest {
     void setUp() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/releases/", ex -> {
-            ex.sendResponseHeaders(200, served.length);
-            ex.getResponseBody().write(served);
+            // Like nginx: honours "Range: bytes=N-"; can stall after some bytes, like a dropped venue network.
+            String range = ex.getRequestHeaders().getFirst("Range");
+            int from = range != null && range.startsWith("bytes=") ? Integer.parseInt(range.substring(6, range.indexOf('-'))) : 0;
+            if (from > 0) rangeRequests++;
+            ex.sendResponseHeaders(from > 0 ? 206 : 200, served.length - from);
+            int stall = stallAfter;
+            if (stall > from && stall < served.length) {
+                ex.getResponseBody().write(served, from, stall - from);
+                ex.getResponseBody().flush();
+                try {
+                    Thread.sleep(3_000); // the client's read times out long before
+                } catch (InterruptedException ignored) {
+                    // stopping
+                }
+                ex.close();
+                return;
+            }
+            ex.getResponseBody().write(served, from, served.length - from);
             ex.close();
         });
+        server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool()); // a stalled response must not block the next one
         server.start();
         KeyPair kp = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         releaseKey = kp.getPrivate();
@@ -81,7 +100,8 @@ class UpdaterTest {
 
             @Override
             public void install(Path file, String version, String sha256, String signature) throws IOException {
-                installs.add(version + "|" + sha256 + "|" + new String(Files.readAllBytes(file), StandardCharsets.UTF_8));
+                byte[] content = Files.readAllBytes(file);
+                installs.add(version + "|" + sha256 + "|" + (content.length < 100 ? new String(content, StandardCharsets.UTF_8) : content.length + " bytes"));
             }
         };
         return new Updater(props, meta, json, new ReleaseSignature(publicKeyFile.toString()), fake, new Activity(), new LiveEvents(json),
@@ -118,6 +138,31 @@ class UpdaterTest {
         assertEquals("INSTALLING", u.status().get("state"));
         u.tick(); // asked once; not again until the retry delay
         assertEquals(1, installs.size());
+    }
+
+    @Test
+    void aStalledDownloadFailsFastThenResumesWhereItStopped() throws Exception {
+        served = new byte[200_000];
+        new java.util.Random(7).nextBytes(served);
+        stallAfter = 120_000; // the connection stops sending after 120 kB
+        Updater u = updater("0.1.0", 0);
+        u.readTimeoutMs = 300;
+        String sha = sha(served);
+        Map<String, Object> frame = releaseFrame("0.2.0", sha, sign("0.2.0", AppVersion.LINUX_DEB, sha));
+
+        long t0 = System.nanoTime();
+        receive(u, frame);
+        assertTrue((System.nanoTime() - t0) / 1_000_000 < 2_500, "a stalled download must fail fast, not hang the updater");
+        assertEquals("FAILED", u.status().get("state"));
+        assertTrue(installs.isEmpty());
+        long kept = Files.size(dir.resolve("data/updates/nguon-pos_0.2.0_amd64.deb.part"));
+        assertTrue(kept >= 120_000 && kept < 200_000, "the partial download is kept: " + kept);
+
+        stallAfter = -1; // the network is back
+        receive(u, frame);
+        assertEquals(1, rangeRequests, "resumed from the partial file, not downloaded again");
+        assertEquals(1, installs.size());
+        assertEquals("INSTALLING", u.status().get("state"));
     }
 
     @Test
