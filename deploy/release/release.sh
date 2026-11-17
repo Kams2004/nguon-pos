@@ -29,12 +29,17 @@ WORKFLOW="Desktop till release"
 
 printf '%s' "$VERSION" | grep -Eqx '[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}' || { echo "Version must be MAJOR.MINOR.PATCH" >&2; exit 1; }
 [ -s "$TOKEN_FILE" ] || { echo "No GitHub token in $TOKEN_FILE — see the top of this script." >&2; exit 1; }
-TOKEN=$(tr -d ' \r\n' < "$TOKEN_FILE")
+# The token goes to curl through a private header file, never on its command
+# line (which any user of the machine can read in the process list).
+HEADERS=$(mktemp)
+chmod 600 "$HEADERS"
+trap 'rm -f "$HEADERS"' EXIT
+printf 'Authorization: Bearer %s\n' "$(tr -d ' \r\n' < "$TOKEN_FILE")" > "$HEADERS"
 cd "$ROOT"
 REPO=$(git remote get-url origin | sed -E 's#^.*github\.com[:/]##; s#\.git$##')
 
 api() { # path → JSON on stdout
-  curl -fsS -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO$1"
+  curl -fsS -H @"$HEADERS" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO$1"
 }
 json() { # python expression over `d` (the JSON read from stdin)
   python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"
@@ -77,12 +82,13 @@ echo "Build OK: https://github.com/$REPO/actions/runs/$run"
 
 # 3. Download both installers.
 WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
+trap 'rm -rf "$WORK" "$HEADERS"' EXIT
 api "/actions/runs/$run/artifacts" | json "'\n'.join(f\"{a['name']} {a['archive_download_url']}\" for a in d['artifacts'])" > "$WORK/artifacts"
 while read -r name url; do
   [ -n "$name" ] || continue
   echo "  downloading $name…"
-  curl -fsSL -H "Authorization: Bearer $TOKEN" -o "$WORK/$name.zip" "$url"
+  # Resumes after a drop (-C -, retries), and gives up on a stalled connection instead of waiting forever.
+  curl -fsSL -H @"$HEADERS" --retry 5 --retry-all-errors -C - --speed-limit 1024 --speed-time 60 -o "$WORK/$name.zip" "$url"
   mkdir -p "$WORK/$name" && unzip -q -o "$WORK/$name.zip" -d "$WORK/$name"
 done < "$WORK/artifacts"
 DEB=$(find "$WORK" -name "*_${VERSION}_amd64.deb" | head -n 1)
