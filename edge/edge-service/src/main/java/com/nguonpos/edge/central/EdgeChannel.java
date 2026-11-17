@@ -86,6 +86,13 @@ public class EdgeChannel {
     private final AtomicBoolean batchInFlight = new AtomicBoolean();
     private volatile String activeUserId;
     private volatile Instant lastStatus = Instant.EPOCH;
+    // Liveness: a network that vanishes silently (Wi-Fi, a cable upstream, the box losing internet)
+    // closes nothing, so the link would look up for many minutes. Anything heard from central counts;
+    // after PING_AFTER of silence the till pings, after DEAD_AFTER it calls the link dead.
+    static final Duration PING_AFTER = Duration.ofSeconds(10);
+    static final Duration DEAD_AFTER = Duration.ofSeconds(20);
+    private volatile Instant lastHeard = Instant.EPOCH;
+    private volatile Instant lastPing = Instant.EPOCH;
     private final StringBuilder partial = new StringBuilder();
 
     public EdgeChannel(EdgeProperties props, Enrollment enrollment, DeviceIdentity device, EventLog eventLog, Catalog catalog,
@@ -123,6 +130,18 @@ public class EdgeChannel {
             if (!connecting && Instant.now().isAfter(nextAttempt)) connect();
             return;
         }
+        WebSocket socket = ws;
+        Instant now = Instant.now();
+        if (now.isAfter(lastHeard.plus(DEAD_AFTER))) {
+            log.info("Live channel silent for {} s: treating it as lost", DEAD_AFTER.toSeconds());
+            socket.abort();
+            dropped(socket, "no answer from central");
+            return;
+        }
+        if (now.isAfter(lastHeard.plus(PING_AFTER)) && now.isAfter(lastPing.plusSeconds(5))) {
+            lastPing = now;
+            socket.sendPing(java.nio.ByteBuffer.wrap(new byte[]{'n'}));
+        }
         worker.execute(this::pushPending);
         if (Instant.now().isAfter(lastStatus.plusSeconds(10))) {
             lastStatus = Instant.now();
@@ -153,6 +172,7 @@ public class EdgeChannel {
                             retryLater(err.getMessage());
                             return;
                         }
+                        lastHeard = Instant.now();
                         ws = socket;
                         backoff = Duration.ofSeconds(1);
                         batchInFlight.set(false);
@@ -276,13 +296,17 @@ public class EdgeChannel {
         WebSocket socket = ws;
         if (socket == null) return;
         try {
-            socket.sendText(json.writeValueAsString(frame), true).join();
+            // Bounded: on a dead connection a send can otherwise wait for good once the buffers fill.
+            socket.sendText(json.writeValueAsString(frame), true).orTimeout(15, java.util.concurrent.TimeUnit.SECONDS).join();
         } catch (RuntimeException e) {
-            dropped("send failed: " + e.getMessage());
+            socket.abort();
+            dropped(socket, "send failed: " + e.getMessage());
         }
     }
 
-    private void dropped(String why) {
+    private void dropped(WebSocket socket, String why) {
+        // A dead link's late error must not tear down the link that replaced it.
+        if (socket != null && ws != socket) return;
         ws = null;
         batchInFlight.set(false);
         retryLater(why);
@@ -337,6 +361,7 @@ public class EdgeChannel {
     private final class Listener implements WebSocket.Listener {
         @Override
         public CompletionStage<?> onText(WebSocket socket, CharSequence data, boolean last) {
+            lastHeard = Instant.now();
             partial.append(data);
             if (last) {
                 String text = partial.toString();
@@ -360,13 +385,26 @@ public class EdgeChannel {
                 live.publish("DEVICE_REVOKED", null);
                 log.warn("This till was revoked by the back office: live channel stopped");
             }
-            dropped("closed " + status);
+            dropped(socket, "closed " + status);
             return null;
         }
 
         @Override
         public void onError(WebSocket socket, Throwable error) {
-            dropped(error.getMessage());
+            dropped(socket, error.getMessage());
+        }
+
+        @Override
+        public CompletionStage<?> onPong(WebSocket socket, java.nio.ByteBuffer message) {
+            lastHeard = Instant.now();
+            socket.request(1);
+            return null;
+        }
+
+        @Override
+        public CompletionStage<?> onPing(WebSocket socket, java.nio.ByteBuffer message) {
+            lastHeard = Instant.now();
+            return WebSocket.Listener.super.onPing(socket, message); // answers with a pong
         }
     }
 }
