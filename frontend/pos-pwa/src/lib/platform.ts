@@ -13,6 +13,16 @@ export function isEdgeMode(): boolean {
 /** The local server's address on this machine. */
 export const EDGE_URL: string = import.meta.env.VITE_EDGE_URL ?? "http://127.0.0.1:47300";
 
+/**
+ * An image from the media library ("/media/2026/11/….png"). The web app
+ * gets it from the server it was loaded from; the desktop till from its
+ * local server, which keeps a copy so tickets still print offline.
+ */
+export function mediaUrl<T extends string | null | undefined>(url: T): T {
+  if (!url || !isEdgeMode() || !url.startsWith("/media/")) return url;
+  return `${EDGE_URL}${url}` as T;
+}
+
 type TauriInternals = { invoke: <T>(cmd: string, args?: Record<string, unknown>) => Promise<T> };
 
 function tauri(): TauriInternals | undefined {

@@ -342,3 +342,10 @@ textarea {
 .stat-strip > :first-child .skeleton {
   background: hsl(0 0% 100% / 0.18);
 }
+
+/* Edge / WebView2 (the Windows till) adds its own "show password" eye and
+   clear cross to password fields; our fields have their own eye button. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}

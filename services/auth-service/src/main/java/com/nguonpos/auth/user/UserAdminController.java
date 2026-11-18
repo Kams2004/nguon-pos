@@ -110,7 +110,7 @@ public class UserAdminController {
 
     public record UpdateRequest(
             @NotBlank @Size(max = 200) String fullName, @NotNull Role role, UUID assignedGateId, boolean active,
-            @Size(max = 200) String password
+            @Size(min = 4, max = 200) String password
     ) {
     }
 

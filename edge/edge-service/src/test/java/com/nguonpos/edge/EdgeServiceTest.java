@@ -271,6 +271,24 @@ class EdgeServiceTest {
     }
 
     @Test
+    void ticketImagesAreKeptOnTheTillAndServedOffline() throws Exception {
+        URI image = URI.create("http://127.0.0.1:" + port + "/media/2026/11/logo-test.png");
+        HttpResponse<String> first = http.send(HttpRequest.newBuilder(image).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(first.statusCode()).isEqualTo(200);
+        assertThat(first.body()).isEqualTo("PNG-test-bytes");
+        assertThat(first.headers().firstValue("Content-Type").orElse("")).isEqualTo("image/png");
+        centralUp.set(false); // offline: the till's copy
+        assertThat(http.send(HttpRequest.newBuilder(image).GET().build(), HttpResponse.BodyHandlers.ofString()).body()).isEqualTo("PNG-test-bytes");
+        // Nothing outside the media folder, nothing unknown.
+        assertThat(http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/media/..%2F..%2Fui-token")).GET().build(),
+                HttpResponse.BodyHandlers.ofString()).statusCode()).isGreaterThanOrEqualTo(400);
+        assertThat(com.nguonpos.edge.web.MediaCache.validKey("../ui-token")).isFalse();
+        assertThat(com.nguonpos.edge.web.MediaCache.validKey("2026/11/a.png")).isTrue();
+        assertThat(http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/media/2026/11/unknown.png")).GET().build(),
+                HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(404);
+    }
+
+    @Test
     void theSameSaleRequestSentTwiceIsOneSale() throws Exception {
         String session = login("cashier1", "secret");
         String body = saleBody(UUID.randomUUID(), 1);
@@ -374,6 +392,13 @@ class EdgeServiceTest {
             return;
         }
         String path = ex.getRequestURI().getPath();
+        if (path.equals("/media/2026/11/logo-test.png")) {
+            byte[] png = "PNG-test-bytes".getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(200, png.length);
+            ex.getResponseBody().write(png);
+            ex.close();
+            return;
+        }
         String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         switch (path) {
             case "/api/auth/auth/login" -> {

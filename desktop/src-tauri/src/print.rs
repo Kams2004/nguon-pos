@@ -218,8 +218,12 @@ mod platform {
     use windows::core::{Interface, HSTRING};
 
     pub fn list_printers() -> Result<Vec<String>, String> {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW: otherwise a PowerShell console flashes up over the till.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         let out = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"])
+            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map_err(|e| format!("Get-Printer: {e}"))?;
         let mut names: Vec<String> = String::from_utf8_lossy(&out.stdout)

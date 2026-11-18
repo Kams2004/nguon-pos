@@ -49,9 +49,11 @@ export default function TicketCard({
   const { t } = useI18n();
   const o = design.ticket;
   const date = new Date(createdAtClient);
-  // "NGUON FESTIVAL" stacks as two lines like the mockup; any title works.
+  // Beside the logo, "NGUON FESTIVAL" stacks as two lines like the mockup; any title works.
   const [titleFirst, ...titleRest] = design.ticketTitle.split(" ");
   const accent = { color: o.accent };
+  const logo = o.showLogo ? o.logoUrl || logoUrl : "";
+  const logoBox = { width: o.logoSize, height: o.logoSize };
 
   const frameStyle =
     o.frame === "pattern"
@@ -78,13 +80,23 @@ export default function TicketCard({
         )}
 
         <div className="flex flex-col items-center px-5 pt-5 text-center">
-          <div className="flex items-center gap-2">
-            {o.showLogo && <img src={logoUrl} alt="" className="h-10 w-10 object-contain" />}
-            <div className="text-left leading-none print:!text-black" style={accent}>
-              <p className="font-display text-lg font-extrabold">{titleFirst}</p>
-              {titleRest.length > 0 && <p className="font-display text-lg font-extrabold">{titleRest.join(" ")}</p>}
+          {o.logoLayout === "stacked" ? (
+            // Logo on top, centred; the title on one line underneath.
+            <>
+              {logo && <img src={logo} alt="" className="mb-1.5 object-contain" style={logoBox} />}
+              <p className="font-display text-lg font-extrabold leading-tight print:!text-black" style={accent}>
+                {design.ticketTitle}
+              </p>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              {logo && <img src={logo} alt="" className="flex-shrink-0 object-contain" style={logoBox} />}
+              <div className="text-left leading-none print:!text-black" style={accent}>
+                <p className="font-display text-lg font-extrabold">{titleFirst}</p>
+                {titleRest.length > 0 && <p className="font-display text-lg font-extrabold">{titleRest.join(" ")}</p>}
+              </div>
             </div>
-          </div>
+          )}
           {o.showSubtitle && <p className="mt-1.5 text-[11px] font-bold text-foreground">{design.ticketSubtitle}</p>}
           {o.showTagline && <p className="text-[10px] text-muted-foreground print:text-black">{design.ticketTagline}</p>}
 

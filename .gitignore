@@ -37,3 +37,4 @@ secrets/
 
 # Database / media backups (deploy/vps/backup.sh)
 /backups/
+/edge/edge-service/data/

@@ -9,6 +9,9 @@ import { Modal, PasswordInput } from "./ui";
 
 const ROLES: Role[] = ["CASHIER", "COORDINATOR", "SUPER_ADMIN"];
 
+/** Same rule as the server (auth-service UserAdminController). Letters, digits, anything. */
+const PASSWORD_MIN = 4;
+
 type FormState = { fullName: string; username: string; password: string; role: Role; gateId: string; active: boolean };
 
 /**
@@ -142,10 +145,18 @@ export function UserFormModal({
             <label className="field-label">{isNew ? t("settings.users.password") : t("settings.users.newPassword")}</label>
             <PasswordInput
               required={isNew}
+              minLength={PASSWORD_MIN}
               value={form.password}
               onChange={(password) => setForm({ ...form, password })}
               placeholder={isNew ? "" : t("settings.users.passwordPlaceholder")}
             />
+            <p
+              className={`mt-1 text-[11px] ${
+                form.password && form.password.length < PASSWORD_MIN ? "font-semibold text-amber-700" : "text-muted-foreground"
+              }`}
+            >
+              {t("settings.users.passwordRule", { min: PASSWORD_MIN })}
+            </p>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">

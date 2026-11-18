@@ -1,5 +1,6 @@
 import type { DesignOptions, TicketDesign } from "./api/types";
 import { translate } from "../i18n";
+import { mediaUrl } from "./platform";
 
 // What the ticket and receipt say when the Super Admin hasn't customised a
 // field (every field is optional server-side). Edited in "Billet & reçu".
@@ -28,6 +29,9 @@ export type TicketOptions = {
   frame: "pattern" | "solid" | "none";
   qrSize: "s" | "m" | "l";
   showLogo: boolean;
+  logoUrl: string; // "" = the establishment's logo
+  logoSize: number; // px on screen, LOGO_SIZE_MIN–LOGO_SIZE_MAX
+  logoLayout: "stacked" | "inline"; // logo above the title, or beside it
   showSubtitle: boolean;
   showTagline: boolean;
   showDate: boolean;
@@ -55,11 +59,17 @@ export type ReceiptOptions = {
   legalLines: string; // tax / legal mentions, one per line
 };
 
+export const LOGO_SIZE_MIN = 24;
+export const LOGO_SIZE_MAX = 120;
+
 export const TICKET_OPTION_DEFAULTS: TicketOptions = {
   accent: "#0A4DA2",
   frame: "pattern",
   qrSize: "m",
   showLogo: true,
+  logoUrl: "",
+  logoSize: 56,
+  logoLayout: "stacked",
   showSubtitle: true,
   showTagline: true,
   showDate: true,
@@ -109,9 +119,16 @@ export function resolveTicketDesign(design: (Partial<TicketDesign> & Partial<Des
     const v = design?.[key];
     if (v) texts[key] = v;
   }
+  const ticket = parseOptions(design?.ticketOptions, TICKET_OPTION_DEFAULTS);
+  if (!Number.isFinite(ticket.logoSize)) ticket.logoSize = TICKET_OPTION_DEFAULTS.logoSize;
+  ticket.logoSize = Math.round(Math.min(LOGO_SIZE_MAX, Math.max(LOGO_SIZE_MIN, ticket.logoSize)));
+  if (ticket.logoLayout !== "inline") ticket.logoLayout = "stacked";
+  ticket.logoUrl = mediaUrl(ticket.logoUrl);
   return {
     ...texts,
-    ticket: parseOptions(design?.ticketOptions, TICKET_OPTION_DEFAULTS),
+    // Images from the media library: on a desktop till, through its local copy.
+    ticketBannerUrl: mediaUrl(texts.ticketBannerUrl),
+    ticket,
     receipt: parseOptions(design?.receiptOptions, RECEIPT_OPTION_DEFAULTS),
   };
 }

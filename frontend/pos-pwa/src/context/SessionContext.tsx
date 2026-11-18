@@ -226,8 +226,32 @@ function EdgeSessionProvider({ children }: { children: ReactNode }) {
 
   const sessionRef = useRef(session);
   sessionRef.current = session;
+
+  /** Re-reads the catalogue from the local server into the open session. */
+  const refreshBootstrap = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    edge
+      .bootstrap(current.token)
+      .then((bootstrap) => {
+        if (sessionRef.current?.token !== current.token) return; // logged out meanwhile
+        const next: Session = {
+          ...current,
+          establishmentId: bootstrap.establishment.id,
+          bootstrap: { ...bootstrap, gate: { ...bootstrap.gate, signingSecret: "" } },
+        };
+        saveSession(next);
+        setSession(next);
+      })
+      .catch(() => {
+        /* the next change or login will bring it */
+      });
+  }, []);
+
   useEffect(() => {
     if (!session) return;
+    // Also on (re)connecting: a change made while the screen was closed is picked up.
+    refreshBootstrap();
     return edge.events(
       session.token,
       (event) => {
@@ -237,11 +261,13 @@ function EdgeSessionProvider({ children }: { children: ReactNode }) {
           setPendingCount(d.pending);
         }
         if (event.type === "SALE_CREATED") refreshPendingCount();
+        // Prices, tickets, design changed in the admin: take the new catalogue now, no new login needed.
+        if (event.type === "CATALOG_CHANGED") refreshBootstrap();
         listeners.current.forEach((l) => l(event as LiveEvent));
       },
       setLiveConnected,
     );
-  }, [session?.token, refreshPendingCount]);
+  }, [session?.token, refreshPendingCount, refreshBootstrap]);
 
   const login = useCallback(
     async (username: string, password: string) => {

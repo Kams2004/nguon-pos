@@ -9,6 +9,8 @@ import {
   RECEIPT_OPTION_DEFAULTS,
   TICKET_DEFAULTS,
   TICKET_OPTION_DEFAULTS,
+  LOGO_SIZE_MAX,
+  LOGO_SIZE_MIN,
   resolveTicketDesign,
   type ReceiptOptions,
   type TicketOptions,
@@ -351,6 +353,44 @@ export default function TicketDesignPage() {
                           { value: "l", label: t("settings.design.qrSize.l") },
                         ]}
                       />
+                    </div>
+                  </div>
+                  <div className="space-y-4 rounded-xl border border-border/70 p-4">
+                    <ImageField
+                      label={t("settings.design.ticketLogo")}
+                      value={ticket.logoUrl || null}
+                      onChange={(url) => setT({ logoUrl: url ?? "", showLogo: true })}
+                      fallback={logoUrl}
+                      hint={t("settings.design.ticketLogoHint")}
+                    />
+                    <div className="flex flex-wrap items-end gap-6">
+                      <div>
+                        <label className="field-label">{t("settings.design.logoLayout")}</label>
+                        <Segmented
+                          value={ticket.logoLayout}
+                          onChange={(logoLayout) => setT({ logoLayout })}
+                          options={[
+                            { value: "stacked", label: t("settings.design.logoLayout.stacked") },
+                            { value: "inline", label: t("settings.design.logoLayout.inline") },
+                          ]}
+                        />
+                      </div>
+                      <div className="min-w-[14rem] flex-1">
+                        <label className="field-label" htmlFor="ticket-logo-size">
+                          {t("settings.design.logoSize")}{" "}
+                          <span className="font-mono text-muted-foreground">{ticket.logoSize} px</span>
+                        </label>
+                        <input
+                          id="ticket-logo-size"
+                          type="range"
+                          min={LOGO_SIZE_MIN}
+                          max={LOGO_SIZE_MAX}
+                          step={4}
+                          value={ticket.logoSize}
+                          onChange={(e) => setT({ logoSize: Number(e.target.value) })}
+                          className="w-full accent-[#0A4DA2]"
+                        />
+                      </div>
                     </div>
                   </div>
                   <ImageField

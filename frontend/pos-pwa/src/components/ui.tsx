@@ -342,6 +342,7 @@ export function PasswordInput({
   value,
   onChange,
   required,
+  minLength,
   placeholder,
   autoComplete = "new-password",
   className = "",
@@ -349,6 +350,7 @@ export function PasswordInput({
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  minLength?: number;
   placeholder?: string;
   autoComplete?: string;
   className?: string;
@@ -359,6 +361,7 @@ export function PasswordInput({
       <input
         type={shown ? "text" : "password"}
         required={required}
+        minLength={minLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

@@ -30,7 +30,7 @@ import type {
   TerminalStatus,
   TransactionSummary,
 } from "./types";
-import { translate } from "../../i18n";
+import { translate, getLang } from "../../i18n";
 
 // nginx routes by path prefix — /api/auth -> auth-service's own /auth/**,
 // /api/catalog -> catalog-service's /catalog/**, /api/sales -> sales-service's
@@ -55,6 +55,8 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      // Server-side error messages in the screen's language.
+      "Accept-Language": getLang(),
       ...options.headers,
     },
   });

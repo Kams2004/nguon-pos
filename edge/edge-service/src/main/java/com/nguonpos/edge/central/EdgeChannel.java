@@ -77,6 +77,7 @@ public class EdgeChannel {
     private final Updater updater;
     private final com.nguonpos.edge.peer.PeerStore peerStore;
     private final com.nguonpos.edge.peer.PeerDiscovery discovery;
+    private final com.nguonpos.edge.web.MediaCache media;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> new Thread(r, "edge-channel"));
 
     private volatile WebSocket ws;
@@ -97,7 +98,9 @@ public class EdgeChannel {
 
     public EdgeChannel(EdgeProperties props, Enrollment enrollment, DeviceIdentity device, EventLog eventLog, Catalog catalog,
                        LocalAuth auth, TillService till, LiveEvents live, Meta meta, JdbcTemplate jdbc, JsonMapper json, Updater updater,
-                       com.nguonpos.edge.peer.PeerStore peerStore, com.nguonpos.edge.peer.PeerDiscovery discovery) {
+                       com.nguonpos.edge.peer.PeerStore peerStore, com.nguonpos.edge.peer.PeerDiscovery discovery,
+                       com.nguonpos.edge.web.MediaCache media) {
+        this.media = media;
         this.peerStore = peerStore;
         this.discovery = discovery;
         this.updater = updater;
@@ -210,6 +213,7 @@ public class EdgeChannel {
             }
             case "CATALOG" -> {
                 catalog.store(f.get("bootstrap"));
+                media.prefetch(f.get("bootstrap").toString()); // its images, for printing offline
                 meta.put("catalog_version", f.get("version").asString());
                 live.publish("CATALOG_CHANGED", null);
             }
