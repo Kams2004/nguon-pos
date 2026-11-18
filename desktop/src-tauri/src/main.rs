@@ -97,7 +97,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![edge_ui_token, restart_app, save_download, print::list_printers, print::print_silent])
+        .invoke_handler(tauri::generate_handler![edge_ui_token, restart_app, save_download, print::list_printers, print::print_silent, print::print_dialog])
         .run(tauri::generate_context!())
         .expect("Nguon POS failed to start");
 }

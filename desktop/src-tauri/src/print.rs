@@ -5,27 +5,63 @@
 
 use tauri::{AppHandle, Manager, Runtime};
 
+/// The outcome of a print, sent back from the GTK / WebView2 callbacks.
+pub type Reply = std::sync::mpsc::Sender<Result<String, String>>;
+
 /// The printers this machine knows (installed in the system).
 #[tauri::command]
-pub fn list_printers() -> Result<Vec<String>, String> {
+pub async fn list_printers() -> Result<Vec<String>, String> {
     platform::list_printers()
 }
 
-/// Prints the till window's page to `printer`, without a dialog.
+/// Prints the till window's page to `printer`, without a dialog, and says
+/// how it went: "SENT" once the job is with the printer's queue, or an error
+/// code (PRINTER_NOT_FOUND, PRINTER_DISABLED, PRINT_TIMEOUT…).
+///
+/// `async`: a plain command runs on the main thread, where the print itself
+/// must run too — waiting for it there would block both (the screen froze and
+/// the print only left after a timeout).
 #[tauri::command]
-pub fn print_silent<R: Runtime>(app: AppHandle<R>, printer: String, paper_width_mm: Option<f64>) -> Result<(), String> {
+pub async fn print_silent<R: Runtime>(app: AppHandle<R>, printer: String, paper_width_mm: Option<f64>) -> Result<String, String> {
     let width = paper_width_mm.filter(|w| (40.0..=120.0).contains(w)).unwrap_or(80.0);
     if printer.trim().is_empty() {
         return Err("NO_PRINTER".into());
     }
+    platform::check_printer(&printer)?;
     let webview = app.get_webview_window("main").ok_or("NO_WINDOW")?;
-    let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    let (tx, rx) = std::sync::mpsc::channel::<Result<String, String>>();
     webview
         .with_webview(move |wv| {
-            let _ = tx.send(platform::print(wv, &printer, width));
+            if let Err(e) = platform::print(wv, &printer, width, tx.clone()) {
+                let _ = tx.send(Err(e));
+            }
         })
         .map_err(|e| e.to_string())?;
-    rx.recv_timeout(std::time::Duration::from_secs(15)).map_err(|_| "PRINT_TIMEOUT".to_string())?
+    wait(rx, 60).await
+}
+
+/// No printer chosen for this till: the system's print dialog. "PRINTED",
+/// "CANCELLED", or "OPENED" where the system does not say (Windows).
+#[tauri::command]
+pub async fn print_dialog<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
+    let webview = app.get_webview_window("main").ok_or("NO_WINDOW")?;
+    let (tx, rx) = std::sync::mpsc::channel::<Result<String, String>>();
+    webview
+        .with_webview(move |wv| {
+            if let Err(e) = platform::print_dialog(wv, tx.clone()) {
+                let _ = tx.send(Err(e));
+            }
+        })
+        .map_err(|e| e.to_string())?;
+    // The person may take their time in the dialog.
+    wait(rx, 600).await
+}
+
+async fn wait(rx: std::sync::mpsc::Receiver<Result<String, String>>, seconds: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(std::time::Duration::from_secs(seconds)))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|_| "PRINT_TIMEOUT".to_string())?
 }
 
 #[cfg(target_os = "linux")]
@@ -45,8 +81,36 @@ mod platform {
         Ok(names)
     }
 
-    /// Runs on the GTK main thread (inside with_webview).
-    pub fn print(wv: tauri::webview::PlatformWebview, printer: &str, paper_width_mm: f64) -> Result<(), String> {
+    /// Known to CUPS, and not paused / disabled — said before anything is sent.
+    pub fn check_printer(printer: &str) -> Result<(), String> {
+        if std::env::var("NGUON_PRINT_TO_FILE").is_ok() {
+            return Ok(()); // tests: GTK's file printer is not a CUPS queue
+        }
+        let out = std::process::Command::new("lpstat").args(["-p", printer]).output().map_err(|e| format!("lpstat: {e}"))?;
+        let text = String::from_utf8_lossy(&out.stdout).to_lowercase();
+        if !out.status.success() || text.trim().is_empty() {
+            return Err("PRINTER_NOT_FOUND".into());
+        }
+        if text.contains("disabled") || text.contains("désactivée") {
+            return Err("PRINTER_DISABLED".into());
+        }
+        Ok(())
+    }
+
+    /// The system's print dialog for the page on screen (GTK main thread).
+    pub fn print_dialog(wv: tauri::webview::PlatformWebview, reply: super::Reply) -> Result<(), String> {
+        let op = PrintOperation::new(&wv.inner());
+        let response = op.run_dialog(None::<&gtk::Window>);
+        let _ = reply.send(Ok(match response {
+            webkit2gtk::PrintOperationResponse::Print => "PRINTED",
+            _ => "CANCELLED",
+        }
+        .to_string()));
+        Ok(())
+    }
+
+    /// Runs on the GTK main thread (inside with_webview); the outcome goes to `reply`.
+    pub fn print(wv: tauri::webview::PlatformWebview, printer: &str, paper_width_mm: f64, reply: super::Reply) -> Result<(), String> {
         let settings = gtk::PrintSettings::new();
         settings.set_printer(printer);
         settings.set_n_copies(1);
@@ -68,7 +132,14 @@ mod platform {
         let op = PrintOperation::new(&wv.inner());
         op.set_print_settings(&settings);
         op.set_page_setup(&setup);
-        op.connect_failed(|_, err| eprintln!("Nguon POS: printing failed: {err}"));
+        let on_fail = reply.clone();
+        op.connect_failed(move |_, err| {
+            let _ = on_fail.send(Err(format!("PRINT_FAILED: {err}")));
+        });
+        // Emitted once the job is handed to the printer's queue (after a failure too: the first reply wins).
+        op.connect_finished(move |_| {
+            let _ = reply.send(Ok("SENT".into()));
+        });
         op.print();
         Ok(())
     }
@@ -140,7 +211,8 @@ mod platform {
 #[cfg(windows)]
 mod platform {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
-        ICoreWebView2Environment6, ICoreWebView2PrintSettings2, ICoreWebView2_16, COREWEBVIEW2_PRINT_STATUS_SUCCEEDED,
+        ICoreWebView2Environment6, ICoreWebView2PrintSettings2, ICoreWebView2_16, COREWEBVIEW2_PRINT_STATUS_PRINTER_UNAVAILABLE,
+        COREWEBVIEW2_PRINT_STATUS_SUCCEEDED,
     };
     use webview2_com::PrintCompletedHandler;
     use windows::core::{Interface, HSTRING};
@@ -159,7 +231,23 @@ mod platform {
         Ok(names)
     }
 
-    pub fn print(wv: tauri::webview::PlatformWebview, printer: &str, _paper_width_mm: f64) -> Result<(), String> {
+    pub fn check_printer(_printer: &str) -> Result<(), String> {
+        Ok(()) // WebView2 itself says PRINTER_UNAVAILABLE
+    }
+
+    pub fn print_dialog(wv: tauri::webview::PlatformWebview, reply: super::Reply) -> Result<(), String> {
+        unsafe {
+            let core = wv.controller().CoreWebView2().map_err(|e| e.message().to_string())?;
+            let core16: ICoreWebView2_16 = core.cast().map_err(|_| "WEBVIEW2_TOO_OLD".to_string())?;
+            core16
+                .ShowPrintUI(webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_PRINT_DIALOG_KIND_SYSTEM)
+                .map_err(|e| e.message().to_string())?;
+        }
+        let _ = reply.send(Ok("OPENED".into()));
+        Ok(())
+    }
+
+    pub fn print(wv: tauri::webview::PlatformWebview, printer: &str, _paper_width_mm: f64, reply: super::Reply) -> Result<(), String> {
         let e = |err: windows::core::Error| err.message().to_string();
         unsafe {
             let core = wv.controller().CoreWebView2().map_err(e)?;
@@ -175,10 +263,17 @@ mod platform {
             let settings2: ICoreWebView2PrintSettings2 = settings.cast().map_err(e)?;
             settings2.SetPrinterName(&HSTRING::from(printer)).map_err(e)?;
             settings2.SetCopies(1).map_err(e)?;
-            let handler = PrintCompletedHandler::create(Box::new(|result, status| {
-                if result.is_err() || status != COREWEBVIEW2_PRINT_STATUS_SUCCEEDED {
-                    eprintln!("Nguon POS: printing failed: {status:?}");
-                }
+            let handler = PrintCompletedHandler::create(Box::new(move |result, status| {
+                let outcome = if result.is_err() {
+                    Err("PRINT_FAILED".to_string())
+                } else if status == COREWEBVIEW2_PRINT_STATUS_SUCCEEDED {
+                    Ok("SENT".to_string())
+                } else if status == COREWEBVIEW2_PRINT_STATUS_PRINTER_UNAVAILABLE {
+                    Err("PRINTER_NOT_FOUND".to_string())
+                } else {
+                    Err("PRINT_FAILED".to_string())
+                };
+                let _ = reply.send(outcome);
                 Ok(())
             }));
             core16.Print(&settings, &handler).map_err(e)?;
@@ -193,7 +288,15 @@ mod platform {
         Ok(vec![])
     }
 
-    pub fn print(_wv: tauri::webview::PlatformWebview, _printer: &str, _paper_width_mm: f64) -> Result<(), String> {
+    pub fn check_printer(_printer: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    pub fn print_dialog(_wv: tauri::webview::PlatformWebview, _reply: super::Reply) -> Result<(), String> {
+        Err("UNSUPPORTED".into())
+    }
+
+    pub fn print(_wv: tauri::webview::PlatformWebview, _printer: &str, _paper_width_mm: f64, _reply: super::Reply) -> Result<(), String> {
         Err("UNSUPPORTED".into())
     }
 }

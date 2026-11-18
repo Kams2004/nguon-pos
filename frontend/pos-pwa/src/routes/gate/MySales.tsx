@@ -9,6 +9,7 @@ import type { GateSession } from "../../lib/offline/session";
 import { formatDateTime, formatMoney, formatTime } from "../../lib/format";
 import { resolveTicketDesign } from "../../lib/ticketDesign";
 import { SkeletonRows } from "../../components/ui";
+import { Pagination, usePaged } from "../../components/Pagination";
 import { useI18n } from "../../i18n";
 import GateHeader from "./GateHeader";
 import { SaleComplete, type CompletedSale } from "./Sell";
@@ -52,6 +53,13 @@ export default function MySales() {
     load();
   }, [load, pendingCount]);
 
+  const q = query.trim().toLowerCase();
+  const visible = (sales ?? [])
+    .filter((s) => period === "all" || isToday(s.at))
+    .filter((s) => !q || (s.reference ?? s.id).toLowerCase().includes(q));
+  // Pages for both periods; back to page 1 when the period or the search changes.
+  const paged = usePaged(visible, 25, `${period}|${q}`);
+
   if (!gateSession) return null;
   const shared = resolveTicketDesign(gateSession.bootstrap.establishment);
   const design = printer ? { ...shared, receipt: { ...shared.receipt, paperWidth: printer.paperWidth } } : shared;
@@ -86,10 +94,6 @@ export default function MySales() {
     );
   }
 
-  const q = query.trim().toLowerCase();
-  const visible = (sales ?? [])
-    .filter((s) => period === "all" || isToday(s.at))
-    .filter((s) => !q || (s.reference ?? s.id).toLowerCase().includes(q));
   const total = visible.reduce((sum, s) => sum + s.total, 0);
   const tickets = visible.reduce((sum, s) => sum + s.tickets, 0);
 
@@ -163,7 +167,7 @@ export default function MySales() {
             </div>
           ) : (
             <ul className="divide-y divide-border/70">
-              {visible.map((s) => (
+              {paged.pageItems.map((s) => (
                 <li key={s.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5">
                   <span className="w-28 text-sm tabular-nums text-muted-foreground">
                     {period === "today" ? formatTime(s.at) : formatDateTime(s.at)}
@@ -187,6 +191,15 @@ export default function MySales() {
               ))}
             </ul>
           )}
+          <Pagination
+            page={paged.page}
+            pages={paged.pages}
+            total={paged.total}
+            size={paged.size}
+            onPage={paged.setPage}
+            onSize={paged.setSize}
+            unit={t("gate.mySales.unit")}
+          />
         </section>
       </div>
     </div>

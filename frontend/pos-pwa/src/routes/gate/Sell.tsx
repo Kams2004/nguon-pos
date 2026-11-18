@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { printPage } from "../../lib/platform";
+import { desktopApp, printPage, printWithDialog } from "../../lib/platform";
+import { PrintStatus, type PrintState } from "../../components/PrintStatus";
+import { PrinterSettingsDialog } from "../../components/PrinterSettingsDialog";
 import QRCode from "qrcode";
 import {
   ArrowLeft,
@@ -61,6 +63,16 @@ export type CompletedSale = {
 
 type PrintTarget = "all" | "receipt" | "tickets";
 
+/**
+ * The sale in progress, kept while the cashier visits another tab (Scanner,
+ * Mes ventes) and comes back: the cart, the payment, or the finished sale
+ * still waiting to be printed. Per cashier, for this app session.
+ */
+type SellDraft = { cart: CartItem[]; paymentMethod: PaymentMethod; received: string; completedSale: CompletedSale | null };
+const drafts = new Map<string, SellDraft>();
+/** Finished sales already auto-printed: coming back to one never prints it again by itself. */
+const autoPrintedSales = new Set<string>();
+
 /** Quick cash buttons: the exact amount, then the next round banknote totals above it. */
 function cashSuggestions(total: number): number[] {
   if (total <= 0) return [];
@@ -79,12 +91,34 @@ export default function Sell() {
   const { logoUrl } = useBranding();
   const [printer] = usePrinterSettings();
   const ticketTypes = session?.bootstrap?.ticketTypes ?? [];
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const draftKey = session?.userId ?? "";
+  const draft = drafts.get(draftKey);
+  const [cart, setCart] = useState<CartItem[]>(draft?.cart ?? []);
   const [query, setQuery] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
-  const [received, setReceived] = useState("");
-  const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(draft?.paymentMethod ?? "CASH");
+  const [received, setReceived] = useState(draft?.received ?? "");
+  const [completedSale, setCompletedSale] = useState<CompletedSale | null>(draft?.completedSale ?? null);
   const [qrImages, setQrImages] = useState<Record<string, string>>({});
+
+  // Keep the sale in progress for when the cashier comes back from another tab.
+  useEffect(() => {
+    if (draftKey) drafts.set(draftKey, { cart, paymentMethod, received, completedSale });
+  }, [draftKey, cart, paymentMethod, received, completedSale]);
+
+  // Back on a finished sale: draw its QR codes again (they are not kept, only the tickets).
+  useEffect(() => {
+    if (!completedSale || completedSale.tickets.every((tk) => qrImages[tk.id])) return;
+    let cancelled = false;
+    (async () => {
+      const images: Record<string, string> = {};
+      for (const tk of completedSale.tickets) images[tk.id] = await QRCode.toDataURL(tk.qrContent, { width: 320, margin: 1 });
+      if (!cancelled) setQrImages(images);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedSale]);
   const [submitting, setSubmitting] = useState(false);
 
   const startNewSale = useCallback(() => {
@@ -540,17 +574,26 @@ export function SaleComplete({
     return () => window.removeEventListener("keydown", onKey);
   }, [onNewSale]);
 
-  const print = (target: PrintTarget) => {
+  const [printState, setPrintState] = useState<PrintState>({ phase: "idle" });
+  const [printerOpen, setPrinterOpen] = useState(false);
+  const print = (target: PrintTarget, viaDialog = false) => {
     setPrintTarget(target);
+    setPrintState({ phase: "printing" });
     // Let React apply the print:hidden classes before printing.
-    setTimeout(() => printPage(printer?.printerName, printer?.paperWidth ?? design.receipt.paperWidth), 50);
+    setTimeout(async () => {
+      const outcome = viaDialog
+        ? await printWithDialog()
+        : await printPage(printer?.printerName, printer?.paperWidth ?? design.receipt.paperWidth);
+      setPrintState({ phase: "done", outcome });
+    }, 50);
   };
 
   // Automatic printing, as set for this till — once every QR code is drawn. Never when printing again.
   useEffect(() => {
-    if (reprint || !printer || printer.autoPrint === "NONE" || autoPrinted.current) return;
+    if (reprint || !printer || printer.autoPrint === "NONE" || autoPrinted.current || autoPrintedSales.has(sale.transactionId)) return;
     if (sale.tickets.some((tk) => !qrImages[tk.id])) return;
     autoPrinted.current = true;
+    autoPrintedSales.add(sale.transactionId); // not again when coming back to this sale from another tab
     const target: PrintTarget =
       printer.autoPrint === "RECEIPT" ? "receipt" : printer.autoPrint === "ALL" ? "all" : ns > 0 ? "tickets" : "receipt";
     print(target);
@@ -653,6 +696,15 @@ export function SaleComplete({
                   <ReceiptIcon className="h-4 w-4" /> {t("gate.done.printReceipt")}
                 </button>
               )}
+              <div className="sm:col-span-2">
+                <PrintStatus
+                  state={printState}
+                  noPrinterChosen={desktopApp.available() && printer !== null && !printer.printerName}
+                  onRetry={() => print(printTarget)}
+                  onDialog={() => print(printTarget, true)}
+                  onSettings={() => setPrinterOpen(true)}
+                />
+              </div>
               <button ref={newSaleRef} onClick={onNewSale} className="btn-gold py-3.5 text-base sm:col-span-2">
                 {reprint ? <ArrowLeft className="h-5 w-5" /> : <ShoppingCart className="h-5 w-5" />}
                 {reprint ? t("gate.mySales.back") : t("gate.done.newSale")}
@@ -663,6 +715,8 @@ export function SaleComplete({
             </div>
           </div>
         </section>
+
+        {printerOpen && <PrinterSettingsDialog onClose={() => setPrinterOpen(false)} />}
 
         {/* Printable column: the till receipt first, then one full ticket per entry, each on its own page */}
         <div className="grid gap-5 lg:grid-cols-[340px_1fr]">

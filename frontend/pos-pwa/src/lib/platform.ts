@@ -38,29 +38,50 @@ export const desktopApp = {
   },
   /** The printers installed on this computer. */
   printers: async (): Promise<string[]> => (await tauri()?.invoke<string[]>("list_printers")) ?? [],
-  /** Prints the page as it is now, straight to `printer`, with no dialog. */
-  printSilent: async (printer: string, paperWidthMm: number): Promise<void> => {
-    const t = tauri();
-    if (!t) throw new Error("NOT_DESKTOP");
-    await t.invoke("print_silent", { printer, paperWidthMm });
-  },
 };
 
+/** What happened when printing, to tell the cashier. */
+export type PrintOutcome =
+  | { kind: "sent"; printer: string } // in the printer's queue (desktop, chosen printer)
+  | { kind: "dialog"; result: "PRINTED" | "CANCELLED" | "OPENED" } // the system's print dialog
+  | { kind: "browser" } // a browser till: the browser's own dialog
+  | { kind: "error"; code: string; printer?: string };
+
 /**
- * Prints what is on screen (the print styles pick the receipt/tickets): on
- * a desktop till with a chosen printer, silently; otherwise through the
- * system's print dialog.
+ * Prints what is on screen (the print styles pick the receipt/tickets). A
+ * desktop till with a chosen printer prints silently and says whether the job
+ * reached it; without one, the system's dialog. A failure is reported, not
+ * covered up by another dialog: the cashier decides what to do.
  */
-export async function printPage(printerName: string | undefined, paperWidthMm: number): Promise<void> {
-  if (printerName && desktopApp.available()) {
+export async function printPage(printerName: string | undefined, paperWidthMm: number): Promise<PrintOutcome> {
+  const t = tauri();
+  if (t) {
     try {
-      await desktopApp.printSilent(printerName, paperWidthMm);
-      return;
+      if (printerName) {
+        await t.invoke("print_silent", { printer: printerName, paperWidthMm });
+        return { kind: "sent", printer: printerName };
+      }
+      return { kind: "dialog", result: await t.invoke<"PRINTED" | "CANCELLED" | "OPENED">("print_dialog") };
     } catch (e) {
-      console.warn("Silent printing failed, falling back to the print dialog", e);
+      return { kind: "error", code: String(e), printer: printerName || undefined };
     }
   }
   window.print();
+  return { kind: "browser" };
+}
+
+/** The system's print dialog, whatever printer is set (after a failed silent print). */
+export async function printWithDialog(): Promise<PrintOutcome> {
+  const t = tauri();
+  if (!t) {
+    window.print();
+    return { kind: "browser" };
+  }
+  try {
+    return { kind: "dialog", result: await t.invoke<"PRINTED" | "CANCELLED" | "OPENED">("print_dialog") };
+  } catch (e) {
+    return { kind: "error", code: String(e) };
+  }
 }
 
 /** "0.2.0" > "0.1.9"; anything that isn't MAJOR.MINOR.PATCH ("dev") never counts as newer. */
