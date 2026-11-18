@@ -1,6 +1,6 @@
 [package]
 name = "nguon-pos"
-version = "0.3.6"
+version = "0.3.7"
 description = "Nguon POS desktop till"
 edition = "2021"
 
