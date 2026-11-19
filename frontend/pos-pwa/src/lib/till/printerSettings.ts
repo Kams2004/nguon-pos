@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useSession } from "../../context/SessionContext";
 import { isEdgeMode } from "../platform";
 import { edge, type PrinterSettings } from "./edgeClient";
@@ -55,4 +55,10 @@ export function usePrinterSettings(): [PrinterSettings | null, (s: PrinterSettin
   );
 
   return [settings, save];
+}
+
+/** CSS variables that shift (and narrow) thermal prints by this till's offset — see .print-thermal in index.css. */
+export function printOffsetStyle(offsetMm: number | undefined): CSSProperties {
+  const mm = Number.isFinite(offsetMm) ? Math.max(-10, Math.min(10, offsetMm ?? 0)) : 0;
+  return { "--print-offset": `${mm}mm`, "--print-shift": `${Math.abs(mm)}mm` } as CSSProperties;
 }

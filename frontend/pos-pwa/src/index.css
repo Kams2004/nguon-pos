@@ -287,22 +287,32 @@ textarea {
   .no-print {
     display: none !important;
   }
+  /* The printable width (72mm on an 80mm roll), centred. A printer whose
+     print starts off-centre is corrected per till ("Décalage horizontal"):
+     the content moves by --print-offset and narrows by twice that much, so
+     it is centred on the paper without running off the far edge.
+     --print-shift is the offset's absolute value (set with it). */
   .print-thermal {
-    width: 72mm;
+    width: calc(72mm - 2 * var(--print-shift, 0mm));
     margin: 0 auto;
-    /* Per-till nudge for printers that clip one edge (Imprimante de cette caisse). */
     position: relative;
     left: var(--print-offset, 0mm);
   }
   .print-thermal .receipt {
-    width: 72mm;
+    width: 100%;
     padding: 0;
     border: 0;
   }
   /* 58mm roll: 48mm printable. */
-  .print-thermal.paper-58,
-  .print-thermal.paper-58 .receipt {
-    width: 48mm;
+  .print-thermal.paper-58 {
+    width: calc(48mm - 2 * var(--print-shift, 0mm));
+  }
+  /* The centring test page (printer settings) prints alone. */
+  body.printing-calibration > * {
+    display: none !important;
+  }
+  body.printing-calibration > .calibration-sheet {
+    display: block !important;
   }
   .print-page-break {
     break-before: page;
@@ -341,6 +351,10 @@ textarea {
 /* On the royal-blue lead figure of a stat strip. */
 .stat-strip > :first-child .skeleton {
   background: hsl(0 0% 100% / 0.18);
+}
+
+.calibration-sheet {
+  display: none;
 }
 
 /* Edge / WebView2 (the Windows till) adds its own "show password" eye and

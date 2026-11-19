@@ -72,7 +72,9 @@ export default function TicketCard({
       <div className="relative overflow-hidden rounded-[1.1rem] bg-white print:rounded-none print:border print:border-black">
         {total > 1 && (
           <span
-            className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold text-white print:border print:border-black print:bg-white print:text-black"
+            // On paper: black on white with a border. The !s beat the inline accent colour, which a
+            // thermal printer would otherwise print as a black blob hiding the number.
+            className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold text-white print:border-[1.5px] print:border-black print:!bg-white print:text-[13px] print:!text-black"
             style={{ backgroundColor: o.accent }}
           >
             {index + 1} / {total}

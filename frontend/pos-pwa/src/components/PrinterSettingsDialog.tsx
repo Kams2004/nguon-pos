@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Check, Crosshair } from "lucide-react";
 import { useI18n } from "../i18n";
-import { usePrinterSettings, type PrinterSettings } from "../lib/till/printerSettings";
+import { printOffsetStyle, usePrinterSettings, type PrinterSettings } from "../lib/till/printerSettings";
 import { errorMessage } from "../lib/api/client";
-import { desktopApp } from "../lib/platform";
+import { desktopApp, printPage } from "../lib/platform";
 import { Modal } from "./ui";
 
 const AUTO = ["NONE", "RECEIPT", "TICKETS", "ALL"] as const;
@@ -17,6 +18,7 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   // Desktop till: the printers installed on this computer, to pick from.
   const [printers, setPrinters] = useState<string[] | null>(null);
+  const [testing, setTesting] = useState<"idle" | "printing" | "sent" | string>("idle");
 
   useEffect(() => {
     if (settings && !form) setForm(settings);
@@ -34,6 +36,18 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
   const set = (patch: Partial<PrinterSettings>) => {
     setSaved(false);
     setForm({ ...form, ...patch });
+  };
+
+  // The centring test: only the test sheet prints, with the offset as typed (saved or not).
+  const printTest = async () => {
+    setTesting("printing");
+    document.body.classList.add("printing-calibration");
+    try {
+      const outcome = await printPage(form.printerName || undefined, form.paperWidth);
+      setTesting(outcome.kind === "error" ? outcome.code : outcome.kind === "dialog" && outcome.result === "CANCELLED" ? "idle" : "sent");
+    } finally {
+      document.body.classList.remove("printing-calibration");
+    }
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -128,6 +142,18 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">{t("gate.printer.offsetHint")}</p>
+        <div className="rounded-xl bg-muted/60 p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={printTest} disabled={testing === "printing"} className="btn-outline bg-white px-3 py-1.5 text-xs">
+              <Crosshair className="h-3.5 w-3.5" /> {testing === "printing" ? t("gate.print.printing") : t("gate.printer.test")}
+            </button>
+            {testing === "sent" && <span className="text-xs font-semibold text-success">{t("gate.printer.testSent")}</span>}
+            {testing !== "idle" && testing !== "printing" && testing !== "sent" && (
+              <span className="text-xs font-semibold text-destructive">{t("gate.print.error.other", { code: testing })}</span>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("gate.printer.testHint")}</p>
+        </div>
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
         <div className="flex items-center gap-3">
           <button type="button" onClick={onClose} className="btn-outline flex-1">
@@ -143,6 +169,23 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
           </p>
         )}
       </form>
+      {createPortal(
+        <div className="calibration-sheet" style={printOffsetStyle(form.offsetMm)}>
+          <div
+            className={`print-thermal ${form.paperWidth === 58 ? "paper-58" : ""}`}
+            style={{ border: "0.5mm solid #000", padding: "3mm 0", textAlign: "center", color: "#000", background: "#fff" }}
+          >
+            <p style={{ fontWeight: 800, fontSize: 14 }}>{t("gate.printer.testTitle")}</p>
+            <div style={{ position: "relative", height: "16mm", margin: "2mm 0" }}>
+              <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, borderLeft: "0.5mm dashed #000" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: "0.3mm solid #000" }} />
+            </div>
+            <p style={{ fontSize: 12, fontWeight: 700 }}>{t("gate.printer.testOffset", { mm: form.offsetMm })}</p>
+            <p style={{ fontSize: 10, padding: "1mm 3mm 0" }}>{t("gate.printer.testHowTo")}</p>
+          </div>
+        </div>,
+        document.body,
+      )}
     </Modal>
   );
 }

@@ -28,7 +28,7 @@ import { useSession } from "../../context/SessionContext";
 import { useBranding } from "../../context/BrandingContext";
 import type { CartLine, IssuedTicket } from "../../lib/offline/sale";
 import { till, type TodaySale } from "../../lib/till/backend";
-import { usePrinterSettings } from "../../lib/till/printerSettings";
+import { printOffsetStyle, usePrinterSettings } from "../../lib/till/printerSettings";
 import type { GateSession } from "../../lib/offline/session";
 import type { PaymentMethod } from "../../lib/api/types";
 import { PAYMENT_LABELS, formatDateTime, formatMoney, formatTime } from "../../lib/format";
@@ -623,7 +623,7 @@ export function SaleComplete({
   const todayPending = today.filter((x) => !x.synced).length;
 
   return (
-    <div className="min-h-screen bg-background" style={{ "--print-offset": `${printer?.offsetMm ?? 0}mm` } as React.CSSProperties}>
+    <div className="min-h-screen bg-background" style={printOffsetStyle(printer?.offsetMm)}>
       {/* Zero page margins for the thermal roll — only while this screen
           is mounted, so reports elsewhere keep the browser's default
           margins. The paper itself (80mm roll, cut at end of content) is
