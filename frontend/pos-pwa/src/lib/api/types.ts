@@ -121,7 +121,8 @@ export type AdminGate = { id: string; name: string; code: string; active: boolea
 
 export type AdminTicketType = {
   id: string;
-  gateId: string | null;
+  /** The gates that sell it; empty = every gate. */
+  gateIds: string[];
   name: string;
   price: number;
   currency: string;

@@ -312,7 +312,7 @@ function GateSection({
   // Browser tills (the web version) currently connected to this gate.
   const browserTills = data.terminals.filter((term) => term.gateId === gate.id && term.online && !deviceIds.has(term.terminalId));
   const cashiers = data.users.filter((u) => u.active && u.role !== "SUPER_ADMIN" && u.assignedGateId === gate.id);
-  const types = data.ticketTypes.filter((tt) => tt.active && (tt.gateId === gate.id || tt.gateId === null)).length;
+  const types = data.ticketTypes.filter((tt) => tt.active && (tt.gateIds.length === 0 || tt.gateIds.includes(gate.id))).length;
   const onlineCount = tills.filter((d) => presence.get(d.id)?.online ?? d.online).length;
   // Who is signed in where, to show it next to each cashier too.
   const tillOfUser = new Map<string, string>();

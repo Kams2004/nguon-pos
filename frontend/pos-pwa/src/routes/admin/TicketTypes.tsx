@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Check } from "lucide-react";
 import { useLiveRefresh, useSession } from "../../context/SessionContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { api, errorMessage } from "../../lib/api/client";
@@ -14,8 +14,9 @@ import { useI18n } from "../../i18n";
 // Labels: settings.ticketTypes.printMode.<mode>.label / .short
 const PRINT_MODES: PrintMode[] = ["INDIVIDUAL", "STANDARD", "INHERIT_ESTABLISHMENT"];
 
-type FormState = { name: string; price: string; gateId: string; printMode: PrintMode; icon: string; color: string };
-const EMPTY_FORM: FormState = { name: "", price: "", gateId: "", printMode: "INDIVIDUAL", icon: "ticket", color: "blue" };
+// gateIds: the gates that sell it; empty = every gate.
+type FormState = { name: string; price: string; gateIds: string[]; printMode: PrintMode; icon: string; color: string };
+const EMPTY_FORM: FormState = { name: "", price: "", gateIds: [], printMode: "INDIVIDUAL", icon: "ticket", color: "blue" };
 
 export default function TicketTypes() {
   const { t } = useI18n();
@@ -45,13 +46,22 @@ export default function TicketTypes() {
   const visible = (types ?? []).filter(
     (t) =>
       // A ticket type with no gate is sold at every gate, so it shows under every gate's tab.
-      (tab === "all" || t.gateId === tab || t.gateId === null) && (!q || t.name.toLowerCase().includes(q)),
+      (tab === "all" || t.gateIds.length === 0 || t.gateIds.includes(tab)) && (!q || t.name.toLowerCase().includes(q)),
   );
   const paged = usePaged(visible, 25, `${q}|${tab}`);
 
   if (!session) return null;
 
-  const gateName = (id: string | null) => (id ? (gates.find((g) => g.id === id)?.name ?? "?") : t("settings.allGates"));
+  /** "Porte A, Porte C", or "Toutes les portes" when none is chosen. */
+  const gateNames = (ids: string[]) =>
+    ids.length === 0
+      ? t("settings.allGates")
+      : gates
+          .filter((g) => ids.includes(g.id))
+          .map((g) => g.name)
+          .join(", ") || "?";
+  const toggleGate = (id: string) =>
+    setForm((f) => ({ ...f, gateIds: f.gateIds.includes(id) ? f.gateIds.filter((g) => g !== id) : [...f.gateIds, id] }));
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -62,7 +72,7 @@ export default function TicketTypes() {
     setForm({
       name: t.name,
       price: String(t.price),
-      gateId: t.gateId ?? "",
+      gateIds: t.gateIds ?? [],
       printMode: t.printMode,
       icon: t.icon ?? "ticket",
       color: t.color ?? "blue",
@@ -79,7 +89,7 @@ export default function TicketTypes() {
     // The bold price sits where its placeholder is in the translated sentence.
     const [beforePrice, afterPrice] = t("settings.ticketTypes.summary", {
       name: form.name,
-      gate: gateName(form.gateId || null).toLowerCase(),
+      gate: gateNames(form.gateIds).toLowerCase(),
     }).split("{price}");
     const ok = await confirm({
       title: isNew ? t("settings.ticketTypes.confirmCreateTitle") : t("settings.confirmSaveChanges"),
@@ -95,7 +105,7 @@ export default function TicketTypes() {
     });
     if (!ok) return;
     const data = {
-      gateId: form.gateId || null,
+      gateIds: form.gateIds,
       name: form.name,
       price: Number(form.price),
       currency: "XAF",
@@ -188,7 +198,7 @@ export default function TicketTypes() {
                       <TicketTypeBadge icon={type.icon} color={type.color} size="sm" />
                     </td>
                     <td className="td font-semibold text-foreground">{type.name}</td>
-                    <td className="td text-muted-foreground">{gateName(type.gateId)}</td>
+                    <td className="td text-muted-foreground">{gateNames(type.gateIds)}</td>
                     <td className="td text-right font-semibold">{formatMoney(type.price, type.currency)}</td>
                     <td className="td">
                       <Pill tone="info">
@@ -264,18 +274,43 @@ export default function TicketTypes() {
                   className="field"
                 />
               </div>
-              <div>
-                <label className="field-label">{t("settings.gate")}</label>
-                <select value={form.gateId} onChange={(e) => setForm({ ...form, gateId: e.target.value })} className="field">
-                  <option value="">{t("settings.allGates")}</option>
-                  {gates.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
+            <fieldset>
+              <legend className="field-label">{t("settings.ticketTypes.gatesLabel")}</legend>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  aria-pressed={form.gateIds.length === 0}
+                  onClick={() => setForm({ ...form, gateIds: [] })}
+                  className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold ring-1 transition-colors ${
+                    form.gateIds.length === 0
+                      ? "bg-secondary text-white ring-secondary"
+                      : "bg-card text-muted-foreground ring-border hover:text-foreground"
+                  }`}
+                >
+                  {form.gateIds.length === 0 && <Check className="h-3.5 w-3.5" />} {t("settings.allGates")}
+                </button>
+                {gates
+                  .filter((g) => g.active || form.gateIds.includes(g.id))
+                  .map((g) => {
+                    const on = form.gateIds.includes(g.id);
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => toggleGate(g.id)}
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold ring-1 transition-colors ${
+                          on ? "bg-secondary text-white ring-secondary" : "bg-card text-muted-foreground ring-border hover:text-foreground"
+                        }`}
+                      >
+                        {on && <Check className="h-3.5 w-3.5" />} {g.name}
+                      </button>
+                    );
+                  })}
+              </div>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">{t("settings.ticketTypes.gatesHint")}</p>
+            </fieldset>
             <div>
               <label className="field-label">{t("settings.ticketTypes.printModeLabel")}</label>
               <select

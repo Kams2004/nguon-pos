@@ -245,7 +245,7 @@ export const api = {
   createTicketType(
     token: string,
     data: {
-      gateId: string | null;
+      gateIds: string[];
       name: string;
       price: number;
       currency: string;
@@ -265,7 +265,7 @@ export const api = {
     token: string,
     id: string,
     data: {
-      gateId: string | null;
+      gateIds: string[];
       name: string;
       price: number;
       currency: string;

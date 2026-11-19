@@ -5,6 +5,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -23,8 +25,12 @@ public class TicketType {
     @Column(nullable = false)
     private UUID establishmentId;
 
-    // Nullable = sellable at any gate; set = gate-exclusive ticket type.
-    private UUID gateId;
+    /** The gates that sell it; empty = every gate of the establishment. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "ticket_type_gate", joinColumns = @JoinColumn(name = "ticket_type_id"))
+    @Column(name = "gate_id", nullable = false)
+    @Builder.Default
+    private Set<UUID> gateIds = new HashSet<>();
 
     @Column(nullable = false)
     private String name;

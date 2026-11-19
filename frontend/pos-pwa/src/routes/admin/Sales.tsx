@@ -114,7 +114,7 @@ export default function Sales() {
             {ticketTypes.map((type) => (
               <option key={type.id} value={type.id}>
                 {type.name}
-                {type.gateId ? ` — ${gateName(type.gateId)}` : ""}
+                {type.gateIds.length > 0 ? ` — ${type.gateIds.map(gateName).join(", ")}` : ""}
               </option>
             ))}
           </select>

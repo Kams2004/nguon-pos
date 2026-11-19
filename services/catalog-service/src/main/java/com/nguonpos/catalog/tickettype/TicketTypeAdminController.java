@@ -1,6 +1,8 @@
 package com.nguonpos.catalog.tickettype;
 
 import com.nguonpos.catalog.audit.AuditService;
+import com.nguonpos.catalog.gate.Gate;
+import com.nguonpos.catalog.gate.GateRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -15,8 +17,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/catalog/admin/ticket-types")
@@ -24,11 +29,25 @@ import java.util.UUID;
 public class TicketTypeAdminController {
 
     private final TicketTypeRepository ticketTypeRepository;
+    private final GateRepository gateRepository;
     private final AuditService audit;
 
-    public TicketTypeAdminController(TicketTypeRepository ticketTypeRepository, AuditService audit) {
+    public TicketTypeAdminController(TicketTypeRepository ticketTypeRepository, GateRepository gateRepository, AuditService audit) {
         this.ticketTypeRepository = ticketTypeRepository;
+        this.gateRepository = gateRepository;
         this.audit = audit;
+    }
+
+    /** The chosen gates, checked to be this establishment's; none = every gate. */
+    private Set<UUID> gates(UUID establishmentId, UpsertRequest request) {
+        Set<UUID> chosen = new HashSet<>();
+        if (request.gateIds() != null) chosen.addAll(request.gateIds());
+        else if (request.gateId() != null) chosen.add(request.gateId()); // older clients
+        if (chosen.isEmpty()) return chosen;
+        Set<UUID> own = gateRepository.findByEstablishmentIdOrderByNameAsc(establishmentId).stream()
+                .map(Gate::getId).collect(Collectors.toSet());
+        if (!own.containsAll(chosen)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Porte inconnue.");
+        return chosen;
     }
 
     @GetMapping
@@ -45,7 +64,7 @@ public class TicketTypeAdminController {
         Instant now = Instant.now();
         TicketType t = TicketType.builder()
                 .establishmentId(establishmentId)
-                .gateId(request.gateId())
+                .gateIds(gates(establishmentId, request))
                 .name(request.name())
                 .price(request.price())
                 .currency(request.currency())
@@ -72,7 +91,8 @@ public class TicketTypeAdminController {
         String priceChange = t.getPrice().compareTo(request.price()) != 0
                 ? " (prix " + t.getPrice().toPlainString() + " → " + request.price().toPlainString() + ")"
                 : "";
-        t.setGateId(request.gateId());
+        t.getGateIds().clear();
+        t.getGateIds().addAll(gates(t.getEstablishmentId(), request));
         t.setName(request.name());
         t.setPrice(request.price());
         t.setCurrency(request.currency());
@@ -103,7 +123,8 @@ public class TicketTypeAdminController {
     }
 
     public record UpsertRequest(
-            UUID gateId, // null = sellable at any gate
+            UUID gateId, // older clients: a single gate
+            @Size(max = 100) List<UUID> gateIds, // empty or null = sold at every gate
             @NotBlank @Size(max = 200) String name,
             @NotNull @PositiveOrZero BigDecimal price,
             @NotBlank @Size(max = 10) String currency,
@@ -117,10 +138,10 @@ public class TicketTypeAdminController {
     }
 
     public record TicketTypeSummary(
-            UUID id, UUID gateId, String name, BigDecimal price, String currency, PrintMode printMode, boolean active, String icon, String color
+            UUID id, List<UUID> gateIds, String name, BigDecimal price, String currency, PrintMode printMode, boolean active, String icon, String color
     ) {
         static TicketTypeSummary from(TicketType t) {
-            return new TicketTypeSummary(t.getId(), t.getGateId(), t.getName(), t.getPrice(), t.getCurrency(), t.getPrintMode(), t.isActive(), t.getIcon(), t.getColor());
+            return new TicketTypeSummary(t.getId(), t.getGateIds().stream().sorted().toList(), t.getName(), t.getPrice(), t.getCurrency(), t.getPrintMode(), t.isActive(), t.getIcon(), t.getColor());
         }
     }
 }

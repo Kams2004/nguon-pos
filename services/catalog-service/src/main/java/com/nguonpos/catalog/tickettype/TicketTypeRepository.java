@@ -9,13 +9,12 @@ import java.util.UUID;
 
 public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
 
-    // Sellable at this gate: either explicitly scoped to it, or unscoped
-    // (gateId null = sellable at any gate of the establishment).
+    // Sellable at this gate: one of its gates, or no gate chosen (= every gate).
     @Query("""
             SELECT t FROM TicketType t
             WHERE t.establishmentId = :establishmentId
               AND t.active = true
-              AND (t.gateId = :gateId OR t.gateId IS NULL)
+              AND (t.gateIds IS EMPTY OR :gateId MEMBER OF t.gateIds)
             """)
     List<TicketType> findSellableAtGate(@Param("establishmentId") UUID establishmentId, @Param("gateId") UUID gateId);
 

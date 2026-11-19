@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { PauseCircle, Rocket } from "lucide-react";
+import { Download, PauseCircle, Rocket } from "lucide-react";
 import { useLiveRefresh, useSession } from "../../context/SessionContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { useI18n } from "../../i18n";
@@ -119,11 +119,19 @@ export function ReleasesCard({ devices }: { devices: Device[] | null }) {
                     {r.notes && <p className="max-w-[60ch] text-xs text-muted-foreground">{r.notes}</p>}
                   </td>
                   <td className="td">
+                    {/* The installers themselves: to install a new till by hand, or keep a copy offline. */}
                     <div className="flex flex-wrap gap-1.5">
                       {r.files.map((f) => (
-                        <Pill key={f.platform} tone="info">
-                          {PLATFORM_LABEL[f.platform] ?? f.platform}
-                        </Pill>
+                        <a
+                          key={f.platform}
+                          href={f.url}
+                          download={f.url.split("/").pop()}
+                          title={t("settings.releases.downloadTitle", { file: f.url.split("/").pop() ?? "", sha: f.sha256 })}
+                          className="btn-outline px-2.5 py-1 text-xs"
+                        >
+                          <Download className="h-3.5 w-3.5" /> {PLATFORM_LABEL[f.platform] ?? f.platform}
+                          <span className="font-normal text-muted-foreground">· {t("settings.releases.size", { mb: f.size < 1_000_000 ? "< 1" : Math.round(f.size / 1_000_000) })}</span>
+                        </a>
                       ))}
                     </div>
                   </td>
