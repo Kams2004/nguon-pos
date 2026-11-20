@@ -1,0 +1,140 @@
+name: Desktop till publish
+
+# After each successful till build (tag desktop-vX.Y.Z): signs both
+# installers with the release key, sends them to the server, which checks the
+# signatures itself and registers the version. Nothing runs on anyone's
+# computer. The tills still install it only once an admin clicks
+# "Publier aux caisses" (Administration → Mises à jour).
+#
+# Secrets (environment "release", set up once with deploy/release/setup-ci.sh):
+#   RELEASE_SIGNING_KEY      the Ed25519 release key (PEM)
+#   RELEASE_SSH_KEY          upload key — on the server it can only run receive-release.sh
+#   RELEASE_SSH_KNOWN_HOSTS  the server's host key (no trust-on-first-use)
+# Optional variable RELEASE_SSH_TARGET (default deploy@167.86.120.214).
+#
+# Re-run by hand (Actions → Desktop till publish → Run workflow) for a tag
+# whose build already exists, e.g. after setting up the secrets.
+on:
+  workflow_run:
+    workflows: ["Desktop till release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag already built, e.g. desktop-v0.3.8"
+        required: true
+      notes:
+        description: "Notes shown in Mises à jour (empty: the tag's message)"
+        required: false
+
+concurrency:
+  group: publish-desktop
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       startsWith(github.event.workflow_run.head_branch, 'desktop-v'))
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.workflow_run.head_branch }}
+      TARGET: ${{ vars.RELEASE_SSH_TARGET || 'deploy@167.86.120.214' }}
+    steps:
+      - name: Version from the tag
+        run: |
+          case "$TAG" in desktop-v*) ;; *) echo "::error::Not a till tag: $TAG"; exit 1 ;; esac
+          v=${TAG#desktop-v}
+          printf '%s' "$v" | grep -Eqx '[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}' || { echo "::error::Bad version $v"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Notes
+        env:
+          INPUT_NOTES: ${{ inputs.notes }}
+        run: |
+          git fetch -q --depth=1 origin "+refs/tags/$TAG:refs/tags/$TAG"
+          if [ -n "${INPUT_NOTES:-}" ]; then
+            printf '%s' "$INPUT_NOTES" > "$RUNNER_TEMP/notes.txt"
+          elif [ "$(git cat-file -t "refs/tags/$TAG")" = tag ]; then
+            git for-each-ref --format='%(contents:subject)' "refs/tags/$TAG" > "$RUNNER_TEMP/notes.txt"
+          else
+            : > "$RUNNER_TEMP/notes.txt"
+          fi
+          echo "Notes: $(cat "$RUNNER_TEMP/notes.txt")"
+
+      - name: Installers from the build
+        run: |
+          if [ "${{ github.event_name }}" = workflow_run ]; then
+            run=${{ github.event.workflow_run.id }}
+          else
+            run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow release-desktop.yml --branch "$TAG" --status success --limit 1 --json databaseId -q '.[0].databaseId')
+          fi
+          [ -n "$run" ] || { echo "::error::No successful build for $TAG"; exit 1; }
+          gh run download "$run" -R "$GITHUB_REPOSITORY" -D "$RUNNER_TEMP/art"
+          mkdir -p "$RUNNER_TEMP/bundle"
+          deb=$(find "$RUNNER_TEMP/art" -name "*_${VERSION}_amd64.deb" | head -n 1)
+          exe=$(find "$RUNNER_TEMP/art" -name "*_${VERSION}_x64-setup.exe" | head -n 1)
+          [ -n "$deb" ] && [ -n "$exe" ] || { echo "::error::Build $run lacks the $VERSION installers"; exit 1; }
+          [ "$(dpkg-deb -f "$deb" Version)" = "$VERSION" ] || { echo "::error::$deb is not version $VERSION"; exit 1; }
+          cp "$deb" "$RUNNER_TEMP/bundle/nguon-pos_${VERSION}_amd64.deb"
+          cp "$exe" "$RUNNER_TEMP/bundle/nguon-pos_${VERSION}_x64-setup.exe"
+          cp "$RUNNER_TEMP/notes.txt" "$RUNNER_TEMP/bundle/notes.txt"
+
+      - name: Sign
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/release.key"
+          printf '%s\n' "$RELEASE_SIGNING_KEY" > "$key"
+          pub=edge/edge-service/src/main/resources/release/release-signing.pub
+          cd "$RUNNER_TEMP/bundle"
+          for pair in linux-deb:nguon-pos_${VERSION}_amd64.deb windows-nsis:nguon-pos_${VERSION}_x64-setup.exe; do
+            platform=${pair%%:*}; f=${pair#*:}
+            sha=$(sha256sum "$f" | cut -d ' ' -f 1)
+            printf 'nguon-pos|%s|%s|%s' "$VERSION" "$platform" "$sha" > msg
+            openssl pkeyutl -sign -inkey "$key" -rawin -in msg -out "$f.sig"
+            openssl pkeyutl -verify -pubin -inkey "$GITHUB_WORKSPACE/$pub" -rawin -in msg -sigfile "$f.sig" >/dev/null \
+              || { echo "::error::RELEASE_SIGNING_KEY does not match the tills' release key"; exit 1; }
+            echo "$platform: $f sha256 $sha"
+          done
+          rm -f msg "$key"
+          chmod 644 ./*
+          tar -cf "$RUNNER_TEMP/bundle.tar" nguon-pos_* notes.txt
+
+      - name: Send to the server
+        env:
+          RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
+          RELEASE_SSH_KNOWN_HOSTS: ${{ secrets.RELEASE_SSH_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          printf '%s\n' "$RELEASE_SSH_KEY" > "$RUNNER_TEMP/ssh.key"
+          printf '%s\n' "$RELEASE_SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          ssh_opts="-i $RUNNER_TEMP/ssh.key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
+          for try in 1 2 3; do
+            set +e
+            # shellcheck disable=SC2086
+            ssh $ssh_opts "$TARGET" "receive $VERSION" < "$RUNNER_TEMP/bundle.tar"
+            code=$?
+            set -e
+            case $code in
+              0) echo "::notice::$VERSION published. Last step: Mises à jour → Publier aux caisses."; break ;;
+              3) echo "::notice::$VERSION was already on the server — left as it is."; break ;;
+              2) echo "::error::The server refused the request"; exit 1 ;;
+            esac
+            [ "$try" -lt 3 ] || { echo "::error::Upload failed 3 times (last code $code)"; exit 1; }
+            echo "Attempt $try failed (code $code), retrying…"; sleep 20
+          done
+          rm -f "$RUNNER_TEMP/ssh.key"

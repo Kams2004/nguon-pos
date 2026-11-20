@@ -4,39 +4,54 @@ The tills update themselves: you publish a version, and each till downloads it,
 checks its signature, and installs it when nobody has used it for 15 minutes.
 Data, enrollment, printer settings and unsent sales are kept.
 
-## 1. Build
+## 1. Build and publish (automatic)
 
-1. Set the new version (`MAJOR.MINOR.PATCH`) in `desktop/src-tauri/tauri.conf.json`,
-   `desktop/package.json` and `desktop/src-tauri/Cargo.toml`, then commit.
-2. Tag it and push the tag:
-
-   ```sh
-   git tag desktop-v0.2.1 && git push origin desktop-v0.2.1
-   ```
-
-3. GitHub Actions ("Desktop till release") builds `nguon-pos-deb` and `nguon-pos-nsis`.
-   Download both artifacts from the run page and unzip them.
-
-## 2. Sign and upload
-
-This must run on the machine that holds the release key
-(`~/nguon-pos-release-key/release-signing.key`). That key is the only thing
-that lets a file be installed on the tills, so keep it offline and backed up.
+From any computer with the repository:
 
 ```sh
-deploy/release/publish-release.sh 0.2.1 \
-  "nguon-pos_0.2.1_amd64.deb" "Nguon POS_0.2.1_x64-setup.exe" \
-  "Short note for the back office"
+deploy/release/release.sh 0.3.9 "Short note for the back office"
 ```
 
-The script:
+It sets the version, commits, tags `desktop-v0.3.9` (the note is the tag's
+message) and pushes. GitHub then does the rest by itself:
 
-1. signs each installer;
-2. checks each signature against the key built into the tills;
-3. uploads the installers to the VPS (`~/nguon-pos/releases/0.2.1/`, served at `/releases/`);
-4. registers the version.
+1. **Desktop till release** builds the Windows and Ubuntu installers (~15 min).
+2. **Desktop till publish** signs them with the release key, and sends them to
+   the server. On the server, `receive-release.sh` checks every signature
+   against the key built into the tills, refuses to replace a version that
+   already exists, puts the files under `~/nguon-pos/releases/0.3.9/` (served
+   at `/releases/`) and registers the version.
 
-Pass `-` instead of a file to skip one platform.
+To publish a tag that was built already (for example after the setup below):
+GitHub → Actions → **Desktop till publish** → Run workflow, with the tag.
+
+### One-time setup
+
+```sh
+sh deploy/release/setup-ci.sh
+```
+
+Run from the computer that holds the release key
+(`~/nguon-pos-release-key/release-signing.key`). It creates GitHub's upload key,
+which on the server can **only** run `receive-release.sh` (no shell), checks
+that, and lists the three secrets to paste into GitHub (Settings →
+Environments → `release`): `RELEASE_SIGNING_KEY`, `RELEASE_SSH_KEY`,
+`RELEASE_SSH_KNOWN_HOSTS`. Run it again to replace the upload key.
+
+Security: the release key now also lives in GitHub's secrets. Someone with
+your GitHub account could get a version registered, but the tills install
+nothing until an admin clicks **Publier aux caisses**. Protect the GitHub
+account with two-factor authentication. Keep the offline copy of the key
+backed up too.
+
+### By hand (fallback)
+
+`publish-release.sh` still signs, uploads and registers from this computer,
+with installers downloaded from the build's run page:
+
+```sh
+deploy/release/publish-release.sh 0.3.9 nguon-pos_0.3.9_amd64.deb nguon-pos_0.3.9_x64-setup.exe "Note"
+```
 
 ## 3. Deploy to the tills
 
