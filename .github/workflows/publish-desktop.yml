@@ -98,7 +98,18 @@ jobs:
         run: |
           umask 077
           key="$RUNNER_TEMP/release.key"
-          printf '%s\n' "$RELEASE_SIGNING_KEY" > "$key"
+          # Pasted secrets get mangled (Windows line ends, spaces, a missing
+          # BEGIN/END line): keep only the key's own text, then rebuild it.
+          body=$(printf '%s' "$RELEASE_SIGNING_KEY" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^-----' | tr -d '\n ')
+          if [ -z "$body" ]; then
+            echo "::error::Secret RELEASE_SIGNING_KEY is empty or missing — add it under Settings → Environments → release (exact name)."
+            exit 1
+          fi
+          printf -- '-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----\n' "$body" > "$key"
+          if ! openssl pkey -in "$key" -noout 2>/dev/null; then
+            echo "::error::RELEASE_SIGNING_KEY is not a valid key (${#body} characters of key text; the real one has 64). Paste the whole release-signing.key again."
+            exit 1
+          fi
           pub=edge/edge-service/src/main/resources/release/release-signing.pub
           cd "$RUNNER_TEMP/bundle"
           for pair in linux-deb:nguon-pos_${VERSION}_amd64.deb windows-nsis:nguon-pos_${VERSION}_x64-setup.exe; do
@@ -120,8 +131,13 @@ jobs:
           RELEASE_SSH_KNOWN_HOSTS: ${{ secrets.RELEASE_SSH_KNOWN_HOSTS }}
         run: |
           umask 077
-          printf '%s\n' "$RELEASE_SSH_KEY" > "$RUNNER_TEMP/ssh.key"
-          printf '%s\n' "$RELEASE_SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          printf '%s\n' "$RELEASE_SSH_KEY" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' > "$RUNNER_TEMP/ssh.key"
+          printf '%s\n' "$RELEASE_SSH_KNOWN_HOSTS" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' > "$RUNNER_TEMP/known_hosts"
+          [ -s "$RUNNER_TEMP/ssh.key" ] || { echo "::error::Secret RELEASE_SSH_KEY is empty or missing (environment release)."; exit 1; }
+          [ -s "$RUNNER_TEMP/known_hosts" ] || { echo "::error::Secret RELEASE_SSH_KNOWN_HOSTS is empty or missing (environment release)."; exit 1; }
+          ssh-keygen -y -f "$RUNNER_TEMP/ssh.key" >/dev/null 2>&1 \
+            || { echo "::error::RELEASE_SSH_KEY is not a valid SSH key — paste the whole upload-key file again (from -----BEGIN to END-----)."; exit 1; }
+          echo "Server identities: $(wc -l < "$RUNNER_TEMP/known_hosts") (expected 3)"
           ssh_opts="-i $RUNNER_TEMP/ssh.key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
           for try in 1 2 3; do
             set +e
