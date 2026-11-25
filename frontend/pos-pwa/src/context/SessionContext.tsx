@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import type { GateChoice } from "../lib/api/types";
 import { api } from "../lib/api/client";
 import { clearSession, getOrCreateTerminalId, loadSession, saveSession, type GateSession, type Session } from "../lib/offline/session";
 import { runSync } from "../lib/offline/sync";
@@ -32,6 +33,20 @@ const HEARTBEAT_MS = 10_000;
 export function deviceLabelFor(session: Session, terminalId: string): string | undefined {
   if (!session.bootstrap) return undefined;
   return `${session.bootstrap.gate.name} · caisse ${terminalId.slice(0, 4).toUpperCase()}`;
+}
+
+/**
+ * A browser till whose cashier may work at several gates: the login stops
+ * here and asks which one; `start` finishes it (no second login).
+ */
+export class GateChoiceNeeded extends Error {
+  readonly gates: GateChoice[];
+  readonly start: (gateId: string) => Promise<Session>;
+  constructor(gates: GateChoice[], start: (gateId: string) => Promise<Session>) {
+    super(gates.length ? "GATE_CHOICE" : "NO_GATE_ASSIGNED");
+    this.gates = gates;
+    this.start = start;
+  }
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -148,22 +163,32 @@ function BrowserSessionProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     const loginRes = await api.login(username, password);
-    // A gateless user (SUPER_ADMIN, and potentially COORDINATOR) has
-    // nothing to bootstrap — the endpoint requires a gate and would 400.
-    const bootstrap = loginRes.assignedGateId ? await api.bootstrap(loginRes.token) : null;
-    const newSession: Session = {
-      token: loginRes.token,
-      userId: loginRes.userId,
-      username: loginRes.username,
-      fullName: loginRes.fullName,
-      role: loginRes.role,
-      establishmentId: loginRes.establishmentId,
-      assignedGateId: loginRes.assignedGateId,
-      bootstrap,
+    // The gate this browser till works at, for this login.
+    const start = async (gateId: string | null) => {
+      const bootstrap = gateId ? await api.bootstrap(loginRes.token, gateId) : null;
+      const newSession: Session = {
+        token: loginRes.token,
+        userId: loginRes.userId,
+        username: loginRes.username,
+        fullName: loginRes.fullName,
+        role: loginRes.role,
+        establishmentId: loginRes.establishmentId,
+        assignedGateId: gateId,
+        bootstrap,
+      };
+      saveSession(newSession);
+      setSession(newSession);
+      return newSession;
     };
-    saveSession(newSession);
-    setSession(newSession);
-    return newSession;
+    // The Super Admin goes to the back office, without a gate.
+    if (loginRes.role === "SUPER_ADMIN") return start(null);
+    // An older server only knows one assigned gate.
+    if (loginRes.gateIds === undefined) return start(loginRes.assignedGateId);
+    const gates = await api.myGates(loginRes.token);
+    if (gates.length === 1) return start(gates[0].id);
+    if (gates.length > 1) throw new GateChoiceNeeded(gates, start);
+    if (loginRes.role === "COORDINATOR") return start(null);
+    throw new GateChoiceNeeded([], start); // a cashier allowed at no open gate
   }, []);
 
   const logout = useCallback(() => {
@@ -263,6 +288,8 @@ function EdgeSessionProvider({ children }: { children: ReactNode }) {
         if (event.type === "SALE_CREATED") refreshPendingCount();
         // Prices, tickets, design changed in the admin: take the new catalogue now, no new login needed.
         if (event.type === "CATALOG_CHANGED") refreshBootstrap();
+        // Revoked by the back office: the till's server has closed every session.
+        if (event.type === "DEVICE_REVOKED") logoutRef.current();
         listeners.current.forEach((l) => l(event as LiveEvent));
       },
       setLiveConnected,
@@ -298,6 +325,8 @@ function EdgeSessionProvider({ children }: { children: ReactNode }) {
     clearSession();
     setSession(null);
   }, []);
+  const logoutRef = useRef(logout);
+  logoutRef.current = logout;
 
   useEffect(() => {
     window.addEventListener(EDGE_SESSION_EXPIRED, logout);

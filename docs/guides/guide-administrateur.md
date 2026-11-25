@@ -34,10 +34,10 @@ Une caisse **hors ligne** continue de vendre et de contrôler. Ses ventes arrive
 
 | Situation | Que faire |
 |---|---|
-| Caissier qui change de porte | **Utilisateurs** → modifier sa **Porte assignée**. |
+| Caissier qui travaille à une autre porte | **Utilisateurs** → modifier → **Portes où il/elle peut travailler** : cochez les portes, ou **Toutes les portes**. Il/elle peut alors se connecter sur n'importe quelle caisse de ces portes. Un nouveau compte arrive tout seul sur les caisses. |
 | Caissier qui part / mot de passe compromis | **Utilisateurs** → désactiver le compte ou changer le mot de passe. |
 | Caisse volée, perdue ou remplacée | **Portes & caisses** → bouclier sur la caisse → **Révoquer** : elle est coupée immédiatement et les autres caisses la refusent. Pour en mettre une autre : **Enrôler une caisse**. |
-| Changer une caisse de porte | La révoquer, puis l'enrôler à nouveau avec un code de la nouvelle porte. |
+| Changer une caisse de porte | La **révoquer** (le caissier connecté est déconnecté aussitôt), puis créer un code pour la nouvelle porte (**Enrôler une caisse**). Sur la caisse, l'écran de connexion propose **Réenrôler cette caisse** : saisir le code. La même porte marche aussi. |
 | Un code d'enrôlement n'a pas servi | Sur la carte de la porte, la ligne « Code émis » → **✕** pour l'annuler. |
 | Un caissier signale un problème | Demandez-lui le fichier du bouton **Support → Enregistrer le diagnostic** et transmettez-le à l'équipe technique. |
 

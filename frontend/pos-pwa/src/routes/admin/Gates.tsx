@@ -311,7 +311,10 @@ function GateSection({
   const deviceIds = new Set(data.devices.map((d) => d.id));
   // Browser tills (the web version) currently connected to this gate.
   const browserTills = data.terminals.filter((term) => term.gateId === gate.id && term.online && !deviceIds.has(term.terminalId));
-  const cashiers = data.users.filter((u) => u.active && u.role !== "SUPER_ADMIN" && u.assignedGateId === gate.id);
+  // Who may work here: those listed for this gate, and those allowed at every gate.
+  const cashiers = data.users.filter(
+    (u) => u.active && u.role !== "SUPER_ADMIN" && ((u.gateIds ?? []).length === 0 || u.gateIds.includes(gate.id)),
+  );
   const types = data.ticketTypes.filter((tt) => tt.active && (tt.gateIds.length === 0 || tt.gateIds.includes(gate.id))).length;
   const onlineCount = tills.filter((d) => presence.get(d.id)?.online ?? d.online).length;
   // Who is signed in where, to show it next to each cashier too.

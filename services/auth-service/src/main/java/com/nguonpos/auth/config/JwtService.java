@@ -40,7 +40,9 @@ public class JwtService {
                 .claim("fullName", user.getFullName())
                 .claim("establishmentId", user.getEstablishmentId().toString())
                 .claim("role", user.getRole().name())
-                .claim("assignedGateId", user.getAssignedGateId() != null ? user.getAssignedGateId().toString() : null)
+                // Where this user may work: listed gates, or [] = every gate.
+                .claim("gateIds", user.gateIdList().stream().map(UUID::toString).toList())
+                .claim("assignedGateId", user.singleGateId() != null ? user.singleGateId().toString() : null)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
                 .signWith(key)

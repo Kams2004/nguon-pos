@@ -9,6 +9,7 @@ import { Pagination, usePaged } from "../../components/Pagination";
 import { Avatar, PageHeader, Pill, RefreshButton, SearchInput, SkeletonRows } from "../../components/ui";
 import { GuideButton } from "../../components/SetupGuide";
 import { UserFormModal } from "../../components/UserFormModal";
+import { gateNamesOf } from "../../components/GateChips";
 import { useI18n } from "../../i18n";
 
 export default function Users() {
@@ -42,7 +43,8 @@ export default function Users() {
 
   if (!session) return null;
 
-  const gateName = (id: string | null) => (id ? (gates.find((g) => g.id === id)?.name ?? "?") : "—");
+  // The Super Admin works everywhere without a gate list: a dash, not "all gates".
+  const gatesOf = (u: AdminUser) => (u.role === "SUPER_ADMIN" ? "—" : gateNamesOf(u.gateIds ?? [], gates, t("settings.allGates")));
   const openCreate = () => setEditing("new");
   const openEdit = (u: AdminUser) => setEditing(u);
 
@@ -56,7 +58,7 @@ export default function Users() {
       tone: u.active ? "danger" : "default",
     });
     if (!ok) return;
-    await api.updateUser(session.token, u.id, { fullName: u.fullName, role: u.role, assignedGateId: u.assignedGateId, active: !u.active });
+    await api.updateUser(session.token, u.id, { fullName: u.fullName, role: u.role, gateIds: u.gateIds ?? [], active: !u.active });
     await load();
   };
 
@@ -90,7 +92,7 @@ export default function Users() {
                   <th className="th">{t("settings.name")}</th>
                   <th className="th">{t("settings.users.col.role")}</th>
                   <th className="th">{t("settings.users.col.username")}</th>
-                  <th className="th">{t("settings.gate")}</th>
+                  <th className="th">{t("settings.users.col.gates")}</th>
                   <th className="th">{t("settings.status")}</th>
                   <th className="th" />
                 </tr>
@@ -107,7 +109,7 @@ export default function Users() {
                     </td>
                     <td className="td">{ROLE_LABELS[u.role]}</td>
                     <td className="td font-mono text-xs text-muted-foreground">{u.username}</td>
-                    <td className="td">{gateName(u.assignedGateId)}</td>
+                    <td className="td">{gatesOf(u)}</td>
                     <td className="td">
                       {u.active ? <Pill tone="success">{t("common.active")}</Pill> : <Pill tone="danger">{t("common.inactive")}</Pill>}
                     </td>

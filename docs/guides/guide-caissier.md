@@ -7,7 +7,7 @@ Ce guide tient en une page : comment ouvrir sa caisse, vendre, contrôler les en
 1. Allumez l'ordinateur et ouvrez **Nguon POS** (icône sur le bureau).
 2. Saisissez votre **nom d'utilisateur** et votre **mot de passe**, puis **Se connecter**.
    - La toute première fois sur une caisse, il faut internet. Ensuite, la connexion marche aussi sans internet.
-   - Si le message dit « Ce compte est affecté à une autre porte », vous n'êtes pas à la bonne caisse.
+   - Si le message dit « Ce compte n'est pas autorisé à la porte de cette caisse », vous n'êtes pas à la bonne porte : demandez à l'administrateur de vous y autoriser.
 3. En haut de l'écran, vérifiez :
    - le **nom de la porte** (à gauche) ;
    - **En ligne** (vert) ou **Hors ligne** (rouge) : les deux permettent de vendre ;

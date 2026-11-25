@@ -8,6 +8,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -39,8 +42,16 @@ public class AppUser {
     @Column(nullable = false)
     private Role role;
 
-    // Cashiers/coordinators are scoped to one gate; null for SUPER_ADMIN.
-    private UUID assignedGateId;
+    /**
+     * The gates where this cashier/coordinator may work; empty = every gate
+     * (new ones included). A till is fixed to one gate: whoever is allowed
+     * there may log in on it.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_gate", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "gate_id", nullable = false)
+    @Builder.Default
+    private Set<UUID> gateIds = new HashSet<>();
 
     @Column(nullable = false)
     private boolean active;
@@ -50,4 +61,18 @@ public class AppUser {
 
     @Column(nullable = false)
     private Instant updatedAt;
+
+    public boolean allowedAt(UUID gateId) {
+        return gateIds.isEmpty() || gateIds.contains(gateId);
+    }
+
+    /** Sorted, for stable output. */
+    public List<UUID> gateIdList() {
+        return gateIds.stream().sorted().toList();
+    }
+
+    /** The one gate when there is exactly one — what older clients call "assigned gate". */
+    public UUID singleGateId() {
+        return gateIds.size() == 1 ? gateIds.iterator().next() : null;
+    }
 }

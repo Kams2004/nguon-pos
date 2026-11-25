@@ -60,7 +60,7 @@ public class UserAdminController {
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .fullName(request.fullName())
                 .role(request.role())
-                .assignedGateId(request.assignedGateId())
+                .gateIds(gatesOf(request.role(), request.gateIds(), request.assignedGateId()))
                 .active(true)
                 .createdAt(now)
                 .updatedAt(now)
@@ -83,12 +83,14 @@ public class UserAdminController {
         java.util.List<String> changes = new java.util.ArrayList<>();
         if (!user.getFullName().equals(request.fullName())) changes.add("nom « " + user.getFullName() + " » → « " + request.fullName() + " »");
         if (user.getRole() != request.role()) changes.add("rôle " + user.getRole() + " → " + request.role());
-        if (!java.util.Objects.equals(user.getAssignedGateId(), request.assignedGateId())) changes.add("porte modifiée");
+        java.util.Set<UUID> gates = gatesOf(request.role(), request.gateIds(), request.assignedGateId());
+        if (!user.getGateIds().equals(gates)) changes.add("portes modifiées");
         if (user.isActive() != request.active()) changes.add(request.active() ? "réactivé" : "désactivé");
         if (request.password() != null && !request.password().isBlank()) changes.add("mot de passe réinitialisé");
         user.setFullName(request.fullName());
         user.setRole(request.role());
-        user.setAssignedGateId(request.assignedGateId());
+        user.getGateIds().clear();
+        user.getGateIds().addAll(gates);
         user.setActive(request.active());
         user.setUpdatedAt(Instant.now());
         if (request.password() != null && !request.password().isBlank()) {
@@ -104,20 +106,29 @@ public class UserAdminController {
     public record CreateRequest(
             @NotBlank @Size(max = 100) String username, @NotBlank @Size(min = 4, max = 200) String password,
             @NotBlank @Size(max = 200) String fullName,
-            @NotNull Role role, UUID assignedGateId
+            @NotNull Role role, UUID assignedGateId, @Size(max = 100) List<UUID> gateIds
     ) {
     }
 
     public record UpdateRequest(
-            @NotBlank @Size(max = 200) String fullName, @NotNull Role role, UUID assignedGateId, boolean active,
+            @NotBlank @Size(max = 200) String fullName, @NotNull Role role, UUID assignedGateId, @Size(max = 100) List<UUID> gateIds, boolean active,
             @Size(min = 4, max = 200) String password
     ) {
     }
 
     // Deliberately excludes passwordHash — never serialize it back out.
-    public record UserSummary(UUID id, String username, String fullName, Role role, UUID assignedGateId, boolean active) {
+    /** gateIds wins; older clients send one assignedGateId. The Super Admin works everywhere: none. */
+    private static java.util.Set<UUID> gatesOf(Role role, List<UUID> gateIds, UUID assignedGateId) {
+        java.util.Set<UUID> out = new java.util.HashSet<>();
+        if (role == Role.SUPER_ADMIN) return out;
+        if (gateIds != null) out.addAll(gateIds);
+        else if (assignedGateId != null) out.add(assignedGateId);
+        return out;
+    }
+
+    public record UserSummary(UUID id, String username, String fullName, Role role, UUID assignedGateId, List<UUID> gateIds, boolean active) {
         static UserSummary from(AppUser u) {
-            return new UserSummary(u.getId(), u.getUsername(), u.getFullName(), u.getRole(), u.getAssignedGateId(), u.isActive());
+            return new UserSummary(u.getId(), u.getUsername(), u.getFullName(), u.getRole(), u.singleGateId(), u.gateIdList(), u.isActive());
         }
     }
 }

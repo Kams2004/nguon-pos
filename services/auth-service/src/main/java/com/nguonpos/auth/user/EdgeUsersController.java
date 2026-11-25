@@ -31,7 +31,8 @@ public class EdgeUsersController {
     public List<EdgeUser> edgeUsers(@AuthenticationPrincipal Claims claims, @PathVariable UUID gateId) {
         UUID establishmentId = UUID.fromString(claims.get("establishmentId", String.class));
         return users.findByEstablishmentIdOrderByFullNameAsc(establishmentId).stream()
-                .filter(u -> gateId.equals(u.getAssignedGateId()) && u.getRole() != Role.SUPER_ADMIN)
+                // Everyone allowed at this gate — those listed for it, and those allowed everywhere.
+                .filter(u -> u.getRole() != Role.SUPER_ADMIN && u.allowedAt(gateId))
                 .map(u -> new EdgeUser(u.getId(), u.getUsername(), u.getFullName(), u.getRole(), u.getPasswordHash(), u.isActive()))
                 .toList();
     }

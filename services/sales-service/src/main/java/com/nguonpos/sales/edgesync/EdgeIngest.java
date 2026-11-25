@@ -137,6 +137,7 @@ public class EdgeIngest {
                 .add("fullName", name)
                 .add("establishmentId", till.establishmentId().toString())
                 .add("assignedGateId", till.gateId().toString())
+                .add("gateIds", java.util.List.of(till.gateId().toString()))
                 .build();
     }
 

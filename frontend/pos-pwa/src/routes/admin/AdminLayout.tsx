@@ -69,13 +69,14 @@ export default function AdminLayout() {
         className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-cover bg-bottom opacity-60 [mask-image:linear-gradient(to_top,black,transparent)]"
         style={{ backgroundImage: "url(/img/banners/blue.jpg)" }}
       />
-      <div className="relative flex items-center justify-between px-5 pt-5 pb-7">
+      <div className="relative flex flex-shrink-0 items-center justify-between px-5 pt-5 pb-7">
         <BrandLockup />
         <button onClick={() => setMobileOpen(false)} className="lg:hidden text-white/80" aria-label={t("shell.nav.closeMenu")}>
           <X className="h-5 w-5" />
         </button>
       </div>
-      <nav className="relative flex-1 space-y-1 px-3">
+      {/* The links scroll on their own when the window is short; logo and logout stay put. */}
+      <nav className="sidebar-scroll relative min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-2">
         {items.map(({ to, label, icon: Icon }) => {
           const active = location.pathname.startsWith(to);
           return (
@@ -95,7 +96,7 @@ export default function AdminLayout() {
           );
         })}
       </nav>
-      <div className="relative space-y-1 border-t border-white/15 px-3 py-4">
+      <div className="relative flex-shrink-0 space-y-1 border-t border-white/15 px-3 py-4">
         {session.assignedGateId && (
           <Link
             to="/gate/sell"

@@ -102,23 +102,31 @@ public class DeviceRegistry {
         }
         String publicKeyB64 = Base64.getEncoder().encodeToString(key.getEncoded());
 
-        Optional<Map<String, Object>> existing = jdbc.queryForList("SELECT status, public_key, device_no, gate_id FROM sales.device WHERE id = ?",
+        Optional<Map<String, Object>> existing = jdbc.queryForList("SELECT status, public_key, device_no, gate_id, label FROM sales.device WHERE id = ?",
                 req.deviceId()).stream().findFirst();
-        if (existing.isPresent() && !(existing.get().get("public_key").equals(publicKeyB64) && "ACTIVE".equals(existing.get().get("status"))
-                && gateId.equals(existing.get().get("gate_id")))) {
+        // The same till coming back (it proves it with its own key, and the admin
+        // gave it a code): renewal, re-enrollment after a revocation, or a move to
+        // another gate — the gate of the new code. Another key: someone else.
+        if (existing.isPresent() && !existing.get().get("public_key").equals(publicKeyB64)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "DEVICE_ID_TAKEN");
         }
-        int deviceNo = existing.map(e -> (Integer) e.get("device_no")).orElseGet(() ->
-                jdbc.queryForObject("SELECT COALESCE(MAX(device_no), 0) + 1 FROM sales.device WHERE gate_id = ?", Integer.class, gateId));
+        UUID previousGateId = existing.map(e -> (UUID) e.get("gate_id")).orElse(null);
+        boolean sameGate = gateId.equals(previousGateId);
+        boolean wasRevoked = existing.map(e -> "REVOKED".equals(e.get("status"))).orElse(false);
+        int deviceNo = existing.isPresent() && sameGate ? (Integer) existing.get().get("device_no")
+                : jdbc.queryForObject("SELECT COALESCE(MAX(device_no), 0) + 1 FROM sales.device WHERE gate_id = ?", Integer.class, gateId);
 
-        String label = requested != null && !requested.isBlank() ? requested : "Caisse n° " + deviceNo;
+        String label = requested != null && !requested.isBlank() ? requested
+                : existing.isPresent() && sameGate ? (String) existing.get().get("label")
+                : "Caisse n° " + deviceNo;
 
         X509Certificate cert = ca.issue(req.deviceId(), gateId, establishmentId, key);
         String fingerprint = DeviceCertificateAuthority.fingerprint(cert);
         if (existing.isPresent()) {
             jdbc.update("""
-                    UPDATE sales.device SET cert_serial = ?, cert_fingerprint = ?, cert_not_after = ?, label = ?, os = ?, app_version = ?
-                    WHERE id = ?""", cert.getSerialNumber().toString(16), fingerprint, Timestamp.from(cert.getNotAfter().toInstant()),
+                    UPDATE sales.device SET gate_id = ?, device_no = ?, status = 'ACTIVE', revoked_at = NULL, revoked_by_user_id = NULL,
+                        cert_serial = ?, cert_fingerprint = ?, cert_not_after = ?, label = ?, os = ?, app_version = ?
+                    WHERE id = ?""", gateId, deviceNo, cert.getSerialNumber().toString(16), fingerprint, Timestamp.from(cert.getNotAfter().toInstant()),
                     label, req.os(), req.appVersion(), req.deviceId());
         } else {
             jdbc.update("""
@@ -129,10 +137,11 @@ public class DeviceRegistry {
                     Timestamp.from(cert.getNotAfter().toInstant()), req.os(), req.appVersion());
         }
         jdbc.update("UPDATE sales.enrollment_code SET used_at = now(), used_by_device_id = ? WHERE code_hash = ?", req.deviceId(), hash(req.code()));
+        String how = existing.isEmpty() ? "enrôlée" : !sameGate ? "réenrôlée sur une autre porte" : wasRevoked ? "réenrôlée après révocation" : "réenrôlée";
         audit.recordAs(null, label, "TERMINAL", "DEVICE_ENROLLED", "DEVICE", req.deviceId(),
-                "Caisse « " + label + " » enrôlée (n° " + deviceNo + ")");
+                "Caisse « " + label + " » " + how + " (n° " + deviceNo + ")");
         return new Enrolled(req.deviceId(), deviceNo, establishmentId, gateId, label,
-                DeviceCertificateAuthority.toPem(cert), ca.chainPem());
+                DeviceCertificateAuthority.toPem(cert), ca.chainPem(), sameGate ? null : previousGateId);
     }
 
     public List<Map<String, Object>> list(UUID establishmentId) {
@@ -206,6 +215,8 @@ public class DeviceRegistry {
     }
 
     public record Enrolled(UUID deviceId, int deviceNo, UUID establishmentId, UUID gateId, String label, String certificatePem,
-                           String caChainPem) {
+                           String caChainPem,
+                           /** Set when the till moved here from another gate. */
+                           UUID previousGateId) {
     }
 }

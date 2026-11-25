@@ -29,6 +29,7 @@ import type {
   ScanSyncResult,
   TerminalStatus,
   TransactionSummary,
+  GateChoice,
 } from "./types";
 import { translate, getLang } from "../../i18n";
 
@@ -80,10 +81,17 @@ export const api = {
     });
   },
 
-  bootstrap(token: string): Promise<BootstrapResponse> {
-    return request(`${CATALOG_BASE}/catalog/bootstrap`, {
+  /** The till's documents for a gate the user may work at (none: their only gate). */
+  bootstrap(token: string, gateId?: string): Promise<BootstrapResponse> {
+    const q = gateId ? `?gateId=${encodeURIComponent(gateId)}` : "";
+    return request(`${CATALOG_BASE}/catalog/bootstrap${q}`, {
       headers: authHeader(token),
     });
+  },
+
+  /** The active gates this user may work at. */
+  myGates(token: string): Promise<GateChoice[]> {
+    return request(`${CATALOG_BASE}/catalog/my-gates`, { headers: authHeader(token) });
   },
 
   syncTransactions(token: string, terminalId: string, gateId: string, entries: SaleSyncEntry[]): Promise<{ results: SaleSyncResult[] }> {
@@ -392,7 +400,7 @@ export const api = {
 
   createUser(
     token: string,
-    data: { username: string; password: string; fullName: string; role: Role; assignedGateId: string | null },
+    data: { username: string; password: string; fullName: string; role: Role; gateIds: string[] },
   ): Promise<AdminUser> {
     return request(`${AUTH_BASE}/auth/admin/users`, {
       method: "POST",
@@ -404,7 +412,7 @@ export const api = {
   updateUser(
     token: string,
     id: string,
-    data: { fullName: string; role: Role; assignedGateId: string | null; active: boolean; password?: string },
+    data: { fullName: string; role: Role; gateIds: string[]; active: boolean; password?: string },
   ): Promise<AdminUser> {
     return request(`${AUTH_BASE}/auth/admin/users/${id}`, {
       method: "PUT",

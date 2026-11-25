@@ -60,11 +60,50 @@ export function EnrollmentBanner() {
     }
   };
 
+  const modal = open && (
+        <Modal title={t(status.revoked ? "gate.enroll.again" : "gate.enroll.title")} onClose={() => setOpen(false)}>
+          <form onSubmit={submit} className="space-y-4">
+            <p className="text-sm text-muted-foreground">{t(status.revoked ? "gate.enroll.againHint" : "gate.enroll.codeHint")}</p>
+            {status.revoked && status.pending > 0 && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 ring-1 ring-amber-200">
+                {t("gate.enroll.pendingWarning", { count: status.pending })}
+              </p>
+            )}
+            <div>
+              <label className="field-label">{t("gate.enroll.code")}</label>
+              <input
+                required
+                autoFocus
+                value={code}
+                maxLength={20}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="XXXX-XXXX-XX"
+                className="field text-center font-mono text-xl tracking-widest"
+              />
+            </div>
+            {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
+            <button type="submit" disabled={busy} className="btn-gold w-full">
+              {t("gate.enroll.submit")}
+            </button>
+          </form>
+        </Modal>
+      );
+
   if (status.revoked) {
+    // Revoked: nobody works here until it is enrolled again — same gate or another.
     return (
-      <div className="flex items-start gap-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-destructive">
-        <ShieldOff className="mt-0.5 h-4 w-4 flex-shrink-0" /> {t("gate.enroll.revoked")}
-      </div>
+      <>
+        <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-destructive ring-1 ring-red-200">
+          <p className="flex items-start gap-2 font-semibold">
+            <ShieldOff className="mt-0.5 h-4 w-4 flex-shrink-0" /> {t("gate.enroll.revoked")}
+          </p>
+          <p className="mt-1 text-xs text-red-900/80">{t("gate.enroll.revokedHint")}</p>
+          <button type="button" onClick={() => setOpen(true)} className="btn-outline mt-2 bg-white px-3 py-1.5 text-xs">
+            <KeyRound className="h-3.5 w-3.5" /> {t("gate.enroll.again")}
+          </button>
+        </div>
+        {modal}
+      </>
     );
   }
 
@@ -102,29 +141,7 @@ export function EnrollmentBanner() {
           <KeyRound className="h-3.5 w-3.5" /> {t("gate.enroll.open")}
         </button>
       </div>
-      {open && (
-        <Modal title={t("gate.enroll.title")} onClose={() => setOpen(false)}>
-          <form onSubmit={submit} className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t("gate.enroll.codeHint")}</p>
-            <div>
-              <label className="field-label">{t("gate.enroll.code")}</label>
-              <input
-                required
-                autoFocus
-                value={code}
-                maxLength={20}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="XXXX-XXXX-XX"
-                className="field text-center font-mono text-xl tracking-widest"
-              />
-            </div>
-            {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-destructive">{error}</p>}
-            <button type="submit" disabled={busy} className="btn-gold w-full">
-              {t("gate.enroll.submit")}
-            </button>
-          </form>
-        </Modal>
-      )}
+      {modal}
     </>
   );
 }

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
-import { useSession } from "../../context/SessionContext";
+import { ArrowLeft, ArrowRight, DoorOpen, Eye, EyeOff } from "lucide-react";
+import { GateChoiceNeeded, useSession } from "../../context/SessionContext";
+import type { Session } from "../../lib/offline/session";
 import { useBranding } from "../../context/BrandingContext";
 import { useI18n } from "../../i18n";
 import { EdgeError } from "../../lib/till/edgeClient";
@@ -31,24 +32,56 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Browser till, cashier allowed at several gates: which one today.
+  const [choice, setChoice] = useState<GateChoiceNeeded | null>(null);
+
+  const remembered = () => {
+    // Only the username is remembered — never the password.
+    try {
+      if (remember) localStorage.setItem(REMEMBER_KEY, username);
+      else localStorage.removeItem(REMEMBER_KEY);
+    } catch {
+      /* storage unavailable: nothing to remember */
+    }
+  };
+  const enter = (session: Session) => {
+    remembered();
+    navigate(session.assignedGateId ? "/gate/sell" : "/admin/dashboard");
+  };
+
+  const chooseGate = async (gateId: string) => {
+    if (!choice) return;
+    setError(null);
+    setLoading(true);
+    try {
+      enter(await choice.start(gateId));
+    } catch {
+      setError(t("shell.login.gateError"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const session = await login(username, password);
-      // Only the username is remembered — never the password.
-      try {
-        if (remember) localStorage.setItem(REMEMBER_KEY, username);
-        else localStorage.removeItem(REMEMBER_KEY);
-      } catch {
-        /* storage unavailable: nothing to remember */
-      }
-      navigate(session.assignedGateId ? "/gate/sell" : "/admin/dashboard");
+      enter(await login(username, password));
     } catch (err) {
-      const code = err instanceof EdgeError ? err.code : "";
-      const known = ["FIRST_LOGIN_NEEDS_NETWORK", "TOO_MANY_ATTEMPTS", "OTHER_GATE", "NO_GATE_ASSIGNED", "EDGE_UNREACHABLE"] as const;
+      if (err instanceof GateChoiceNeeded && err.gates.length > 0) {
+        setChoice(err);
+        return;
+      }
+      const code = err instanceof EdgeError || err instanceof GateChoiceNeeded ? (err instanceof EdgeError ? err.code : err.message) : "";
+      const known = [
+        "FIRST_LOGIN_NEEDS_NETWORK",
+        "TOO_MANY_ATTEMPTS",
+        "OTHER_GATE",
+        "NO_GATE_ASSIGNED",
+        "EDGE_UNREACHABLE",
+        "DEVICE_REVOKED",
+      ] as const;
       const match = known.find((k) => k === code);
       setError(match ? t(`shell.login.error.${match}`) : t("shell.login.invalid"));
     } finally {
@@ -92,6 +125,38 @@ export default function Login() {
           <EnrollmentBanner />
           <UpdateNotice auto tone="dark" />
           {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-destructive">{error}</div>}
+
+          {choice ? (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-foreground">{t("shell.login.chooseGate")}</p>
+              <div className="grid gap-2">
+                {choice.gates.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => chooseGate(g.id)}
+                    className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold ring-1 ring-border transition-colors hover:bg-blue-50 hover:ring-secondary disabled:opacity-60"
+                  >
+                    <DoorOpen className="h-5 w-5 text-secondary" />
+                    <span className="flex-1">{g.name}</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setChoice(null);
+                  setError(null);
+                }}
+                className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> {t("shell.login.otherAccount")}
+              </button>
+            </div>
+          ) : (
+            <>
 
           <div>
             <label className="field-label">{t("shell.login.username")}</label>
@@ -150,6 +215,8 @@ export default function Login() {
             )}
           </button>
           <SupportButton tone="link" />
+            </>
+          )}
         </form>
       </div>
     </div>

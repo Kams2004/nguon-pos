@@ -22,20 +22,20 @@ class ValidationErrorsTest {
 
     @Test
     void aShortPasswordSaysHowLongItMustBe() {
-        var result = validate(new CreateRequest("caisse1", "abc", "Awa Njoya", Role.CASHIER, null));
+        var result = validate(new CreateRequest("caisse1", "abc", "Awa Njoya", Role.CASHIER, null, null));
         assertEquals("Mot de passe : 4 caractères minimum.", ValidationErrors.describe(result.getFieldError("password"), false));
         assertEquals("Password : 4 characters minimum.", ValidationErrors.describe(result.getFieldError("password"), true));
     }
 
     @Test
     void lettersAreAcceptedLikeDigits() {
-        assertFalse(validate(new CreateRequest("caisse1", "abcd", "Awa Njoya", Role.CASHIER, null)).hasErrors());
-        assertFalse(validate(new CreateRequest("caisse1", "1234", "Awa Njoya", Role.CASHIER, null)).hasErrors());
+        assertFalse(validate(new CreateRequest("caisse1", "abcd", "Awa Njoya", Role.CASHIER, null, null)).hasErrors());
+        assertFalse(validate(new CreateRequest("caisse1", "1234", "Awa Njoya", Role.CASHIER, null, null)).hasErrors());
     }
 
     @Test
     void aMissingFieldIsNamed() {
-        var result = validate(new CreateRequest("caisse1", "abcd", " ", Role.CASHIER, null));
+        var result = validate(new CreateRequest("caisse1", "abcd", " ", Role.CASHIER, null, null));
         assertEquals("Nom complet : obligatoire.", ValidationErrors.describe(result.getFieldError("fullName"), false));
     }
 }

@@ -53,14 +53,22 @@ public class SyncController {
     }
 
     /**
-     * A till only reports for the gate its user is assigned to. The gate in
-     * the request body is otherwise unchecked, and it decides which gate the
-     * sale and its tickets belong to.
+     * A till only reports for a gate its user may work at (listed, or every
+     * gate). The gate in the request body is otherwise unchecked, and it
+     * decides which gate the sale and its tickets belong to.
      */
     private static void requireAssignedGate(Claims claims, UUID gateId) {
-        String assigned = claims.get("assignedGateId", String.class);
-        if (assigned == null || !assigned.equals(gateId.toString())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ce compte n'est pas affecté à cette porte.");
+        Object raw = claims.get("gateIds");
+        java.util.List<String> allowed;
+        if (raw instanceof java.util.List<?> list) {
+            allowed = list.stream().map(String::valueOf).toList();
+        } else { // a token from before multi-gate users: its one gate, or none
+            String one = claims.get("assignedGateId", String.class);
+            if (one == null) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ce compte n'est autorisé à aucune porte.");
+            allowed = java.util.List.of(one);
+        }
+        if ("SUPER_ADMIN".equals(claims.get("role", String.class)) || (!allowed.isEmpty() && !allowed.contains(gateId.toString()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ce compte n'est pas autorisé à cette porte.");
         }
     }
 

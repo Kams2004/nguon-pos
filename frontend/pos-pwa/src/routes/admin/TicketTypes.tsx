@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Check } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useLiveRefresh, useSession } from "../../context/SessionContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { api, errorMessage } from "../../lib/api/client";
@@ -9,6 +9,7 @@ import { TICKET_COLORS, TICKET_ICONS, TicketTypeBadge, ticketColor, ticketIcon }
 import { Pagination, usePaged } from "../../components/Pagination";
 import { Loading, Modal, PageHeader, Pill, RefreshButton, SearchInput } from "../../components/ui";
 import { GuideButton } from "../../components/SetupGuide";
+import { GateChips, gateNamesOf } from "../../components/GateChips";
 import { useI18n } from "../../i18n";
 
 // Labels: settings.ticketTypes.printMode.<mode>.label / .short
@@ -52,16 +53,7 @@ export default function TicketTypes() {
 
   if (!session) return null;
 
-  /** "Porte A, Porte C", or "Toutes les portes" when none is chosen. */
-  const gateNames = (ids: string[]) =>
-    ids.length === 0
-      ? t("settings.allGates")
-      : gates
-          .filter((g) => ids.includes(g.id))
-          .map((g) => g.name)
-          .join(", ") || "?";
-  const toggleGate = (id: string) =>
-    setForm((f) => ({ ...f, gateIds: f.gateIds.includes(id) ? f.gateIds.filter((g) => g !== id) : [...f.gateIds, id] }));
+  const gateNames = (ids: string[]) => gateNamesOf(ids, gates, t("settings.allGates"));
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -275,42 +267,13 @@ export default function TicketTypes() {
                 />
               </div>
             </div>
-            <fieldset>
-              <legend className="field-label">{t("settings.ticketTypes.gatesLabel")}</legend>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  aria-pressed={form.gateIds.length === 0}
-                  onClick={() => setForm({ ...form, gateIds: [] })}
-                  className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold ring-1 transition-colors ${
-                    form.gateIds.length === 0
-                      ? "bg-secondary text-white ring-secondary"
-                      : "bg-card text-muted-foreground ring-border hover:text-foreground"
-                  }`}
-                >
-                  {form.gateIds.length === 0 && <Check className="h-3.5 w-3.5" />} {t("settings.allGates")}
-                </button>
-                {gates
-                  .filter((g) => g.active || form.gateIds.includes(g.id))
-                  .map((g) => {
-                    const on = form.gateIds.includes(g.id);
-                    return (
-                      <button
-                        key={g.id}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => toggleGate(g.id)}
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold ring-1 transition-colors ${
-                          on ? "bg-secondary text-white ring-secondary" : "bg-card text-muted-foreground ring-border hover:text-foreground"
-                        }`}
-                      >
-                        {on && <Check className="h-3.5 w-3.5" />} {g.name}
-                      </button>
-                    );
-                  })}
-              </div>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">{t("settings.ticketTypes.gatesHint")}</p>
-            </fieldset>
+            <GateChips
+              gates={gates}
+              value={form.gateIds}
+              onChange={(gateIds) => setForm({ ...form, gateIds })}
+              label={t("settings.ticketTypes.gatesLabel")}
+              hint={t("settings.ticketTypes.gatesHint")}
+            />
             <div>
               <label className="field-label">{t("settings.ticketTypes.printModeLabel")}</label>
               <select

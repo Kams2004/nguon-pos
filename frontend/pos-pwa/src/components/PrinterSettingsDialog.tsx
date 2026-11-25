@@ -5,7 +5,7 @@ import { useI18n } from "../i18n";
 import { printOffsetStyle, usePrinterSettings, type PrinterSettings } from "../lib/till/printerSettings";
 import { errorMessage } from "../lib/api/client";
 import { desktopApp, printPage } from "../lib/platform";
-import { Modal } from "./ui";
+import { Modal, Skeleton } from "./ui";
 
 const AUTO = ["NONE", "RECEIPT", "TICKETS", "ALL"] as const;
 
@@ -18,6 +18,7 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   // Desktop till: the printers installed on this computer, to pick from.
   const [printers, setPrinters] = useState<string[] | null>(null);
+  const desktop = desktopApp.available();
   const [testing, setTesting] = useState<"idle" | "printing" | "sent" | string>("idle");
 
   useEffect(() => {
@@ -67,7 +68,13 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
         <p className="text-sm text-muted-foreground">{t("gate.printer.intro")}</p>
         <div>
           <label className="field-label">{t("gate.printer.name")}</label>
-          {printers ? (
+          {desktop && !printers ? (
+            // Asking the computer for its printers takes a moment: a placeholder shaped like the list.
+            <div role="status" aria-live="polite" className="field flex items-center gap-3">
+              <Skeleton className="h-3.5 flex-1" />
+              <span className="sr-only">{t("gate.printer.loading")}</span>
+            </div>
+          ) : printers ? (
             <select value={form.printerName} onChange={(e) => set({ printerName: e.target.value })} className="field">
               <option value="">{t("gate.printer.dialogEachTime")}</option>
               {/* A saved printer that is unplugged right now stays selectable. */}
@@ -86,7 +93,9 @@ export function PrinterSettingsDialog({ onClose }: { onClose: () => void }) {
               className="field"
             />
           )}
-          <p className="mt-1 text-[11px] text-muted-foreground">{printers ? t("gate.printer.silentHint") : t("gate.printer.nameHint")}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {desktop && !printers ? t("gate.printer.loading") : printers ? t("gate.printer.silentHint") : t("gate.printer.nameHint")}
+          </p>
         </div>
         <div>
           <label className="field-label">{t("gate.printer.paper")}</label>

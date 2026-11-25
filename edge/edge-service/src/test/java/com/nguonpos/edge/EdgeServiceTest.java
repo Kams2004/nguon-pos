@@ -67,6 +67,14 @@ class EdgeServiceTest {
     @Autowired
     org.springframework.jdbc.core.JdbcTemplate jdbc;
 
+    @Autowired
+    com.nguonpos.edge.core.Meta meta;
+
+    @Autowired
+    com.nguonpos.edge.central.Enrollment enrollment;
+
+    static final java.util.concurrent.atomic.AtomicReference<String> lastBootstrapQuery = new java.util.concurrent.atomic.AtomicReference<>();
+
     final HttpClient http = HttpClient.newHttpClient();
 
     @BeforeAll
@@ -136,6 +144,42 @@ class EdgeServiceTest {
         assertThat(offline.get("user").get("fullName").asString()).isEqualTo("Caissier Test");
 
         assertThat(post("/local/v1/auth/login", null, "{\"username\":\"cashier1\",\"password\":\"wrong\"}").statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void anyoneAllowedAtThisTillsGateMayLogInHereAndNobodyElse() throws Exception {
+        login("cashier1", "secret"); // the till knows its gate
+        assertThat(loginResponse("multigate", "secret").get("user").get("username").asString()).isEqualTo("multigate");
+        assertThat(lastBootstrapQuery.get()).isEqualTo("gateId=" + GATE_ID); // this till's gate, not the user's first one
+        assertThat(loginResponse("everywhere", "secret").get("user").get("username").asString()).isEqualTo("everywhere");
+        HttpResponse<String> refused = post("/local/v1/auth/login", null, "{\"username\":\"elsewhere\",\"password\":\"secret\"}");
+        assertThat(refused.statusCode()).isEqualTo(403);
+        assertThat(refused.body()).contains("OTHER_GATE");
+    }
+
+    @Test
+    void aRevokedTillSendsEveryoneOffAndCanBeEnrolledAgainAtAnotherGate() throws Exception {
+        String session = login("cashier1", "secret");
+        meta.put("enrolled_gate_id", GATE_ID);
+        enrollment.markRevoked();
+        try {
+            assertThat(send(withUi("/local/v1/sales").header("Authorization", "Bearer " + session).GET(), null).statusCode()).isEqualTo(401);
+            HttpResponse<String> refused = post("/local/v1/auth/login", null, "{\"username\":\"cashier1\",\"password\":\"secret\"}");
+            assertThat(refused.statusCode()).isEqualTo(403);
+            assertThat(refused.body()).contains("DEVICE_REVOKED");
+
+            HttpResponse<String> enrolled = post("/local/v1/enroll", null, "{\"code\":\"ABCD-EFGH-12\",\"label\":\"\"}");
+            assertThat(enrolled.statusCode()).as(enrolled.body()).isEqualTo(200);
+            assertThat(enrollment.revoked()).isFalse();
+            assertThat(enrollment.enrolled()).isTrue();
+            // The old gate's tickets, key and cashiers are gone; the new gate's come over the live channel.
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM gate_config", Integer.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM user_credential", Integer.class)).isZero();
+            assertThat(meta.get("enrolled_gate_id")).contains("gate-2");
+        } finally {
+            // Back to the unenrolled till the other tests expect (their login restores the catalogue).
+            for (String k : new String[]{"revoked", "device_cert", "ca_chain", "device_no", "device_label", "enrolled_gate_id"}) meta.remove(k);
+        }
     }
 
     @Test
@@ -403,7 +447,22 @@ class EdgeServiceTest {
         switch (path) {
             case "/api/auth/auth/login" -> {
                 JsonNode req = JSON.readTree(body);
-                if (req.get("username").asString().equals("cashier1") && req.get("password").asString().equals("secret")) {
+                String user = req.get("username").asString();
+                // Newer central: where each may work — listed gates, or [] = every gate.
+                String gates = switch (user) {
+                    case "multigate" -> "[\"other-gate\",\"" + GATE_ID + "\"]";
+                    case "everywhere" -> "[]";
+                    case "elsewhere" -> "[\"other-gate\"]";
+                    default -> null;
+                };
+                if (gates != null && req.get("password").asString().equals("secret")) {
+                    String claims = Base64.getUrlEncoder().withoutPadding()
+                            .encodeToString(("{\"exp\":" + (Instant.now().getEpochSecond() + 3600) + "}").getBytes(StandardCharsets.UTF_8));
+                    String id = UUID.nameUUIDFromBytes(user.getBytes(StandardCharsets.UTF_8)).toString();
+                    respond(ex, 200, """
+                            {"token":"h.%s.s","userId":"%s","username":"%s","fullName":"%s","role":"CASHIER","establishmentId":"e",
+                             "assignedGateId":null,"gateIds":%s}""".formatted(claims, id, user, user, gates));
+                } else if (user.equals("cashier1") && req.get("password").asString().equals("secret")) {
                     String claims = Base64.getUrlEncoder().withoutPadding()
                             .encodeToString(("{\"exp\":" + (Instant.now().getEpochSecond() + 3600) + "}").getBytes(StandardCharsets.UTF_8));
                     respond(ex, 200, """
@@ -414,11 +473,17 @@ class EdgeServiceTest {
                     respond(ex, 401, "{\"message\":\"bad\"}");
                 }
             }
-            case "/api/catalog/catalog/bootstrap" -> respond(ex, 200, """
+            case "/api/catalog/catalog/bootstrap" -> {
+                lastBootstrapQuery.set(ex.getRequestURI().getQuery());
+                respond(ex, 200, """
                     {"establishment":{"id":"e","name":"Festival Test","receiptMode":"INDIVIDUAL_TICKETS"},
                      "gate":{"id":"%s","name":"Porte Test","code":"%s","signingSecret":"%s"},
                      "ticketTypes":[{"id":"%s","name":"Entrée","price":2000,"currency":"XAF","printMode":"INDIVIDUAL","icon":null,"color":null}]}"""
                     .formatted(GATE_ID, GATE_CODE, SECRET, TICKET_TYPE));
+            }
+            case "/api/sales/sales/enroll/v1" -> respond(ex, 200, """
+                    {"deviceId":"d","deviceNo":1,"establishmentId":"e","gateId":"gate-2","label":"Caisse n° 1",
+                     "certificatePem":"CERT","caChainPem":"CHAIN","previousGateId":"%s"}""".formatted(GATE_ID));
             case "/api/sales/sales/sync/transactions" -> {
                 StringBuilder results = new StringBuilder();
                 for (JsonNode e : JSON.readTree(body).get("entries")) {

@@ -7,8 +7,14 @@ export type LoginResponse = {
   fullName: string;
   role: Role;
   establishmentId: string;
+  /** The one allowed gate, when there is exactly one. */
   assignedGateId: string | null;
+  /** Gates where this user may work; empty = every gate. Absent from an older server. */
+  gateIds?: string[];
 };
+
+/** A gate a browser till's cashier may pick at login. */
+export type GateChoice = { id: string; name: string; code: string };
 
 export type BootstrapResponse = {
   establishment: {
@@ -151,6 +157,8 @@ export type AdminUser = {
   fullName: string;
   role: Role;
   assignedGateId: string | null;
+  /** Where this person may work; empty = every gate. */
+  gateIds: string[];
   active: boolean;
 };
 

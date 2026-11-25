@@ -45,10 +45,12 @@ public class LocalAuth {
     private final CentralClient central;
     private final Catalog catalog;
     private final JsonMapper json;
+    private final Meta meta;
     private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder(12);
     private final SecureRandom random = new SecureRandom();
 
-    public LocalAuth(JdbcTemplate jdbc, TransactionTemplate tx, CentralClient central, Catalog catalog, JsonMapper json) {
+    public LocalAuth(JdbcTemplate jdbc, TransactionTemplate tx, CentralClient central, Catalog catalog, JsonMapper json, Meta meta) {
+        this.meta = meta;
         this.jdbc = jdbc;
         this.tx = tx;
         this.central = central;
@@ -57,6 +59,10 @@ public class LocalAuth {
     }
 
     public LoginResult login(String username, String password) {
+        if (meta.get("revoked").isPresent()) {
+            // Revoked by the back office: no work here until the till is enrolled again.
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "DEVICE_REVOKED");
+        }
         if (recentFailures(username) >= MAX_FAILURES) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_ATTEMPTS");
         }
@@ -97,16 +103,26 @@ public class LocalAuth {
         if (!res.ok() || res.body() == null) throw new CentralClient.Unreachable("login answered " + res.status());
         JsonNode body = res.body();
         String token = body.get("token").asString();
-        JsonNode gateNode = body.get("assignedGateId");
-        if (gateNode == null || gateNode.isNull()) {
+        // Where this user may work: listed gates, or [] = every gate. (A central
+        // from before multi-gate users only sends the one assignedGateId.)
+        List<String> allowed = new java.util.ArrayList<>();
+        JsonNode gates = body.get("gateIds");
+        if (gates != null && gates.isArray()) {
+            for (JsonNode g : gates) allowed.add(g.asString());
+        } else if (body.hasNonNull("assignedGateId")) {
+            allowed.add(body.get("assignedGateId").asString());
+        } else {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "NO_GATE_ASSIGNED");
         }
-        String gateId = gateNode.asString();
-        Optional<Catalog.GateInfo> bound = catalog.gate();
-        if (bound.isPresent() && !bound.get().id().equals(gateId)) {
+        // This till's gate: the one it was enrolled for.
+        String tillGate = catalog.gate().map(Catalog.GateInfo::id).or(() -> meta.get("enrolled_gate_id")).orElse(null);
+        if (tillGate == null && allowed.size() != 1) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "NO_GATE_ASSIGNED");
+        if (tillGate != null && !allowed.isEmpty() && !allowed.contains(tillGate)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "OTHER_GATE");
         }
-        CentralClient.Response boot = central.bootstrap(token);
+        // A till not enrolled yet (development) works at the user's one gate.
+        final String gateId = tillGate != null ? tillGate : allowed.getFirst();
+        CentralClient.Response boot = central.bootstrap(token, gateId);
         if (!boot.ok() || boot.body() == null) throw new CentralClient.Unreachable("bootstrap answered " + boot.status());
         String verifier = bcrypt.encode(password);
         tx.executeWithoutResult(s -> {

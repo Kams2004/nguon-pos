@@ -44,8 +44,10 @@ public class CentralClient {
         return post("/api/sales/sales/enroll/v1", null, body);
     }
 
-    public Response bootstrap(String token) {
-        return send(request("/api/catalog/catalog/bootstrap", token).GET().build());
+    /** The till's documents for its gate (the user must be allowed there). */
+    public Response bootstrap(String token, String gateId) {
+        String q = gateId == null ? "" : "?gateId=" + java.net.URLEncoder.encode(gateId, java.nio.charset.StandardCharsets.UTF_8);
+        return send(request("/api/catalog/catalog/bootstrap" + q, token).GET().build());
     }
 
     public Response syncTransactions(String token, Object body) {

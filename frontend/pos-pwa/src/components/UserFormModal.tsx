@@ -6,13 +6,15 @@ import type { AdminGate, AdminUser, Role } from "../lib/api/types";
 import { ROLE_LABELS } from "../lib/format";
 import { useI18n } from "../i18n";
 import { Modal, PasswordInput } from "./ui";
+import { GateChips } from "./GateChips";
 
 const ROLES: Role[] = ["CASHIER", "COORDINATOR", "SUPER_ADMIN"];
 
 /** Same rule as the server (auth-service UserAdminController). Letters, digits, anything. */
 const PASSWORD_MIN = 4;
 
-type FormState = { fullName: string; username: string; password: string; role: Role; gateId: string; active: boolean };
+// gateIds: where this person may work; empty = every gate (new ones too).
+type FormState = { fullName: string; username: string; password: string; role: Role; gateIds: string[]; active: boolean };
 
 /**
  * Create or edit an account. Used by Utilisateurs, and by Portes & caisses
@@ -34,7 +36,6 @@ export function UserFormModal({
   const { t } = useI18n();
   const { session } = useSession();
   const confirm = useConfirm();
-  const activeGates = gates.filter((g) => g.active || (editing !== "new" && g.id === editing.assignedGateId));
   const [form, setForm] = useState<FormState>(() =>
     editing === "new"
       ? {
@@ -42,8 +43,8 @@ export function UserFormModal({
           username: "",
           password: "",
           role: "CASHIER",
-          // One gate, or opened from a gate: nothing to choose.
-          gateId: presetGateId ?? (activeGates.length === 1 ? activeGates[0].id : ""),
+          // Opened from a gate: that gate. Otherwise every gate, to narrow if needed.
+          gateIds: presetGateId ? [presetGateId] : [],
           active: true,
         }
       : {
@@ -51,7 +52,7 @@ export function UserFormModal({
           username: editing.username,
           password: "",
           role: editing.role,
-          gateId: editing.assignedGateId ?? "",
+          gateIds: editing.gateIds ?? (editing.assignedGateId ? [editing.assignedGateId] : []),
           active: editing.active,
         },
   );
@@ -84,7 +85,7 @@ export function UserFormModal({
     if (!ok) return;
     setSaving(true);
     setError(null);
-    const assignedGateId = form.role === "SUPER_ADMIN" ? null : form.gateId || null;
+    const gateIds = form.role === "SUPER_ADMIN" ? [] : form.gateIds;
     try {
       if (isNew) {
         await api.createUser(session.token, {
@@ -92,13 +93,13 @@ export function UserFormModal({
           password: form.password,
           fullName: form.fullName.trim(),
           role: form.role,
-          assignedGateId,
+          gateIds,
         });
       } else {
         await api.updateUser(session.token, editing.id, {
           fullName: form.fullName.trim(),
           role: form.role,
-          assignedGateId,
+          gateIds,
           active: form.active,
           password: form.password || undefined,
         });
@@ -175,26 +176,16 @@ export function UserFormModal({
               ))}
             </select>
           </div>
-          {form.role !== "SUPER_ADMIN" && (
-            <div>
-              <label className="field-label">{t("settings.users.assignedGate")}</label>
-              {/* A cashier sells at one gate: without it they couldn't use any till. */}
-              <select
-                required={form.role === "CASHIER"}
-                value={form.gateId}
-                onChange={(e) => setForm({ ...form, gateId: e.target.value })}
-                className="field"
-              >
-                <option value="">{form.role === "CASHIER" ? t("settings.users.chooseGate") : t("settings.users.noGate")}</option>
-                {activeGates.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
+        {form.role !== "SUPER_ADMIN" && (
+          <GateChips
+            gates={gates}
+            value={form.gateIds}
+            onChange={(gateIds) => setForm({ ...form, gateIds })}
+            label={t("settings.users.gates")}
+            hint={t("settings.users.gatesHint")}
+          />
+        )}
         {!isNew && !isSelf && (
           <label className="flex cursor-pointer items-center gap-2 text-sm">
             <input

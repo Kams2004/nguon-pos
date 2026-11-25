@@ -357,6 +357,19 @@ textarea {
   display: none;
 }
 
+/* The admin sidebar's link list, when it scrolls: a slim light bar on the blue. */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(0 0% 100% / 0.35) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: hsl(0 0% 100% / 0.35);
+}
+
 /* Edge / WebView2 (the Windows till) adds its own "show password" eye and
    clear cross to password fields; our fields have their own eye button. */
 input[type="password"]::-ms-reveal,

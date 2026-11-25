@@ -34,12 +34,15 @@ public class Enrollment {
     private final DeviceIdentity device;
     private final Meta meta;
     private final TransactionTemplate tx;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    public Enrollment(CentralClient central, DeviceIdentity device, Meta meta, TransactionTemplate tx) {
+    public Enrollment(CentralClient central, DeviceIdentity device, Meta meta, TransactionTemplate tx,
+                      org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.central = central;
         this.device = device;
         this.meta = meta;
         this.tx = tx;
+        this.jdbc = jdbc;
     }
 
     public boolean enrolled() {
@@ -67,8 +70,14 @@ public class Enrollment {
         return meta.get("device_no").map(Integer::parseInt);
     }
 
+    /**
+     * First enrollment, or enrolling again after the back office revoked this
+     * till — with a new code, for the same gate or another one (the till keeps
+     * its identity; central knows it by its key).
+     */
     public Map<String, Object> enroll(String code, String label) {
         if (!central.configured()) throw new ResponseStatusException(HttpStatus.CONFLICT, "NO_CENTRAL");
+        if (enrolled()) throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_ENROLLED");
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("deviceId", device.deviceId().toString());
         body.put("code", code.strip().toUpperCase());
@@ -88,7 +97,11 @@ public class Enrollment {
                     reason.isBlank() ? "ENROLLMENT_REFUSED" : reason);
         }
         JsonNode r = res.body();
+        String newGate = r.get("gateId").asString();
+        boolean gateChanged = meta.get("enrolled_gate_id").map(g -> !g.equals(newGate)).orElse(false);
         tx.executeWithoutResult(s -> {
+            if (gateChanged) forgetGate();
+            meta.remove("revoked");
             meta.put("device_cert", r.get("certificatePem").asString());
             meta.put("ca_chain", r.get("caChainPem").asString());
             meta.put("device_no", Integer.toString(r.get("deviceNo").asInt()));
@@ -98,9 +111,31 @@ public class Enrollment {
         return Map.of("deviceNo", r.get("deviceNo").asInt(), "label", r.get("label").asString(), "gateId", r.get("gateId").asString());
     }
 
-    /** Central refused this till's certificate for good (close code 4403). */
+    /**
+     * Central refused this till's certificate (close code 4403): nobody may
+     * keep working here — every open session ends, logins are refused —
+     * until the till is enrolled again.
+     */
     public void markRevoked() {
-        meta.put("revoked", java.time.Instant.now().toString());
+        tx.executeWithoutResult(s -> {
+            meta.put("revoked", java.time.Instant.now().toString());
+            jdbc.update("DELETE FROM local_session");
+        });
+    }
+
+    /**
+     * Moving to another gate: what belonged to the old one goes — its tickets
+     * catalogue and signing key, its cashiers, its tills, where its feed was
+     * read up to — and the new gate's arrive over the live channel. Sales
+     * already made stay in the history.
+     */
+    private void forgetGate() {
+        jdbc.update("DELETE FROM gate_config");
+        jdbc.update("DELETE FROM signing_key");
+        jdbc.update("DELETE FROM local_session");
+        jdbc.update("DELETE FROM user_credential");
+        jdbc.update("DELETE FROM peer");
+        for (String key : new String[]{"catalog_version", "users_version", "feed_cursor"}) meta.remove(key);
     }
 
     static String csr(KeyPair keys) {

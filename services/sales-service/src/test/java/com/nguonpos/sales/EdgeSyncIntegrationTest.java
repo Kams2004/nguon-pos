@@ -178,6 +178,32 @@ class EdgeSyncIntegrationTest {
     }
 
     @Test
+    void aRevokedTillCanBeEnrolledAgainAtAnotherGateButNotByAnotherMachine() throws Exception {
+        Till t = enroll("Caisse mobile");
+        http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/devices/" + t.id + "/revoke"))
+                .header("Authorization", "Bearer " + adminToken()).POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(t.tryConnect()).isFalse();
+
+        // Another machine claiming the same identity: refused.
+        assertThat(enrollRequest(t.id, createCode("", gate), ecKeys()).statusCode()).isEqualTo(409);
+
+        // The same till (same key), with a new code for another gate: back in service there.
+        UUID otherGate = UUID.randomUUID();
+        HttpResponse<String> again = enrollRequest(t.id, createCode("", otherGate), t.keys);
+        assertThat(again.statusCode()).as(again.body()).isEqualTo(200);
+        JsonNode body = JSON.readTree(again.body());
+        assertThat(body.get("gateId").asString()).isEqualTo(otherGate.toString());
+        assertThat(body.get("deviceNo").asInt()).isEqualTo(1);
+        assertThat(body.get("label").asString()).isEqualTo("Caisse n° 1");
+        var row = jdbc.queryForMap("SELECT status, gate_id, revoked_at FROM sales.device WHERE id = ?", t.id);
+        assertThat(row.get("status")).isEqualTo("ACTIVE");
+        assertThat(row.get("gate_id")).isEqualTo(otherGate);
+        assertThat(row.get("revoked_at")).isNull();
+        t.certPem = body.get("certificatePem").asString();
+        assertThat(t.tryConnect()).isTrue();
+    }
+
+    @Test
     void anEnrollmentCodeWorksOnceAndTheChannelNeedsACertificate() throws Exception {
         String code = createCode("Caisse X");
         KeyPair keys = ecKeys();
@@ -440,9 +466,13 @@ class EdgeSyncIntegrationTest {
     }
 
     String createCode(String label) throws Exception {
+        return createCode(label, gate);
+    }
+
+    String createCode(String label, UUID forGate) throws Exception {
         HttpResponse<String> res = http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/devices/enrollment-codes"))
                 .header("Authorization", "Bearer " + adminToken()).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString("{\"gateId\":\"" + gate + "\",\"label\":\"" + label + "\"}")).build(),
+                .POST(HttpRequest.BodyPublishers.ofString("{\"gateId\":\"" + forGate + "\",\"label\":\"" + label + "\"}")).build(),
                 HttpResponse.BodyHandlers.ofString());
         assertThat(res.statusCode()).as(res.body()).isEqualTo(200);
         return JSON.readTree(res.body()).get("code").asString();

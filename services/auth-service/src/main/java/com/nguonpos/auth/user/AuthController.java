@@ -41,7 +41,7 @@ public class AuthController {
                 user.getFullName() + " s'est connecté(e)");
         return new LoginResponse(
                 token, user.getId(), user.getUsername(), user.getFullName(),
-                user.getRole(), user.getEstablishmentId(), user.getAssignedGateId()
+                user.getRole(), user.getEstablishmentId(), user.singleGateId(), user.gateIdList()
         );
     }
 
@@ -61,14 +61,15 @@ public class AuthController {
         var claims = jwtService.parseClaims(token);
         UUID userId = UUID.fromString(claims.get("userId", String.class));
         return userRepository.findById(userId)
-                .map(u -> new MeResponse(u.getId(), u.getUsername(), u.getFullName(), u.getRole(), u.getEstablishmentId(), u.getAssignedGateId()))
+                .map(u -> new MeResponse(u.getId(), u.getUsername(), u.getFullName(), u.getRole(), u.getEstablishmentId(), u.singleGateId(), u.gateIdList()))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // Deliberately not the raw AppUser entity — never serialize passwordHash
     // back out, even though it's a one-way bcrypt hash.
-    public record MeResponse(UUID id, String username, String fullName, Role role, UUID establishmentId, UUID assignedGateId) {
+    public record MeResponse(UUID id, String username, String fullName, Role role, UUID establishmentId, UUID assignedGateId,
+                             java.util.List<UUID> gateIds) {
     }
 
     @ExceptionHandler(BadCredentialsException.class)

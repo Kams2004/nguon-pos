@@ -45,6 +45,7 @@ public class EnrollmentController {
         DeviceRegistry.Enrolled enrolled = registry.enroll(
                 new DeviceRegistry.EnrollRequest(req.deviceId(), req.code(), req.csrPem(), req.label(), req.os(), req.appVersion()));
         sessions.peersChanged(enrolled.gateId()); // the gate's other tills learn about the new one at once
+        if (enrolled.previousGateId() != null) sessions.peersChanged(enrolled.previousGateId()); // …and its old gate, that it left
         return enrolled;
     }
 
