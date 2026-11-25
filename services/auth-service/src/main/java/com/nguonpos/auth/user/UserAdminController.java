@@ -117,13 +117,12 @@ public class UserAdminController {
     }
 
     // Deliberately excludes passwordHash — never serialize it back out.
-    /** gateIds wins; older clients send one assignedGateId. The Super Admin works everywhere: none. */
+    /**
+     * Everyone works at every gate (none listed): a till is fixed to its gate,
+     * a person is not. Gates sent by an older admin screen are ignored.
+     */
     private static java.util.Set<UUID> gatesOf(Role role, List<UUID> gateIds, UUID assignedGateId) {
-        java.util.Set<UUID> out = new java.util.HashSet<>();
-        if (role == Role.SUPER_ADMIN) return out;
-        if (gateIds != null) out.addAll(gateIds);
-        else if (assignedGateId != null) out.add(assignedGateId);
-        return out;
+        return new java.util.HashSet<>();
     }
 
     public record UserSummary(UUID id, String username, String fullName, Role role, UUID assignedGateId, List<UUID> gateIds, boolean active) {

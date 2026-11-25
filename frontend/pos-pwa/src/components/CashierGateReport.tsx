@@ -3,6 +3,7 @@ import type { CashierReport } from "../lib/stats";
 import { formatDateTime, formatMoney, formatTime } from "../lib/format";
 import { locale, useI18n } from "../i18n";
 import { CardHeader } from "./ui";
+import { Pagination, usePaged } from "./Pagination";
 
 /** "19/11/2026 08:55 → 11:30"; the date only once when both are the same day, never on a one-day report. */
 export function periodLabel(first: string, last: string, oneDay = false): string {
@@ -32,6 +33,8 @@ export function CashierGateReport({
 }) {
   const { t } = useI18n();
   const span = (first: string, last: string) => periodLabel(first, last, oneDay);
+  // Pages of cashiers (each with all their gates); back to page 1 when the report changes.
+  const paged = usePaged(report, 10, report.map((c) => c.cashierUserId).join(","));
   const num = (n: number) => n.toLocaleString(locale());
   return (
     <div className="card overflow-hidden">
@@ -61,7 +64,7 @@ export function CashierGateReport({
                 <th className="th">{t("reports.cashierGates.period")}</th>
               </tr>
             </thead>
-            {report.map((c) => (
+            {paged.pageItems.map((c) => (
               <tbody key={c.cashierUserId} className="border-b border-border last:border-0">
                 <tr className="bg-muted/25">
                   <td className="td font-bold text-foreground">
@@ -101,6 +104,15 @@ export function CashierGateReport({
           </table>
         </div>
       )}
+      <Pagination
+        page={paged.page}
+        pages={paged.pages}
+        total={paged.total}
+        size={paged.size}
+        onPage={paged.setPage}
+        onSize={paged.setSize}
+        unit={t("reports.cashierGates.unit")}
+      />
     </div>
   );
 }

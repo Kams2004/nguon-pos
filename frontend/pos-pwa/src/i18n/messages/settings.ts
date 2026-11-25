@@ -267,7 +267,7 @@ export default defineMessages({
 
     // Users
     "settings.users.title": "Utilisateurs",
-    "settings.users.subtitle": "Comptes individuels, rôles et portes où chacun peut travailler",
+    "settings.users.subtitle": "Comptes individuels et rôles — chacun peut travailler à toutes les portes",
     "settings.users.confirmCreateTitle": "Créer cet utilisateur ?",
     "settings.users.confirmCreateMessage": "Le compte {username} ({role}) pourra se connecter immédiatement.",
     "settings.users.confirmEditMessage": "Le compte de {name} sera mis à jour. La modification est tracée dans le journal.",
@@ -282,6 +282,8 @@ export default defineMessages({
     "settings.users.search": "Rechercher un utilisateur…",
     "settings.users.col.role": "Rôle",
     "settings.users.col.gates": "Portes",
+    "settings.users.col.now": "En ce moment",
+    "settings.users.notSignedIn": "Pas connecté(e)",
     "settings.users.col.username": "Identifiant",
     "settings.users.unit": "utilisateurs",
     "settings.users.editTitle": "Modifier {name}",
@@ -303,6 +305,8 @@ export default defineMessages({
     "settings.gates.tills": "Caisses",
     "settings.gates.tillsSummary_one": "{online} / {count} caisse en ligne",
     "settings.gates.tillsSummary_other": "{online} / {count} caisses en ligne",
+    "settings.gates.signedInCount_one": "{count} personne connectée",
+    "settings.gates.signedInCount_other": "{count} personnes connectées",
     "settings.gates.cashierCount_one": "{count} caissier",
     "settings.gates.cashierCount_other": "{count} caissiers",
     "settings.gates.noTill": "Aucune caisse pour l'instant. « Enrôler une caisse » donne le code à saisir sur l'ordinateur de la caisse.",
@@ -342,7 +346,7 @@ export default defineMessages({
 
     // Gates
     "settings.gates.title": "Portes & caisses",
-    "settings.gates.subtitle": "Chaque porte, ses caisses, qui les utilise, et ses caissiers",
+    "settings.gates.subtitle": "Chaque porte, ses caisses et qui y travaille en ce moment",
     "settings.gates.confirmCreateTitle": "Créer cette porte ?",
     "settings.gates.confirmRenameTitle": "Renommer cette porte ?",
     "settings.gates.confirmCreateMessage":
@@ -667,7 +671,7 @@ export default defineMessages({
     "settings.ticketTypes.color": "Colour",
 
     "settings.users.title": "Users",
-    "settings.users.subtitle": "Individual accounts, roles and the gates where each may work",
+    "settings.users.subtitle": "Individual accounts and roles — everyone may work at every gate",
     "settings.users.confirmCreateTitle": "Create this user?",
     "settings.users.confirmCreateMessage": "The account {username} ({role}) will be able to sign in immediately.",
     "settings.users.confirmEditMessage": "{name}'s account will be updated. The change is recorded in the log.",
@@ -682,6 +686,8 @@ export default defineMessages({
     "settings.users.search": "Search users…",
     "settings.users.col.role": "Role",
     "settings.users.col.gates": "Gates",
+    "settings.users.col.now": "Right now",
+    "settings.users.notSignedIn": "Not signed in",
     "settings.users.col.username": "Username",
     "settings.users.unit": "users",
     "settings.users.editTitle": "Edit {name}",
@@ -703,6 +709,8 @@ export default defineMessages({
     "settings.gates.tills": "Tills",
     "settings.gates.tillsSummary_one": "{online} / {count} till online",
     "settings.gates.tillsSummary_other": "{online} / {count} tills online",
+    "settings.gates.signedInCount_one": "{count} person signed in",
+    "settings.gates.signedInCount_other": "{count} people signed in",
     "settings.gates.cashierCount_one": "{count} cashier",
     "settings.gates.cashierCount_other": "{count} cashiers",
     "settings.gates.noTill": 'No till yet. "Enroll a till" gives the code to type on the till\'s computer.',
@@ -740,7 +748,7 @@ export default defineMessages({
     "settings.gates.enrollCodeHint": 'On the till\'s computer, click "Enroll this till" and type this code. Valid until {time}, once.',
 
     "settings.gates.title": "Gates & tills",
-    "settings.gates.subtitle": "Each gate, its tills, who is using them, and its cashiers",
+    "settings.gates.subtitle": "Each gate, its tills and who is working there right now",
     "settings.gates.confirmCreateTitle": "Create this gate?",
     "settings.gates.confirmRenameTitle": "Rename this gate?",
     "settings.gates.confirmCreateMessage":

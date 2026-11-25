@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Clock, DoorOpen, Globe, KeyRound, MonitorSmartphone, Pencil, Plus, ShieldOff, Ticket, UserPlus, Users, X } from "lucide-react";
+import { Clock, DoorOpen, Globe, KeyRound, MonitorSmartphone, Pencil, Plus, ShieldOff, Ticket, Users, X } from "lucide-react";
 import { useLiveRefresh, useSession } from "../../context/SessionContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { api, errorMessage } from "../../lib/api/client";
-import type { AdminGate, AdminTicketType, AdminUser, Device, EnrollmentCode, PendingEnrollment, TerminalStatus } from "../../lib/api/types";
+import type { AdminGate, AdminTicketType, Device, EnrollmentCode, PendingEnrollment, TerminalStatus } from "../../lib/api/types";
 import { formatDateTime, formatTime } from "../../lib/format";
-import { UserFormModal } from "../../components/UserFormModal";
 import { Modal, PageHeader, Pill, RefreshButton, SkeletonCards } from "../../components/ui";
 import { GuideButton } from "../../components/SetupGuide";
 import { useI18n } from "../../i18n";
@@ -27,7 +26,6 @@ type Data = {
   devices: Device[];
   terminals: TerminalStatus[];
   pending: PendingEnrollment[];
-  users: AdminUser[];
   ticketTypes: AdminTicketType[];
 };
 
@@ -48,22 +46,20 @@ export default function Gates() {
   const [codeTouched, setCodeTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [cashierFor, setCashierFor] = useState<AdminGate | null>(null);
   const [enrollFor, setEnrollFor] = useState<AdminGate | null>(null);
   const isSuperAdmin = session?.role === "SUPER_ADMIN";
 
   const load = useCallback(async () => {
     if (!session) return;
     const none = <T,>() => [] as T[];
-    const [gates, devices, terminals, pending, users, ticketTypes] = await Promise.all([
+    const [gates, devices, terminals, pending, ticketTypes] = await Promise.all([
       api.listGates(session.token),
       api.listDevices(session.token).catch(none<Device>),
       api.syncStatus(session.token).catch(none<TerminalStatus>),
       api.listPendingEnrollments(session.token).catch(none<PendingEnrollment>),
-      api.listUsers(session.token).catch(none<AdminUser>),
       api.listTicketTypesAdmin(session.token).catch(none<AdminTicketType>),
     ]);
-    setData({ gates, devices, terminals, pending, users, ticketTypes });
+    setData({ gates, devices, terminals, pending, ticketTypes });
   }, [session]);
 
   useEffect(() => {
@@ -197,7 +193,6 @@ export default function Gates() {
               isSuperAdmin={isSuperAdmin}
               onEdit={() => openEdit(g)}
               onToggle={() => toggleActive(g)}
-              onAddCashier={() => setCashierFor(g)}
               onEnroll={() => setEnrollFor(g)}
               onRevoke={revoke}
               onCancelPending={cancelPending}
@@ -256,19 +251,6 @@ export default function Gates() {
         </Modal>
       )}
 
-      {cashierFor && data && (
-        <UserFormModal
-          editing="new"
-          gates={data.gates}
-          presetGateId={cashierFor.id}
-          onClose={() => setCashierFor(null)}
-          onSaved={() => {
-            setCashierFor(null);
-            load();
-          }}
-        />
-      )}
-
       {enrollFor && data && (
         <EnrollTillModal gate={enrollFor} nextNo={nextTillNo(enrollFor.id, data)} onClose={() => setEnrollFor(null)} onCreated={load} />
       )}
@@ -288,7 +270,6 @@ function GateSection({
   isSuperAdmin,
   onEdit,
   onToggle,
-  onAddCashier,
   onEnroll,
   onRevoke,
   onCancelPending,
@@ -298,7 +279,6 @@ function GateSection({
   isSuperAdmin: boolean;
   onEdit: () => void;
   onToggle: () => void;
-  onAddCashier: () => void;
   onEnroll: () => void;
   onRevoke: (d: Device) => void;
   onCancelPending: (p: PendingEnrollment) => void;
@@ -311,19 +291,14 @@ function GateSection({
   const deviceIds = new Set(data.devices.map((d) => d.id));
   // Browser tills (the web version) currently connected to this gate.
   const browserTills = data.terminals.filter((term) => term.gateId === gate.id && term.online && !deviceIds.has(term.terminalId));
-  // Who may work here: those listed for this gate, and those allowed at every gate.
-  const cashiers = data.users.filter(
-    (u) => u.active && u.role !== "SUPER_ADMIN" && ((u.gateIds ?? []).length === 0 || u.gateIds.includes(gate.id)),
-  );
   const types = data.ticketTypes.filter((tt) => tt.active && (tt.gateIds.length === 0 || tt.gateIds.includes(gate.id))).length;
   const onlineCount = tills.filter((d) => presence.get(d.id)?.online ?? d.online).length;
-  // Who is signed in where, to show it next to each cashier too.
-  const tillOfUser = new Map<string, string>();
-  for (const d of tills) {
-    const p = presence.get(d.id);
-    if (p?.online && p.currentUserId) tillOfUser.set(p.currentUserId, d.label);
-  }
-  for (const b of browserTills) if (b.currentUserId) tillOfUser.set(b.currentUserId, b.deviceLabel ?? t("settings.gates.browserTill"));
+  // People working at this gate right now: signed in on one of its tills.
+  const signedIn =
+    tills.filter((d) => {
+      const p = presence.get(d.id);
+      return (p?.online ?? d.online) && p?.loggedIn && p.currentUserId;
+    }).length + browserTills.filter((b) => b.loggedIn && b.currentUserId).length;
 
   return (
     <section className={`card overflow-hidden ${gate.active ? "" : "opacity-75"}`} aria-labelledby={`gate-${gate.id}`}>
@@ -354,7 +329,7 @@ function GateSection({
               <MonitorSmartphone className="h-3.5 w-3.5" /> {t("settings.gates.tillsSummary", { online: onlineCount, count: tills.length })}
             </span>
             <span className="flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5" /> {t("settings.gates.cashierCount", { count: cashiers.length })}
+              <Users className="h-3.5 w-3.5" /> {t("settings.gates.signedInCount", { count: signedIn })}
             </span>
             <span className="flex items-center gap-1.5">
               <Ticket className="h-3.5 w-3.5" /> {t("settings.gates.typeCount", { count: types })}
@@ -373,9 +348,9 @@ function GateSection({
         )}
       </div>
 
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
-        {/* Tills */}
-        <div className="min-w-0 lg:border-r lg:border-border">
+      <div>
+        {/* Tills, and who is signed in on each right now */}
+        <div className="min-w-0">
           <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
             <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("settings.gates.tills")}</h3>
             {isSuperAdmin && gate.active && (
@@ -504,38 +479,6 @@ function GateSection({
           )}
         </div>
 
-        {/* Cashiers */}
-        <div className="border-t border-border lg:border-t-0">
-          <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
-            <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("settings.gates.cashiers")}</h3>
-            {isSuperAdmin && gate.active && (
-              <button onClick={onAddCashier} className="btn-outline px-3 py-1.5 text-xs">
-                <UserPlus className="h-3.5 w-3.5" /> {t("settings.gates.addCashierShort")}
-              </button>
-            )}
-          </div>
-          {cashiers.length === 0 ? (
-            <p className="px-5 pb-5 text-sm text-muted-foreground">{t("settings.gates.noCashier")}</p>
-          ) : (
-            <ul className="space-y-1 px-3 pb-4">
-              {cashiers.map((u) => {
-                const at = tillOfUser.get(u.id);
-                return (
-                  <li key={u.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
-                    <span className={`h-2 w-2 flex-shrink-0 rounded-full ${at ? "bg-emerald-500" : "bg-border"}`} aria-hidden />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">{u.fullName}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {at ? t("settings.gates.signedInAt", { till: at }) : `@${u.username}`}
-                        {u.role === "COORDINATOR" ? ` · ${t("role.COORDINATOR")}` : ""}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
       </div>
     </section>
   );
