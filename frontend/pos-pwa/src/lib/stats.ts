@@ -149,3 +149,75 @@ export function amountHistogram(transactions: TransactionSummary[]): HistogramBi
   }
   return bins;
 }
+
+/** One cashier's work at one gate, over the chosen period. */
+export type CashierAtGate = {
+  gateId: string;
+  /** Completed sales (cancelled ones are counted apart). */
+  sales: number;
+  tickets: number;
+  amount: number;
+  voided: number;
+  voidedAmount: number;
+  /** Earliest and latest sale there (completed or not): when they worked there. */
+  first: string;
+  last: string;
+};
+
+export type CashierReport = {
+  cashierUserId: string;
+  sales: number;
+  tickets: number;
+  amount: number;
+  voided: number;
+  voidedAmount: number;
+  gates: CashierAtGate[];
+};
+
+/**
+ * Each cashier, and each gate they sold at: what they sold there, what was
+ * cancelled, and when they started and stopped selling there. Cashiers by
+ * amount collected; each one's gates in the order they worked there.
+ */
+export function byCashierAndGate(transactions: TransactionSummary[]): CashierReport[] {
+  const cashiers = new Map<string, Map<string, CashierAtGate>>();
+  for (const tx of transactions) {
+    const gates = cashiers.get(tx.cashierUserId) ?? new Map<string, CashierAtGate>();
+    cashiers.set(tx.cashierUserId, gates);
+    const g = gates.get(tx.gateId) ?? {
+      gateId: tx.gateId,
+      sales: 0,
+      tickets: 0,
+      amount: 0,
+      voided: 0,
+      voidedAmount: 0,
+      first: tx.createdAtClient,
+      last: tx.createdAtClient,
+    };
+    gates.set(tx.gateId, g);
+    if (tx.status === "VOIDED") {
+      g.voided += 1;
+      g.voidedAmount += tx.totalAmount;
+    } else {
+      g.sales += 1;
+      g.amount += tx.totalAmount;
+      g.tickets += tx.lines.reduce((n, l) => n + l.quantity, 0);
+    }
+    if (tx.createdAtClient < g.first) g.first = tx.createdAtClient;
+    if (tx.createdAtClient > g.last) g.last = tx.createdAtClient;
+  }
+  return [...cashiers.entries()]
+    .map(([cashierUserId, gates]) => {
+      const list = [...gates.values()].sort((a, b) => a.first.localeCompare(b.first));
+      return {
+        cashierUserId,
+        sales: list.reduce((n, g) => n + g.sales, 0),
+        tickets: list.reduce((n, g) => n + g.tickets, 0),
+        amount: list.reduce((n, g) => n + g.amount, 0),
+        voided: list.reduce((n, g) => n + g.voided, 0),
+        voidedAmount: list.reduce((n, g) => n + g.voidedAmount, 0),
+        gates: list,
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+}

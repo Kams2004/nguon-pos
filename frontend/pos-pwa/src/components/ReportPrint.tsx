@@ -14,6 +14,15 @@ export type ReportPrintProps = {
   kpis: { label: string; value: string }[];
   byDay: { label: string; value: number; count: number }[];
   sections: { title: string; countLabel: string; rows: Share[] }[];
+  /** Each cashier, and what they sold at each gate they worked at. */
+  cashierGates?: {
+    cashier: string;
+    sales: number;
+    tickets: number;
+    amount: number;
+    voided: number;
+    gates: { gate: string; sales: number; tickets: number; amount: number; voided: number; period: string }[];
+  }[];
   detail: {
     reference: string;
     date: string;
@@ -95,6 +104,33 @@ export function ReportPrint(p: ReportPrintProps) {
           );
         })}
       </div>
+
+      {p.cashierGates && p.cashierGates.length > 0 && (
+        <Section title={t("reports.cashierGates.title")}>
+          <Table
+            head={[
+              t("reports.cashierGates.who"),
+              t("reports.kpi.sales"),
+              t("reports.col.tickets"),
+              t("reports.col.amount"),
+              t("reports.kpi.voids"),
+              t("reports.cashierGates.period"),
+            ]}
+            rows={p.cashierGates.flatMap((c) => [
+              [c.cashier.toUpperCase(), String(c.sales), String(c.tickets), formatMoney(c.amount), c.voided ? String(c.voided) : "—", ""],
+              ...c.gates.map((g) => [
+                `   ${g.gate}`,
+                String(g.sales),
+                String(g.tickets),
+                formatMoney(g.amount),
+                g.voided ? String(g.voided) : "—",
+                g.period,
+              ]),
+            ])}
+            alignRight={[1, 2, 3, 4]}
+          />
+        </Section>
+      )}
 
       <Section title={t("reports.salesDetail", { n: p.detail.length })}>
         <Table

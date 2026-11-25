@@ -3,7 +3,8 @@ import { Ban, Download, Printer, Receipt as ReceiptIcon, ShoppingBag, Wallet } f
 import { useLiveRefresh, useSession } from "../../context/SessionContext";
 import { api } from "../../lib/api/client";
 import type { AdminGate, TerminalStatus, TransactionSummary } from "../../lib/api/types";
-import { ALL_TRANSACTIONS_PAGE_SIZE, amountHistogram, computeStats, hourHistogram } from "../../lib/stats";
+import { ALL_TRANSACTIONS_PAGE_SIZE, amountHistogram, byCashierAndGate, computeStats, hourHistogram } from "../../lib/stats";
+import { CashierGateReport, periodLabel } from "../../components/CashierGateReport";
 import { PAYMENT_LABELS, addDays, dayKey, formatDateTime, formatMoney, startOfDay } from "../../lib/format";
 import { Pagination, usePaged } from "../../components/Pagination";
 import { CardHeader, PageHeader, PageSkeleton, RefreshButton, StatCard } from "../../components/ui";
@@ -122,6 +123,7 @@ export default function Reports() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hours = useMemo(() => hourHistogram(rows), [rows, lang]);
   const amounts = useMemo(() => amountHistogram(rows), [rows]);
+  const cashierGates = useMemo(() => byCashierAndGate(rows), [rows]);
   const paged = usePaged(rows, 25, `${start.getTime()}|${end.getTime()}|${gateId}|${cashierUserId}|${ticketTypeId}`);
 
   if (!session) return null;
@@ -129,6 +131,47 @@ export default function Reports() {
 
   const gateName = (id: string) => gates.find((g) => g.id === id)?.name ?? id.slice(0, 8);
   const rangeLabel = `${start.toLocaleDateString(locale())} — ${addDays(end, -1).toLocaleDateString(locale())}`;
+
+  const downloadCsv = (header: string[], lines: (string | number)[][], file: string) => {
+    const body = lines.map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";"));
+    // BOM + semicolons so Excel (French locale) opens it with accents and columns intact.
+    const blob = new Blob(["\uFEFF" + [header.join(";"), ...body].join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = file;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  // One line per cashier and gate.
+  const exportCashierGatesCsv = () =>
+    downloadCsv(
+      [
+        t("reports.col.cashier"),
+        t("reports.col.gate"),
+        t("reports.kpi.sales"),
+        t("reports.col.tickets"),
+        t("reports.col.amount"),
+        t("reports.kpi.voids"),
+        t("reports.cashierGates.voidedAmount"),
+        t("reports.cashierGates.firstSale"),
+        t("reports.cashierGates.lastSale"),
+      ],
+      cashierGates.flatMap((c) =>
+        c.gates.map((g) => [
+          userName(c.cashierUserId),
+          gateName(g.gateId),
+          g.sales,
+          g.tickets,
+          g.amount,
+          g.voided,
+          g.voidedAmount,
+          formatDateTime(g.first),
+          formatDateTime(g.last),
+        ]),
+      ),
+      t("reports.cashierGates.csvFile", { date: dayKey(start) }),
+    );
 
   const exportCsv = () => {
     const header = [
@@ -213,6 +256,21 @@ export default function Reports() {
           },
           { title: t("reports.reports.byCashier"), countLabel: t("reports.kpi.sales"), rows: byCashier },
         ]}
+        cashierGates={cashierGates.map((c) => ({
+          cashier: userName(c.cashierUserId),
+          sales: c.sales,
+          tickets: c.tickets,
+          amount: c.amount,
+          voided: c.voided,
+          gates: c.gates.map((g) => ({
+            gate: gateName(g.gateId),
+            sales: g.sales,
+            tickets: g.tickets,
+            amount: g.amount,
+            voided: g.voided,
+            period: periodLabel(g.first, g.last),
+          })),
+        }))}
         detail={rows.map((tx) => ({
           reference: tx.referenceNumber,
           date: formatDateTime(tx.createdAtClient),
@@ -398,6 +456,14 @@ export default function Reports() {
             )}
           </div>
         </div>
+
+        <CashierGateReport
+          report={cashierGates}
+          userName={userName}
+          gateName={gateName}
+          oneDay={kind === "daily"}
+          onExport={exportCashierGatesCsv}
+        />
 
         <div className="card overflow-hidden">
           <CardHeader title={t("reports.salesDetail", { n: rows.length })} />

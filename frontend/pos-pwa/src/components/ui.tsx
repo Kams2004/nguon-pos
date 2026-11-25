@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useContext, createContext, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Eye, EyeOff, RefreshCw, Search, X, type LucideIcon } from "lucide-react";
 import { useBranding } from "../context/BrandingContext";
@@ -240,28 +240,44 @@ export function Empty({ children }: { children: ReactNode }) {
 const MODAL_WIDTHS = { md: "max-w-md", lg: "max-w-2xl", xl: "max-w-4xl" } as const;
 
 /** Closes on the ×, on Échap, or on a click in the empty area around it. */
+/**
+ * True while the shared confirmation (ConfirmContext) is shown. A dialog
+ * that asked for it steps aside meanwhile — one dialog on screen, never one
+ * over another — and comes back as it was if the person cancels.
+ */
+export const ConfirmingContext = createContext(false);
+
 export function Modal({
   title,
   onClose,
   children,
   size = "md",
+  isConfirmation = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   size?: keyof typeof MODAL_WIDTHS;
+  /** The confirmation itself (ConfirmContext only). */
+  isConfirmation?: boolean;
 }) {
+  const steppedAside = useContext(ConfirmingContext) && !isConfirmation;
   useEffect(() => {
+    if (steppedAside) return; // Escape belongs to the confirmation for now
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, steppedAside]);
 
   // Rendered at the root of the page, so a dialog never picks up the styles
   // of whatever opened it (a white page banner, the till's blue header…).
   return createPortal(
     <div
-      className="no-print fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-royal-deep/50 p-4 backdrop-blur-sm"
+      // Stepped aside: still mounted (what was typed is kept), just not shown.
+      aria-hidden={steppedAside || undefined}
+      className={`no-print fixed inset-0 z-50 items-center justify-center overflow-y-auto bg-royal-deep/50 p-4 backdrop-blur-sm ${
+        steppedAside ? "hidden" : "flex"
+      }`}
       // mousedown, not click: a text selection dragged from inside the
       // dialog and released outside must not close it.
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}

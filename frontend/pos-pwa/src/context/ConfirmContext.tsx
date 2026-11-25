@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, HelpCircle } from "lucide-react";
-import { Modal } from "../components/ui";
+import { ConfirmingContext, Modal } from "../components/ui";
 import { useI18n } from "../i18n";
 
 type ConfirmOptions = {
@@ -40,9 +40,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const danger = options?.tone === "danger";
   return (
     <ConfirmContext.Provider value={confirm}>
-      {children}
+      {/* A dialog that asked for this confirmation steps aside until it is answered. */}
+      <ConfirmingContext.Provider value={options !== null}>{children}</ConfirmingContext.Provider>
       {options && (
-        <Modal title={options.title} onClose={() => close(false)}>
+        <Modal title={options.title} onClose={() => close(false)} isConfirmation>
           <div className="flex gap-4">
             <div
               className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full ${
