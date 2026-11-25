@@ -7,6 +7,7 @@ import type { AdminGate, TerminalStatus } from "../../lib/api/types";
 import { timeAgo, useNow } from "../../lib/useNow";
 import { PageHeader, Pill, RefreshButton, SkeletonCards, StatCard } from "../../components/ui";
 import { TerminalState } from "../../components/TerminalState";
+import { SessionHistory } from "../../components/SessionHistory";
 import { useI18n } from "../../i18n";
 
 type View = "cards" | "table";
@@ -288,6 +289,8 @@ export default function SyncStatus() {
           </div>
         </div>
       )}
+
+      <SessionHistory gates={gates} gateFilter={gateFilter} />
     </>
   );
 }

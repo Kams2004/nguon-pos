@@ -30,6 +30,7 @@ import type {
   TerminalStatus,
   TransactionSummary,
   GateChoice,
+  TillSession,
 } from "./types";
 import { translate, getLang } from "../../i18n";
 
@@ -222,6 +223,12 @@ export const api = {
     return request(`${SALES_BASE}/sales/admin/sync-status`, {
       headers: authHeader(token),
     });
+  },
+
+  /** Who was signed in on which till, at which gate, from when to when, over [from, to). */
+  tillSessions(token: string, from: string, to: string): Promise<TillSession[]> {
+    const q = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+    return request(`${SALES_BASE}/sales/admin/sync-status/sessions?${q}`, { headers: authHeader(token) });
   },
 
   // ── Admin: catalog ──────────────────────────────────────────────────

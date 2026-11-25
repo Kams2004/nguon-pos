@@ -84,8 +84,9 @@ public class EdgeSyncHandler extends TextWebSocketHandler {
                     frame.path("lan").forEach(a -> lan.add(a.asString("")));
                     sessions.lanAddresses(live, lan);
                 }
-                presence.heartbeat(new HeartbeatRequest(device.id(), device.gateId(), frame.path("pending").asInt(0), device.label()),
-                        ingest.actorClaims(device, user != null ? UUID.fromString(user) : new UUID(0, 0)));
+                HeartbeatRequest beat = new HeartbeatRequest(device.id(), device.gateId(), frame.path("pending").asInt(0), device.label());
+                if (user != null) presence.heartbeat(beat, ingest.actorClaims(device, UUID.fromString(user)));
+                else presence.idle(beat); // nobody signed in on this till right now
             }
             default -> log.debug("Ignored frame from till {}: {}", device.id(), frame.path("t"));
         }

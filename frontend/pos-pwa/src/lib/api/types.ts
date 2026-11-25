@@ -123,6 +123,20 @@ export type TransactionSummary = {
 export type PrintMode = "STANDARD" | "INDIVIDUAL" | "INHERIT_ESTABLISHMENT";
 export type ReceiptMode = "STANDARD" | "INDIVIDUAL_TICKETS" | "CONFIGURABLE_PER_TICKET_TYPE";
 
+/** One cashier's time on one till (Caisses en direct → Historique des connexions). */
+export type TillSession = {
+  id: string;
+  terminalId: string;
+  gateId: string;
+  deviceLabel: string | null;
+  userId: string;
+  userName: string | null;
+  startedAt: string;
+  lastSeenAt: string;
+  /** null: still signed in. */
+  endedAt: string | null;
+};
+
 export type AdminGate = { id: string; name: string; code: string; active: boolean };
 
 export type AdminTicketType = {

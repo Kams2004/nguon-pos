@@ -204,6 +204,37 @@ class EdgeSyncIntegrationTest {
     }
 
     @Test
+    void whoWorkedOnWhichTillAndFromWhenToWhenIsKept() throws Exception {
+        Till t = enroll("Caisse historique");
+        Channel ch = t.connect();
+        ch.send("{\"t\":\"STATUS\",\"pending\":0,\"userId\":\"" + cashier + "\"}");
+        await(() -> jdbc.queryForObject("SELECT COUNT(*) FROM sales.till_session WHERE terminal_id = ? AND ended_at IS NULL", Integer.class, t.id) == 1);
+        ch.send("{\"t\":\"STATUS\",\"pending\":0}"); // the cashier logged out
+        await(() -> jdbc.queryForObject("SELECT COUNT(*) FROM sales.till_session WHERE terminal_id = ? AND ended_at IS NOT NULL", Integer.class, t.id) == 1);
+        ch.send("{\"t\":\"STATUS\",\"pending\":0}"); // still nobody: no new session
+        Thread.sleep(300);
+
+        HttpResponse<String> res = http.send(HttpRequest.newBuilder(URI.create(base() + "/sales/admin/sync-status/sessions"))
+                .header("Authorization", "Bearer " + adminToken()).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(res.statusCode()).as(res.body()).isEqualTo(200);
+        JsonNode mine = null;
+        for (JsonNode s : JSON.readTree(res.body())) if (s.get("terminalId").asString().equals(t.id.toString())) mine = s;
+        assertThat(mine).isNotNull();
+        assertThat(mine.get("userId").asString()).isEqualTo(cashier.toString());
+        assertThat(mine.get("gateId").asString()).isEqualTo(gate.toString());
+        assertThat(mine.get("deviceLabel").asString()).isEqualTo("Caisse historique");
+        assertThat(mine.get("endedAt").isNull()).isFalse();
+        var terminal = jdbc.queryForMap("SELECT logged_in, current_user_id FROM sales.terminal WHERE id = ?", t.id);
+        assertThat(terminal.get("logged_in")).isEqualTo(false);
+        assertThat(terminal.get("current_user_id")).isNull();
+    }
+
+    static void await(java.util.function.BooleanSupplier condition) throws InterruptedException {
+        for (int i = 0; i < 50 && !condition.getAsBoolean(); i++) Thread.sleep(100);
+        assertThat(condition.getAsBoolean()).isTrue();
+    }
+
+    @Test
     void anEnrollmentCodeWorksOnceAndTheChannelNeedsACertificate() throws Exception {
         String code = createCode("Caisse X");
         KeyPair keys = ecKeys();

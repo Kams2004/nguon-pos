@@ -85,10 +85,12 @@ const browserTill: TillBackend = {
       reference: e.referenceNumber ?? null,
     };
   },
-  async todaySales() {
+  async todaySales(session) {
     const entries = await getAllOutboxEntries();
     return entries
+      // The signed-in cashier's own sales only (an older sale without a cashier counts as theirs).
       .filter((e) => e.type === "SALE" && isToday(e.createdAtClient))
+      .filter((e) => !e.cashierUserId || e.cashierUserId === session.userId)
       .map((e) => {
         const p = e.payload as SaleOutboxPayload;
         return {
@@ -158,7 +160,8 @@ const edgeTill: TillBackend = {
     };
   },
   async todaySales(session) {
-    const sales = await edge.recentSales(session.token);
+    // The signed-in cashier's own sales only.
+    const sales = await edge.recentSales(session.token, 500, true);
     return sales
       .filter((s) => isToday(s.createdAt))
       .map((s) => ({
